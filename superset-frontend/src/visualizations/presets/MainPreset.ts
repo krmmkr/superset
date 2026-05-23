@@ -91,6 +91,7 @@ import AgGridTableChartPlugin from '@superset-ui/plugin-chart-ag-grid-table';
 import TimeTableChartPlugin from '../TimeTable';
 import { CustomDatePickerPlugin } from 'plugins/custom_controls/custom_datefilter/src/plugin';
 import { CustomControlsChartPlugin } from 'plugins/custom_controls/custom_filters/src/plugin';
+import EchartsSankeyMultiLevelChartPlugin from 'plugins/plugin-chart-echarts-custom/src/Sankey';
 
 export default class MainPreset extends Preset {
   constructor() {
@@ -217,6 +218,9 @@ export default class MainPreset extends Preset {
         ...agGridTablePlugin,
         new CustomDatePickerPlugin().configure({ key: 'custom_datepicker' }),
         new CustomControlsChartPlugin().configure({ key: 'custom_controls' }),
+        new EchartsSankeyMultiLevelChartPlugin().configure({
+          key: 'sankey_multi_level',
+        }),
       ],
     });
   }
