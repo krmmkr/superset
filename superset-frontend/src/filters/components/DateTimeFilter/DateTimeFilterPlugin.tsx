@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { t } from '@apache-superset/core/translation';
 import { NO_TIME_RANGE, fetchTimeRange, SEPARATOR } from '@superset-ui/core';
-import { styled } from '@apache-superset/core/theme';
+import { styled, useTheme } from '@apache-superset/core/theme';
 import {
   RangePicker,
   Button,
@@ -180,7 +180,7 @@ const PopoverContent = styled.div`
 
     .ant-row { margin-top: 8px; }
     .ant-picker { padding: 4px 17px 4px; border-radius: 4px; }
-    .ant-divider-horizontal { margin: 16px 0; border-color: #2d3134; }
+    .ant-divider-horizontal { margin: 16px 0; border-color: ${({ theme }) => theme.colorBorderSecondary}; }
     .control-anchor-to { margin-top: 16px; }
     .control-anchor-to-datetime { width: 217px; }
   }
@@ -270,7 +270,7 @@ const InlineCalendarContainer = styled.div`
 
   .ant-picker-content th {
     font-size: 11px;
-    color: #52595d;
+    color: ${({ theme }) => theme.colorTextDescription};
     font-weight: 500;
   }
 
@@ -282,7 +282,7 @@ const InlineCalendarContainer = styled.div`
   .ant-picker-cell-in-view.ant-picker-cell-range-start .ant-picker-cell-inner,
   .ant-picker-cell-in-view.ant-picker-cell-range-end .ant-picker-cell-inner {
     background: ${({ theme }) => theme.colorPrimary} !important;
-    color: #fff !important;
+    color: white !important;
   }
   .ant-picker-cell-in-view.ant-picker-cell-today .ant-picker-cell-inner::before {
     border-color: ${({ theme }) => theme.colorPrimary} !important;
@@ -305,8 +305,8 @@ const InlineCalendarContainer = styled.div`
 
 
 const StatusTag = styled.span`
-  background: #00a86b22;
-  color: #00a86b;
+  background: ${({ theme }) => theme.colorSuccessBg};
+  color: ${({ theme }) => theme.colorSuccess};
   font-size: 10px;
   font-weight: 700;
   padding: 2px 6px;
@@ -323,7 +323,7 @@ const StatusTag = styled.span`
     content: '';
     width: 6px;
     height: 6px;
-    background: #00a86b;
+    background: ${({ theme }) => theme.colorSuccess};
     border-radius: 50%;
   }
 `;
@@ -340,10 +340,10 @@ const InputWrapper = styled.div`
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
-    color: ${({ theme }) => theme.colorTextDescription || theme.colorTextTertiary || '#52595d'};
+    color: ${({ theme }) => theme.colorTextDescription || theme.colorTextTertiary};
     font-size: 12px;
     transition: color 0.2s;
-   
+
     &:hover {
       color: ${({ theme }) => theme.colorText};
     }
@@ -357,6 +357,7 @@ const InputWrapper = styled.div`
 
 
 export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
+  const theme = useTheme();
   const {
     setDataMask,
     setHoveredFilter,
@@ -387,6 +388,9 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
   // Bump to re-mount the inline RangePicker after the popover finishes animating in
   const [calendarKey, setCalendarKey] = useState(0);
+  const [defaultPickerValue, setDefaultPickerValue] = useState<
+    [dayjs.Dayjs, dayjs.Dayjs] | undefined
+  >(undefined);
 
 
   const datePickerLocale = useLocale();
@@ -430,14 +434,7 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
   }, [since, until, evalResponse]);
 
 
-  // Determine the default picker view (show the end of the range)
-  const defaultPickerValue: [dayjs.Dayjs, dayjs.Dayjs] | undefined = useMemo(() => {
-    const end = calValue[1] || dayjs();
-    if (end.isValid()) {
-      return [end.subtract(1, 'month'), end];
-    }
-    return undefined;
-  }, [calValue]);
+
 
 
 
@@ -513,7 +510,7 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     return () => {
       isCurrent = false;
     };
-  }, [timeRangeValue, t]);
+  }, [timeRangeValue]);
 
 
   /* ---- Emit filter ---------------------------------------------- */
@@ -565,6 +562,25 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
   function onOpen() {
     const current = (filterState.value as string) || NO_TIME_RANGE;
     setTimeRangeValue(current);
+
+    // Compute defaultPickerValue once upon opening based on current value
+    let endVal: dayjs.Dayjs | null = null;
+
+    if (current && current !== NO_TIME_RANGE && current.includes(SEPARATOR)) {
+      const parts = current.split(SEPARATOR);
+      const e = parts[1]?.trim() || '';
+      if (e && dayjs(e).isValid()) {
+        endVal = dayjs(e);
+      }
+    }
+
+    const end = endVal || dayjs();
+    if (end.isValid()) {
+      setDefaultPickerValue([end.subtract(1, 'month'), end]);
+    } else {
+      setDefaultPickerValue(undefined);
+    }
+
     // Always open on Basic tab so the inline calendar is shown immediately
     setActiveTab('basic');
     setShow(true);
@@ -632,13 +648,30 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
           open
           value={calValue}
           defaultPickerValue={defaultPickerValue}
+          onCalendarChange={(dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) => {
+            if (dates && (dates[0] || dates[1])) {
+              const start = dates[0] ? dates[0].format('YYYY-MM-DD') : '';
+              const end = dates[1] ? dates[1].format('YYYY-MM-DD') : '';
+              setTimeRangeValue(`${start}${SEPARATOR}${end}`);
+              if (dates[0]) {
+                setDefaultPickerValue([dates[0], dates[0].add(1, 'month')]);
+              } else if (dates[1]) {
+                setDefaultPickerValue([dates[1].subtract(1, 'month'), dates[1]]);
+              }
+            } else {
+              setTimeRangeValue(NO_TIME_RANGE);
+              setDefaultPickerValue(undefined);
+            }
+          }}
           onChange={(dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) => {
             if (dates && dates[0] && dates[1]) {
               setTimeRangeValue(
                 `${dates[0].format('YYYY-MM-DD')}${SEPARATOR}${dates[1].format('YYYY-MM-DD')}`,
               );
+              setDefaultPickerValue([dates[0], dates[1]]);
             } else {
               setTimeRangeValue(NO_TIME_RANGE);
+              setDefaultPickerValue(undefined);
             }
           }}
           allowClear={false}
@@ -680,19 +713,73 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
           </InputWrapper>
           <div style={{ marginTop: 2, fontSize: 11, opacity: 0.6 }}>
             {t('Suggested:')}{' '}
-            <a
-              style={{ color: '#00a86b' }}
+            <button
+              type="button"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: theme.colorPrimary,
+                cursor: 'pointer',
+                font: 'inherit',
+                textDecoration: 'none',
+                display: 'inline',
+              }}
               onClick={() => setTimeRangeValue(`7 days ago${SEPARATOR}${until}`)}
             >
               {t('7 days ago')}
-            </a>
+            </button>
             {', '}
-            <a
-              style={{ color: '#00a86b' }}
+            <button
+              type="button"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: theme.colorPrimary,
+                cursor: 'pointer',
+                font: 'inherit',
+                textDecoration: 'none',
+                display: 'inline',
+              }}
               onClick={() => setTimeRangeValue(`30 days ago${SEPARATOR}${until}`)}
             >
               {t('30 days ago')}
-            </a>
+            </button>
+            {', '}
+            <button
+              type="button"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: theme.colorPrimary,
+                cursor: 'pointer',
+                font: 'inherit',
+                textDecoration: 'none',
+                display: 'inline',
+              }}
+              onClick={() => setTimeRangeValue(`45 days ago${SEPARATOR}${until}`)}
+            >
+              {t('45 days ago')}
+            </button>
+            {', '}
+            <button
+              type="button"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: theme.colorPrimary,
+                cursor: 'pointer',
+                font: 'inherit',
+                textDecoration: 'none',
+                display: 'inline',
+              }}
+              onClick={() => setTimeRangeValue(`90 days ago${SEPARATOR}${until}`)}
+            >
+              {t('90 days ago')}
+            </button>
           </div>
         </div>
 
@@ -726,19 +813,56 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
           </InputWrapper>
           <div style={{ marginTop: 2, fontSize: 11, opacity: 0.6 }}>
             {t('Suggested:')}{' '}
-            <a
-              style={{ color: '#00a86b' }}
+            <button
+              type="button"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: theme.colorPrimary,
+                cursor: 'pointer',
+                font: 'inherit',
+                textDecoration: 'none',
+                display: 'inline',
+              }}
               onClick={() => setTimeRangeValue(`${since}${SEPARATOR}now`)}
             >
               {t('now')}
-            </a>
+            </button>
             {', '}
-            <a
-              style={{ color: '#00a86b' }}
+            <button
+              type="button"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: theme.colorPrimary,
+                cursor: 'pointer',
+                font: 'inherit',
+                textDecoration: 'none',
+                display: 'inline',
+              }}
               onClick={() => setTimeRangeValue(`${since}${SEPARATOR}yesterday`)}
             >
               {t('yesterday')}
-            </a>
+            </button>
+            {', '}
+            <button
+              type="button"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: theme.colorPrimary,
+                cursor: 'pointer',
+                font: 'inherit',
+                textDecoration: 'none',
+                display: 'inline',
+              }}
+              onClick={() => setTimeRangeValue(`${since}${SEPARATOR}tomorrow`)}
+            >
+              {t('tomorrow')}
+            </button>
           </div>
         </div>
       </div>
