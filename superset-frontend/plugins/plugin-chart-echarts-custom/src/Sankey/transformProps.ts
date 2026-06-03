@@ -46,12 +46,32 @@ export default function transformProps(
     metric,
     groupby = [],
     sliceId,
-    show_stage_name = true,
-    show_stage_percentage = true,
-    show_node_value = true,
-    show_label_percentage = false,
-    show_link_percentages = true,
+    showStageName = true,
+    showStagePercentage = true,
+    showNodeValue = true,
+    showLabelPercentage = false,
+    showLinkPercentages = true,
   } = formData;
+  const show_stage_name =
+    formData.show_stage_name !== undefined
+      ? formData.show_stage_name
+      : showStageName;
+  const show_stage_percentage =
+    formData.show_stage_percentage !== undefined
+      ? formData.show_stage_percentage
+      : showStagePercentage;
+  const show_node_value =
+    formData.show_node_value !== undefined
+      ? formData.show_node_value
+      : showNodeValue;
+  const show_label_percentage =
+    formData.show_label_percentage !== undefined
+      ? formData.show_label_percentage
+      : showLabelPercentage;
+  const show_link_percentages =
+    formData.show_link_percentages !== undefined
+      ? formData.show_link_percentages
+      : showLinkPercentages;
   const { data } = queriesData[0];
   const colorFn = CategoricalColorNamespace.getScale(colorScheme);
   const metricLabel = getMetricLabel(metric);
@@ -99,6 +119,28 @@ export default function transformProps(
     });
   }
 
+  // stores a map with the total values for each node considering the links
+  const incomingFlows = new Map<string, number>();
+  const outgoingFlows = new Map<string, number>();
+  const allNodeNames = new Set<string>();
+
+  links.forEach(link => {
+    const { source, target, value } = link;
+    allNodeNames.add(source);
+    allNodeNames.add(target);
+    incomingFlows.set(target, (incomingFlows.get(target) || 0) + value);
+    outgoingFlows.set(source, (outgoingFlows.get(source) || 0) + value);
+  });
+
+  const nodeValues = new Map<string, number>();
+
+  allNodeNames.forEach(nodeName => {
+    const totalIncoming = incomingFlows.get(nodeName) || 0;
+    const totalOutgoing = outgoingFlows.get(nodeName) || 0;
+
+    nodeValues.set(nodeName, Math.max(totalIncoming, totalOutgoing));
+  });
+
   const seriesData: NonNullable<SankeySeriesOption['data']> = Array.from(
     set,
   ).map(name => {
@@ -125,28 +167,6 @@ export default function transformProps(
         formatter: () => displayName,
       },
     };
-  });
-
-  // stores a map with the total values for each node considering the links
-  const incomingFlows = new Map<string, number>();
-  const outgoingFlows = new Map<string, number>();
-  const allNodeNames = new Set<string>();
-
-  links.forEach(link => {
-    const { source, target, value } = link;
-    allNodeNames.add(source);
-    allNodeNames.add(target);
-    incomingFlows.set(target, (incomingFlows.get(target) || 0) + value);
-    outgoingFlows.set(source, (outgoingFlows.get(source) || 0) + value);
-  });
-
-  const nodeValues = new Map<string, number>();
-
-  allNodeNames.forEach(nodeName => {
-    const totalIncoming = incomingFlows.get(nodeName) || 0;
-    const totalOutgoing = outgoingFlows.get(nodeName) || 0;
-
-    nodeValues.set(nodeName, Math.max(totalIncoming, totalOutgoing));
   });
 
   const tooltipFormatter = (params: CallbackDataParams) => {
@@ -196,15 +216,17 @@ export default function transformProps(
   };
 
   const echartOptions: EChartsOption = {
-    series: {
-      animation: false,
-      data: seriesData,
-      lineStyle: {
-        color: 'source',
+    series: [
+      {
+        animation: false,
+        data: seriesData,
+        lineStyle: {
+          color: 'source',
+        },
+        links,
+        type: 'sankey',
       },
-      links,
-      type: 'sankey',
-    },
+    ],
     tooltip: {
       ...getDefaultTooltip(refs),
       formatter: tooltipFormatter,

@@ -32,6 +32,11 @@ export type SankeyFormData = QueryFormData & {
   show_node_value?: boolean;
   show_label_percentage?: boolean;
   show_link_percentages?: boolean;
+  showStageName?: boolean;
+  showStagePercentage?: boolean;
+  showNodeValue?: boolean;
+  showLabelPercentage?: boolean;
+  showLinkPercentages?: boolean;
 };
 
 export interface SankeyChartProps extends BaseChartProps<SankeyFormData> {
