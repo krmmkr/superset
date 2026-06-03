@@ -92,6 +92,7 @@
     { "path": "./plugins/legacy-preset-chart-deckgl" },
     { "path": "./plugins/legacy-preset-chart-nvd3" },
     { "path": "./plugins/plugin-chart-ag-grid-table" },
+    { "path": "./plugins/plugin-ag-grid-table-custom" },
     { "path": "./plugins/plugin-chart-cartodiagram" },
     { "path": "./plugins/plugin-chart-echarts" },
     { "path": "./plugins/plugin-chart-handlebars" },

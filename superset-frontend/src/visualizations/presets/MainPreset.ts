@@ -88,10 +88,12 @@ import { PivotTableChartPlugin as PivotTableChartPluginV2 } from '@superset-ui/p
 import { HandlebarsChartPlugin } from '@superset-ui/plugin-chart-handlebars';
 import { ChartCustomizationPlugins, FilterPlugins } from 'src/constants';
 import AgGridTableChartPlugin from '@superset-ui/plugin-chart-ag-grid-table';
+import AgGridTableCustomChartPlugin from 'plugins/plugin-ag-grid-table-custom/src';
 import TimeTableChartPlugin from '../TimeTable';
 import { CustomDatePickerPlugin } from 'plugins/custom_controls/custom_datefilter/src/plugin';
 import { CustomControlsChartPlugin } from 'plugins/custom_controls/custom_filters/src/plugin';
 import EchartsSankeyMultiLevelChartPlugin from 'plugins/plugin-chart-echarts-custom/src/Sankey';
+import EchartsCalendarHeatmapChartPlugin from 'plugins/plugin-chart-echarts-custom/src/CalendarChart1/src';
 
 export default class MainPreset extends Preset {
   constructor() {
@@ -106,7 +108,10 @@ export default class MainPreset extends Preset {
       : [];
 
     const agGridTablePlugin = isFeatureEnabled(FeatureFlag.AgGridTableEnabled)
-      ? [new AgGridTableChartPlugin().configure({ key: VizType.TableAgGrid })]
+      ? [
+          new AgGridTableChartPlugin().configure({ key: VizType.TableAgGrid }),
+          new AgGridTableCustomChartPlugin().configure({ key: 'ag_grid_table_custom' }),
+        ]
       : [];
 
     super({
@@ -220,6 +225,9 @@ export default class MainPreset extends Preset {
         new CustomControlsChartPlugin().configure({ key: 'custom_controls' }),
         new EchartsSankeyMultiLevelChartPlugin().configure({
           key: 'sankey_multi_level',
+        }),
+        new EchartsCalendarHeatmapChartPlugin().configure({
+          key: 'calendar_heatmap_custom',
         }),
       ],
     });
