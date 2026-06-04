@@ -35,6 +35,13 @@ import { getPercentFormatter } from '../utils/formatters';
 type Link = { source: string; target: string; value: number };
 type EChartsOption = ComposeOption<SankeySeriesOption>;
 
+const isNullValue = (val: any): boolean =>
+  val === undefined ||
+  val === null ||
+  String(val).trim() === '' ||
+  String(val) === 'null' ||
+  String(val) === 'undefined';
+
 export default function transformProps(
   chartProps: SankeyChartProps,
 ): SankeyTransformedProps {
@@ -51,6 +58,10 @@ export default function transformProps(
     showNodeValue = true,
     showLabelPercentage = false,
     showLinkPercentages = true,
+    showLabelPercentageType = 'stage',
+    showWholePercentage = true,
+    showStageTotal = true,
+    showOverallTotal = true,
   } = formData;
   const show_stage_name =
     formData.show_stage_name !== undefined
@@ -72,6 +83,23 @@ export default function transformProps(
     formData.show_link_percentages !== undefined
       ? formData.show_link_percentages
       : showLinkPercentages;
+  const show_label_percentage_type =
+    formData.show_label_percentage_type !== undefined
+      ? formData.show_label_percentage_type
+      : showLabelPercentageType;
+  const show_whole_percentage =
+    formData.show_whole_percentage !== undefined
+      ? formData.show_whole_percentage
+      : showWholePercentage;
+  const show_stage_total =
+    formData.show_stage_total !== undefined
+      ? formData.show_stage_total
+      : showStageTotal;
+  const show_overall_total =
+    formData.show_overall_total !== undefined
+      ? formData.show_overall_total
+      : showOverallTotal;
+
   const { data } = queriesData[0];
   const colorFn = CategoricalColorNamespace.getScale(colorScheme);
   const metricLabel = getMetricLabel(metric);
@@ -82,6 +110,10 @@ export default function transformProps(
   const set = new Set<string>();
   const columns = groupby.map(col => getColumnLabel(col));
   const stageTotals = new Array(columns.length).fill(0);
+  const overallTotal = data.reduce(
+    (sum, datum) => sum + ((datum[metricLabel] as number) || 0),
+    0,
+  );
 
   if (columns.length >= 2) {
     const linkMap = new Map<string, number>();
@@ -90,17 +122,22 @@ export default function transformProps(
       const value = (datum[metricLabel] as number) || 0;
       for (let i = 0; i < columns.length; i += 1) {
         const val = datum[columns[i]];
-        if (val !== undefined && val !== null && String(val).trim() !== '') {
+        if (!isNullValue(val)) {
           stageTotals[i] += value;
         }
       }
       for (let i = 0; i < columns.length - 1; i += 1) {
         const sourceCol = columns[i];
         const targetCol = columns[i + 1];
-        const sourceVal = String(datum[sourceCol]);
-        const targetVal = String(datum[targetCol]);
-        const sourceName = `${sourceVal} (stage ${i})`;
-        const targetName = `${targetVal} (stage ${i + 1})`;
+        const sourceVal = datum[sourceCol];
+        const targetVal = datum[targetCol];
+
+        if (isNullValue(sourceVal) || isNullValue(targetVal)) {
+          continue;
+        }
+
+        const sourceName = `${String(sourceVal)} (stage ${i})`;
+        const targetName = `${String(targetVal)} (stage ${i + 1})`;
 
         const linkKey = `${sourceName} \u0000 ${targetName}`;
         linkMap.set(linkKey, (linkMap.get(linkKey) || 0) + value);
@@ -151,8 +188,24 @@ export default function transformProps(
         const stageIndex = parseInt(match[1], 10);
         const stageTotal = stageTotals[stageIndex];
         const val = nodeValues.get(name) || 0;
-        if (stageTotal > 0) {
-          displayName = `${displayName} (${percentFormatter.format(val / stageTotal)})`;
+
+        let percentStr = '';
+        if (show_label_percentage_type === 'stage' && stageTotal > 0) {
+          percentStr = percentFormatter.format(val / stageTotal);
+        } else if (show_label_percentage_type === 'whole' && overallTotal > 0) {
+          percentStr = percentFormatter.format(val / overallTotal);
+        } else if (show_label_percentage_type === 'both') {
+          const stagePercent =
+            stageTotal > 0 ? percentFormatter.format(val / stageTotal) : '-';
+          const wholePercent =
+            overallTotal > 0
+              ? percentFormatter.format(val / overallTotal)
+              : '-';
+          percentStr = `${stagePercent} / ${wholePercent}`;
+        }
+
+        if (percentStr) {
+          displayName = `${displayName} (${percentStr})`;
         }
       }
     }
@@ -209,6 +262,18 @@ export default function transformProps(
             'Stage %',
             percentFormatter.format(value / stageTotal),
           ]);
+        }
+        if (show_whole_percentage && overallTotal > 0) {
+          rows.push([
+            'Percent of Whole',
+            percentFormatter.format(value / overallTotal),
+          ]);
+        }
+        if (show_stage_total && stageTotal > 0) {
+          rows.push(['Stage Total', valueFormatter.format(stageTotal)]);
+        }
+        if (show_overall_total && overallTotal > 0) {
+          rows.push(['Overall Total', valueFormatter.format(overallTotal)]);
         }
       }
     }

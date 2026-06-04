@@ -1,5 +1,5 @@
 {
-  "name": "@superset-ui/plugin-chart-ag-grid-table",
+  "name": "@superset-ui/plugin-chart-ag-grid-table-custom",
   "version": "0.20.3",
   "description": "Superset Chart - Table",
   "keywords": [

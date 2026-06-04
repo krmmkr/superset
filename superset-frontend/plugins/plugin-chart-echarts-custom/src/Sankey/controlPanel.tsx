@@ -20,6 +20,7 @@ import { t } from '@apache-superset/core/translation';
 import { validateNonEmpty } from '@superset-ui/core';
 import {
   ControlPanelConfig,
+  ControlPanelsContainerProps,
   dndGroupByControl,
 } from '@superset-ui/chart-controls';
 
@@ -67,6 +68,25 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'show_label_percentage_type',
+            config: {
+              type: 'SelectControl',
+              label: t('Label Percentage Type'),
+              default: 'stage',
+              choices: [
+                ['stage', t('Percentage of Stage')],
+                ['whole', t('Percentage of Whole Data')],
+                ['both', t('Both')],
+              ],
+              renderTrigger: true,
+              description: t('Choose whether to display percentage of stage, percentage of whole data, or both next to the label.'),
+              visibility: ({ controls }: ControlPanelsContainerProps) =>
+                Boolean(controls?.show_label_percentage?.value),
+            },
+          },
+        ],
       ],
     },
     {
@@ -94,6 +114,42 @@ const config: ControlPanelConfig = {
               default: true,
               renderTrigger: true,
               description: t("Show the node's percentage of the total flow for that stage."),
+            },
+          },
+        ],
+        [
+          {
+            name: 'show_whole_percentage',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Show Percent of Whole Data'),
+              default: true,
+              renderTrigger: true,
+              description: t("Show the node's percentage of the total flow for the whole data."),
+            },
+          },
+        ],
+        [
+          {
+            name: 'show_stage_total',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Show Stage Total Value'),
+              default: true,
+              renderTrigger: true,
+              description: t('Show the total value of the stage in the tooltip.'),
+            },
+          },
+        ],
+        [
+          {
+            name: 'show_overall_total',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Show Overall Total Value'),
+              default: true,
+              renderTrigger: true,
+              description: t('Show the overall total value of the dataset in the tooltip.'),
             },
           },
         ],
