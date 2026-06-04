@@ -49,9 +49,6 @@ export interface S2TableFormData extends QueryFormData {
   crossfilterColumns: QueryFormColumn[];
 
   advancedS2Options?: string;
-  columnHeaderHeight?: string;
-  rowCellHeight?: string;
-  defaultColumnWidth?: string;
 }
 
 export interface S2TableChartProps extends ChartProps {
