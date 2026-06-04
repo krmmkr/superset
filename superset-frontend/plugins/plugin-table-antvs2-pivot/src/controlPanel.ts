@@ -147,6 +147,42 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'column_header_height',
+            config: {
+              type: 'TextControl',
+              label: t('Column Header Height'),
+              description: t('Height of the column header cells in pixels (default: 48).'),
+              default: '48',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'row_cell_height',
+            config: {
+              type: 'TextControl',
+              label: t('Row Cell Height'),
+              description: t('Height of the row/data cells in pixels (default: 36).'),
+              default: '36',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'default_column_width',
+            config: {
+              type: 'TextControl',
+              label: t('Default Column Width'),
+              description: t('Default width for columns in pixels. Leave empty for auto layout.'),
+              default: '',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
             name: 'show_sort_controls',
             config: {
               type: 'CheckboxControl',

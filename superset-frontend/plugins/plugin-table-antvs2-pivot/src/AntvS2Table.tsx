@@ -22,6 +22,7 @@ import { setLang, getPalette } from '@antv/s2';
 import '@antv/s2-react/dist/style.min.css';
 import { DataMask } from '@superset-ui/core';
 import { merge } from 'lodash';
+import { useTheme, useThemeMode } from '@apache-superset/core/theme';
 import { S2TableTransformedProps } from './types';
 
 setLang('en_US');
@@ -38,7 +39,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     formData,
     s2DataConfig,
     s2Options,
-    s2Theme,
     setDataMask,
     emitCrossFilters,
     crossfilterColumns,
@@ -75,9 +75,19 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
 
   const clearAllSorts = useCallback(() => setSortEntries([]), []);
 
-  // Pre-sort data by all sort entries (first entry = primary sort)
+  // Pre-sort data by all sort entries (first entry = primary sort) and attach sortParams for S2 header sort icons
   const sortedDataCfg = useMemo(() => {
-    if (sortEntries.length === 0) return s2DataConfig;
+    const sortParams = sortEntries.map(entry => ({
+      sortFieldId: entry.field,
+      sortMethod: entry.direction,
+    }));
+
+    const baseCfg = {
+      ...s2DataConfig,
+      sortParams,
+    };
+
+    if (sortEntries.length === 0) return baseCfg;
 
     const sorted = [...s2DataConfig.data].sort((a: any, b: any) => {
       for (const { field, direction } of sortEntries) {
@@ -99,7 +109,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       return 0;
     });
 
-    return { ...s2DataConfig, data: sorted };
+    return { ...baseCfg, data: sorted };
   }, [s2DataConfig, sortEntries, metricCols]);
 
   // ── Cross-filtering (data & row cell clicks only) ──
@@ -139,102 +149,284 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     [emitCrossFilters, setDataMask, crossfilterColumns, groupby],
   );
 
+  // ── Column Header sorting on click ──
+  const handleColCellClick = useCallback(
+    (cellItem: any) => {
+      const meta = cellItem?.viewMeta || cellItem?.meta;
+      if (!meta || !meta.field) return;
+      const clickedField = meta.field;
+
+      setSortEntries(prev => {
+        const existingIdx = prev.findIndex(e => e.field === clickedField);
+        if (existingIdx === -1) {
+          // Single-column sort: clear others and set ASC
+          return [{ field: clickedField, direction: 'ASC' }];
+        }
+        const existing = prev[existingIdx];
+        if (existing.direction === 'ASC') {
+          // Toggle to DESC
+          return [{ field: clickedField, direction: 'DESC' }];
+        }
+        // Toggle to None (clear sort)
+        return [];
+      });
+    },
+    [],
+  );
+
   // ── Theme ────────────────────────────────────
-  const textColor = s2Theme?.colorText || '#262626';
-  const bgColor = s2Theme?.colorBgContainer || '#ffffff';
+  const theme = useTheme();
+  const isDarkMode = useThemeMode();
+
+  const textColor = theme?.colorText || '#262626';
+  const bgColor = theme?.colorBgContainer || '#ffffff';
+  const isDark = isDarkMode;
   const headerBgColor =
-    s2Theme?.colorBgLayout || s2Theme?.colorFillAlter || '#fafafa';
-  const borderColor =
-    s2Theme?.colorBorderSecondary || s2Theme?.colorBorder || '#f0f0f0';
-  const hoverBgColor =
-    s2Theme?.colorBgTextHover || s2Theme?.colorFillAlter || '#f5f5f5';
+    theme?.colorBgLayout || theme?.colorFillAlter || '#fafafa';
+  const borderColor = isDark
+    ? theme?.colorBorderSecondary || theme?.colorBorder || '#303030'
+    : theme?.colorBorderSecondary || theme?.colorBorder || '#f0f0f0';
+  const hoverBgColor = isDark
+    ? theme?.colorFillContentHover || 'rgba(255, 255, 255, 0.08)'
+    : theme?.colorBgTextHover || theme?.colorFillAlter || '#f5f5f5';
   const headerTextColor =
-    s2Theme?.colorTextHeading || s2Theme?.colorText || '#262626';
+    theme?.colorTextHeading || theme?.colorText || '#262626';
 
   const totalText = headerTextColor;
   const totalFontWeight = 700;
 
   const isDefaultTheme = !formData.theme || formData.theme === 'default';
 
-  const baseThemeCfg: any = {
-    name: formData.theme || 'default',
-    theme: isDefaultTheme
-      ? {
-          background: { color: bgColor },
-          splitLine: {
-            horizontalBorderColor: borderColor,
-            verticalBorderColor: borderColor,
-            horizontalBorderColorOpacity: 1,
-            verticalBorderColorOpacity: 1,
-          },
-          dataCell: {
-            cell: {
-              backgroundColor: bgColor,
-              crossBackgroundColor: hoverBgColor,
-              interactionState: {
-                hover: { backgroundColor: hoverBgColor },
-              },
-            },
-            text: { fill: textColor },
-            bolderText: { fill: totalText, fontWeight: totalFontWeight },
-            measureText: { fill: textColor },
-          },
-          cornerCell: {
-            cell: { backgroundColor: headerBgColor },
-            text: { fill: headerTextColor, fontWeight: 'bold' },
-            bolderText: { fill: headerTextColor },
-            measureText: { fill: headerTextColor },
-          },
-          rowCell: {
-            cell: { backgroundColor: bgColor },
-            text: { fill: textColor },
-            bolderText: { fill: totalText, fontWeight: totalFontWeight },
-            measureText: { fill: textColor },
-          },
-          colCell: {
-            cell: { backgroundColor: headerBgColor },
-            text: { fill: headerTextColor, fontWeight: 'bold' },
-            bolderText: { fill: headerTextColor },
-            measureText: { fill: headerTextColor },
-          },
-          scrollBar: {
-            thumbColor:
-              s2Theme?.colorTextSecondary ||
-              s2Theme?.colorTextTertiary ||
-              'rgba(0,0,0,0.35)',
-            thumbHoverColor: s2Theme?.colorText || 'rgba(0,0,0,0.5)',
-            trackColor:
-              s2Theme?.colorFillSecondary ||
-              s2Theme?.colorBgLayout ||
-              'rgba(0,0,0,0.05)',
-            size: 8,
-            hoverSize: 12,
-            lineCap: 'round',
-          },
-        }
-      : {},
-  };
+  const {
+    sheetType = 'pivot',
+    adaptive,
+    loading,
+    showPagination,
+    themeCfg: advThemeCfg,
+    theme: advTheme,
+    palette: advPalette,
+  } = advancedS2OptionsObj || {};
 
   const customThemeCfg = useMemo(() => {
-    const advThemeCfg = advancedS2OptionsObj?.themeCfg || {};
-    const merged = merge({}, baseThemeCfg, advThemeCfg);
+    const baseThemeCfg: any = {
+      name: formData.theme || 'default',
+      theme: isDefaultTheme
+        ? {
+            background: { color: bgColor },
+            splitLine: {
+              horizontalBorderColor: borderColor,
+              verticalBorderColor: borderColor,
+              horizontalBorderColorOpacity: isDark ? 0.6 : 1,
+              verticalBorderColorOpacity: isDark ? 0.6 : 1,
+            },
+            dataCell: {
+              cell: {
+                backgroundColor: bgColor,
+                crossBackgroundColor: hoverBgColor,
+                horizontalBorderColor: borderColor,
+                verticalBorderColor: borderColor,
+                interactionState: {
+                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                },
+              },
+              text: { fill: textColor, textAlign: 'center' },
+              bolderText: { fill: totalText, fontWeight: totalFontWeight, textAlign: 'center' },
+              measureText: { fill: textColor, textAlign: 'center' },
+            },
+            cornerCell: {
+              cell: {
+                backgroundColor: headerBgColor,
+                horizontalBorderColor: borderColor,
+                verticalBorderColor: borderColor,
+                interactionState: {
+                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                },
+              },
+              text: { fill: headerTextColor, fontWeight: 'bold' },
+              bolderText: { fill: headerTextColor },
+              measureText: { fill: headerTextColor },
+            },
+            rowCell: {
+              cell: {
+                backgroundColor: bgColor,
+                horizontalBorderColor: borderColor,
+                verticalBorderColor: borderColor,
+                interactionState: {
+                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                },
+              },
+              text: { fill: textColor },
+              bolderText: { fill: totalText, fontWeight: totalFontWeight },
+              measureText: { fill: textColor },
+            },
+            colCell: {
+              cell: {
+                backgroundColor: headerBgColor,
+                horizontalBorderColor: borderColor,
+                verticalBorderColor: borderColor,
+                interactionState: {
+                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                },
+              },
+              text: { fill: headerTextColor, fontWeight: 'bold', textAlign: 'center' },
+              bolderText: { fill: headerTextColor, textAlign: 'center' },
+              measureText: { fill: headerTextColor, textAlign: 'center' },
+            },
+            scrollBar: {
+              thumbColor:
+                theme?.colorTextSecondary ||
+                theme?.colorTextTertiary ||
+                'rgba(0,0,0,0.35)',
+              thumbHoverColor: theme?.colorText || 'rgba(0,0,0,0.5)',
+              trackColor:
+                theme?.colorFillSecondary ||
+                theme?.colorBgLayout ||
+                'rgba(0,0,0,0.05)',
+              size: 8,
+              hoverSize: 12,
+              lineCap: 'round',
+            },
+          }
+        : {},
+    };
 
-    // Ensure S2 always has a built-in palette to fall back on if `name` is overriden.
-    // Doing this safely natively allows `merged.name` to be recognized by S2's getTheme engine!
-    merged.palette =
-      advThemeCfg.palette || getPalette(merged.name || 'default');
+    const userOptions = (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
+    const finalAdvThemeCfg = advThemeCfg || userOptions.themeCfg || {};
+    const merged = merge({}, baseThemeCfg, finalAdvThemeCfg);
+
+    const activeTheme = merge({}, advTheme || userOptions.theme || finalAdvThemeCfg.theme || {});
+    const themeKeys = ['background', 'splitLine', 'dataCell', 'rowCell', 'colCell', 'cornerCell', 'scrollBar', 'cell'];
+
+    // Auto-promote keys from root, root.options, themeCfg or themeCfg.theme to merged.theme
+    themeKeys.forEach(key => {
+      if (advancedS2OptionsObj && advancedS2OptionsObj[key]) {
+        activeTheme[key] = merge({}, activeTheme[key] || {}, advancedS2OptionsObj[key]);
+      }
+      if (userOptions && userOptions[key]) {
+        activeTheme[key] = merge({}, activeTheme[key] || {}, userOptions[key]);
+      }
+      if (finalAdvThemeCfg[key]) {
+        activeTheme[key] = merge({}, activeTheme[key] || {}, finalAdvThemeCfg[key]);
+      }
+    });
+
+    if (Object.keys(activeTheme).length > 0) {
+      merged.theme = merge({}, merged.theme || {}, activeTheme);
+    }
+
+    const activePalette = advPalette || userOptions.palette || finalAdvThemeCfg.palette;
+    if (activePalette) {
+      merged.palette = activePalette;
+    } else {
+      merged.palette = getPalette(merged.name || 'default');
+    }
 
     return merged;
-  }, [baseThemeCfg, advancedS2OptionsObj, formData.theme]);
+  }, [
+    bgColor,
+    borderColor,
+    textColor,
+    hoverBgColor,
+    headerBgColor,
+    headerTextColor,
+    isDark,
+    theme,
+    formData.theme,
+    advThemeCfg,
+    advTheme,
+    advPalette,
+    totalText,
+    totalFontWeight,
+    isDefaultTheme,
+    advancedS2OptionsObj,
+  ]);
 
   // Conditional background custom rules + JSON overrides
   const optionsWithStyles = useMemo(() => {
     const baseOptions = { ...s2Options };
 
-    // Deep merge advanced options directly on top (excluding themeCfg since we applied it above)
-    const { themeCfg, ...restAdvancedOptions } = advancedS2OptionsObj || {};
-    return merge({}, baseOptions, restAdvancedOptions);
+    // Deep merge advanced options directly on top (excluding theme settings and top-level props)
+    const {
+      sheetType: ignoredSheetType,
+      adaptive: ignoredAdaptive,
+      loading: ignoredLoading,
+      showPagination: ignoredShowPagination,
+      themeCfg: ignoredThemeCfg,
+      theme: ignoredTheme,
+      palette: ignoredPalette,
+      background: ignoredBackground,
+      splitLine: ignoredSplitLine,
+      dataCell: ignoredDataCell,
+      rowCell: ignoredRowCell,
+      colCell: ignoredColCell,
+      cornerCell: ignoredCornerCell,
+      scrollBar: ignoredScrollBar,
+      cell: ignoredCell,
+      options: ignoredOptions,
+      ...restOptions
+    } = advancedS2OptionsObj || {};
+    
+    const userOptions = (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
+    const finalOptions = merge({}, baseOptions, restOptions, userOptions);
+
+    // Promote layout/style keys from root of advancedS2OptionsObj or nested options to style block
+    const styleKeys = ['colCfg', 'rowCfg', 'cellCfg', 'layoutWidthType', 'showSeriesNumber'];
+    styleKeys.forEach(key => {
+      if (advancedS2OptionsObj && advancedS2OptionsObj[key]) {
+        finalOptions.style = finalOptions.style || {};
+        finalOptions.style[key] = merge({}, finalOptions.style[key] || {}, advancedS2OptionsObj[key]);
+      }
+      if (userOptions && userOptions[key]) {
+        finalOptions.style = finalOptions.style || {};
+        finalOptions.style[key] = merge({}, finalOptions.style[key] || {}, userOptions[key]);
+      }
+    });
+
+    // Also support direct rowHeight / colHeight / cellHeight overrides from root or nested options
+    if (advancedS2OptionsObj) {
+      const colHeight = advancedS2OptionsObj.colHeight ?? userOptions.colHeight;
+      if (colHeight !== undefined) {
+        finalOptions.style = finalOptions.style || {};
+        finalOptions.style.colCfg = finalOptions.style.colCfg || {};
+        finalOptions.style.colCfg.height = colHeight;
+      }
+      const rowHeight = advancedS2OptionsObj.rowHeight ?? userOptions.rowHeight;
+      if (rowHeight !== undefined) {
+        finalOptions.style = finalOptions.style || {};
+        finalOptions.style.rowCfg = finalOptions.style.rowCfg || {};
+        finalOptions.style.rowCfg.height = rowHeight;
+      }
+      const cellHeight = advancedS2OptionsObj.cellHeight ?? userOptions.cellHeight;
+      if (cellHeight !== undefined) {
+        finalOptions.style = finalOptions.style || {};
+        finalOptions.style.cellCfg = finalOptions.style.cellCfg || {};
+        finalOptions.style.cellCfg.height = cellHeight;
+      }
+    }
+
+    return finalOptions;
   }, [s2Options, advancedS2OptionsObj]);
+
+  // Generate a key to force SheetComponent remount when options or theme changes
+  const sheetKey = useMemo(() => {
+    return [
+      width,
+      height,
+      isDark ? 'dark' : 'light',
+      formData.theme || 'default',
+      formData.advancedS2Options || '',
+      formData.tableMode || 'grid',
+    ].join('_');
+  }, [width, height, isDark, formData.theme, formData.advancedS2Options, formData.tableMode]);
+
 
   const controlBarHeight = showSortControls ? 32 : 0;
 
@@ -357,11 +549,20 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     >
       {showSortControls && sortBar}
       {React.createElement(SheetComponent as any, {
+        key: sheetKey,
+        sheetType,
+        adaptive,
+        loading,
+        showPagination,
         dataCfg: sortedDataCfg,
         options: { ...optionsWithStyles, height: chartHeight },
         themeCfg: customThemeCfg,
+        onMounted: (s2: any) => {
+          (window as any).s2 = s2;
+        },
         onDataCellClick: handleDataClick,
         onRowCellClick: handleDataClick,
+        onColCellClick: handleColCellClick,
       })}
     </div>
   );

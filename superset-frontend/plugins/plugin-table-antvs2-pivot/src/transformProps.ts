@@ -18,7 +18,146 @@
  */
 import { DataRecord, getMetricLabel } from '@superset-ui/core';
 import { S2TableChartProps, S2TableTransformedProps, Refs } from './types';
+import { ColCell, CornerCell, renderText, getTextPosition } from '@antv/s2';
 import type { S2DataConfig, S2Options } from '@antv/s2';
+
+function wrapText(
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+  fontParam: any,
+  measureTextWidth: (t: string, font: any) => number,
+): string {
+  if (!text) return '';
+  const parts = text.split('\n');
+  const allLines: string[] = [];
+
+  for (const part of parts) {
+    const words = part.split(' ');
+    let currentLine = '';
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (measureTextWidth(testLine, fontParam) <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        const wordWidth = measureTextWidth(word, fontParam);
+        if (wordWidth > maxWidth) {
+          for (let j = 0; j < word.length; j++) {
+            const char = word[j];
+            const testCharLine = currentLine ? `${currentLine}${char}` : char;
+            if (measureTextWidth(testCharLine, fontParam) <= maxWidth) {
+              currentLine = testCharLine;
+            } else {
+              if (currentLine) allLines.push(currentLine);
+              currentLine = char;
+            }
+          }
+        } else {
+          if (currentLine) allLines.push(currentLine);
+          currentLine = word;
+        }
+      }
+    }
+    if (currentLine) {
+      allLines.push(currentLine);
+    }
+  }
+
+  if (allLines.length > maxLines) {
+    const truncatedLines = allLines.slice(0, maxLines);
+    let lastLine = truncatedLines[maxLines - 1];
+    const ellipsis = '...';
+    while (lastLine.length > 0 && measureTextWidth(lastLine + ellipsis, fontParam) > maxWidth) {
+      lastLine = lastLine.slice(0, -1);
+    }
+    truncatedLines[maxLines - 1] = lastLine + ellipsis;
+    return truncatedLines.join('\n');
+  }
+
+  return allLines.join('\n');
+}
+
+class WrappedColCell extends ColCell {
+  protected drawTextShape() {
+    const textStyle = { ...this.getTextStyle(), textBaseline: 'middle' as const };
+    const cellWidth = this.meta.width;
+    const padding = 8;
+    const maxTextWidth = cellWidth - padding * 2 - this.getActionIconsWidth();
+    const rawText = this.meta.label || this.meta.value || '';
+
+    const text = wrapText(
+      rawText,
+      maxTextWidth,
+      4,
+      textStyle,
+      this.spreadsheet.measureTextWidth,
+    );
+
+    this.actualText = text;
+    this.actualTextWidth = Math.min(
+      this.spreadsheet.measureTextWidth(text, textStyle),
+      maxTextWidth,
+    );
+
+    const position = this.getTextPosition();
+
+    // @ts-ignore
+    this.textShape = renderText(
+      this,
+      this.textShapes,
+      position.x,
+      position.y,
+      text,
+      textStyle,
+    );
+    this.textShapes = [this.textShape];
+  }
+}
+
+class WrappedCornerCell extends CornerCell {
+  protected drawTextShape() {
+    const x = this.getContentArea().x;
+    const { y, height } = this.getCellArea();
+    const textStyle = { ...this.getTextStyle(), textBaseline: 'middle' as const };
+    const cornerText = this.getCornerText();
+    const maxWidth = this.getMaxTextWidth();
+
+    const text = wrapText(
+      cornerText,
+      maxWidth,
+      4,
+      textStyle,
+      this.spreadsheet.measureTextWidth,
+    );
+
+    this.actualText = text;
+    this.actualTextWidth = Math.min(
+      this.spreadsheet.measureTextWidth(text, textStyle),
+      maxWidth,
+    );
+
+    const position = getTextPosition(
+      {
+        x: x + this.getTreeIconWidth(),
+        y,
+        width: maxWidth,
+        height,
+      },
+      textStyle,
+    );
+
+    // @ts-ignore
+    this.textShape = renderText(
+      this,
+      this.textShapes,
+      position.x,
+      position.y,
+      text,
+      textStyle,
+    );
+    this.textShapes = [this.textShape];
+  }
+}
 
 /**
  * Aggregate helper: computes a single value from an array of numbers
@@ -97,9 +236,13 @@ export default function transformProps(
   const showColSubtotals = formData.showColSubtotals ?? false;
   const showSortControls = formData.showSortControls ?? true;
   const advancedS2OptionsObj = safeParseJson<any>(
-    formData.advanced_s2_options,
+    formData.advancedS2Options,
     {},
   );
+
+  const columnHeaderHeight = formData.columnHeaderHeight !== undefined ? Number(formData.columnHeaderHeight) || 48 : 48;
+  const rowCellHeight = formData.rowCellHeight !== undefined ? Number(formData.rowCellHeight) || 36 : 36;
+  const defaultColumnWidth = formData.defaultColumnWidth ? Number(formData.defaultColumnWidth) || undefined : undefined;
 
   const columnAggregations = safeParseJson<Record<string, string>>(
     formData.columnAggregations,
@@ -180,9 +323,19 @@ export default function transformProps(
     style: {
       colCfg: {
         hideMeasureColumn: metricCols.length <= 1,
+        height: columnHeaderHeight,
+        width: defaultColumnWidth,
+      },
+      cellCfg: {
+        height: rowCellHeight,
       },
     },
+    showDefaultHeaderActionIcon: true,
     tooltip: { showTooltip: false },
+    colCell: (node: any, spreadsheet: any, headerConfig: any) =>
+      new WrappedColCell(node, spreadsheet, headerConfig),
+    cornerCell: (node: any, spreadsheet: any, headerConfig: any) =>
+      new WrappedCornerCell(node, spreadsheet, headerConfig),
     totals: {
       row: {
         showGrandTotals: showRowTotals,
