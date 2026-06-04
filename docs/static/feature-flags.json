@@ -5,7 +5,7 @@
     "development": [
       {
         "name": "AG_GRID_TABLE_ENABLED",
-        "default": false,
+        "default": true,
         "lifecycle": "development",
         "description": "Enables Table V2 (AG Grid) viz plugin"
       },

@@ -94,6 +94,7 @@ import { CustomDatePickerPlugin } from 'plugins/custom_controls/custom_datefilte
 import { CustomControlsChartPlugin } from 'plugins/custom_controls/custom_filters/src/plugin';
 import EchartsSankeyMultiLevelChartPlugin from 'plugins/plugin-chart-echarts-custom/src/Sankey';
 import EchartsCalendarHeatmapChartPlugin from 'plugins/plugin-chart-echarts-custom/src/CalendarChart1/src';
+import AntvS2TableChartPlugin from 'plugins/plugin-table-antvs2-pivot/src';
 
 export default class MainPreset extends Preset {
   constructor() {
@@ -228,6 +229,9 @@ export default class MainPreset extends Preset {
         }),
         new EchartsCalendarHeatmapChartPlugin().configure({
           key: 'calendar_heatmap_custom',
+        }),
+        new AntvS2TableChartPlugin().configure({
+          key: 'antvs2_table_pivot',
         }),
       ],
     });
