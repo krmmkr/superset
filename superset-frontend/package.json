@@ -95,6 +95,8 @@
     "last 3 edge versions"
   ],
   "dependencies": {
+    "@antv/s2": "^1.40.0",
+    "@antv/s2-react": "^1.40.0",
     "@apache-superset/core": "file:packages/superset-core",
     "@deck.gl/aggregation-layers": "~9.2.5",
     "@deck.gl/core": "~9.2.5",
