@@ -86,7 +86,6 @@ export default function transformProps(
   const rawColumns = formData.columns || [];
   const metricsRaw = formData.metrics || [];
 
-  const frontendAggregation = formData.frontendAggregation ?? true;
   const tableMode = formData.tableMode || 'grid';
   const emitFilter = formData.emitFilter ?? true;
 
@@ -159,7 +158,7 @@ export default function transformProps(
     const values = rows.map(row => Number(row[metric]) || 0);
     return aggregate(values, columnAggregations[metric] || 'SUM');
   };
-  const calcTotalsObj = frontendAggregation ? { calcFunc } : undefined;
+  const calcTotalsObj = { calcFunc };
 
   // ── S2 Options ───────────────────────────────
   const s2Options: S2Options = {

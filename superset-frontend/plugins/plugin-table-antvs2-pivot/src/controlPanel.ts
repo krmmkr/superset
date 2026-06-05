@@ -90,25 +90,7 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-        [
-          {
-            name: 'frontend_aggregation',
-            config: {
-              type: 'SelectControl',
-              label: t('Aggregation Mode'),
-              description: t(
-                '"Frontend" uses custom per-column aggregation. ' +
-                  '"Backend Default" uses standard sum for totals.',
-              ),
-              default: true,
-              choices: [
-                [true, t('Frontend (Custom Per-Column)')],
-                [false, t('Backend Default (Sum)')],
-              ],
-              renderTrigger: true,
-            },
-          },
-        ],
+
         [
           {
             name: 'column_aggregations',

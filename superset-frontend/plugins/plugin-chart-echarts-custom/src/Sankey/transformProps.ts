@@ -109,7 +109,7 @@ export default function transformProps(
   const links: Link[] = [];
   const set = new Set<string>();
   const columns = groupby.map(col => getColumnLabel(col));
-  const stageTotals = new Array(columns.length).fill(0);
+  const stageTotals = Array.from({ length: columns.length }, () => 0);
   const overallTotal = data.reduce(
     (sum, datum) => sum + ((datum[metricLabel] as number) || 0),
     0,
@@ -212,7 +212,7 @@ export default function transformProps(
     return {
       name,
       itemStyle: {
-        color: colorFn(name, sliceId),
+        color: colorFn(String(name).replace(/ \(stage \d+\)$/, ''), sliceId),
       },
       label: {
         color: theme.colorText,

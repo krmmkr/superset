@@ -33,7 +33,6 @@ export interface S2TableFormData extends QueryFormData {
   columns: QueryFormColumn[];
   metrics: QueryFormMetric[];
 
-  frontendAggregation: boolean;
   columnAggregations: string;
   tableMode: 'grid' | 'tree';
   theme: 'default' | 'colorful' | 'gray';
