@@ -18,7 +18,14 @@
  */
 import React, { useRef, useCallback, useState, useMemo } from 'react';
 import { SheetComponent } from '@antv/s2-react';
-import { setLang, getPalette } from '@antv/s2';
+import {
+  setLang,
+  getPalette,
+  DataCell,
+  ColCell,
+  RowCell,
+  CornerCell,
+} from '@antv/s2';
 import '@antv/s2-react/dist/style.min.css';
 import { DataMask } from '@superset-ui/core';
 import { merge } from 'lodash';
@@ -26,6 +33,69 @@ import { useTheme, useThemeMode } from '@apache-superset/core/theme';
 import { S2TableTransformedProps } from './types';
 
 setLang('en_US');
+
+class CustomDataCell extends DataCell {
+  getTextStyle() {
+    const textStyle = super.getTextStyle();
+    const spreadsheet = this.spreadsheet;
+    const alignments = (spreadsheet?.options as any)?.columnAlignmentsObj || {};
+    const defaultMetricAlign = (spreadsheet?.options as any)?.defaultMetricAlign || 'right';
+    const field = this.meta.valueField;
+    const alignment = alignments[field] || defaultMetricAlign;
+    return {
+      ...textStyle,
+      textAlign: alignment,
+    };
+  }
+}
+
+class CustomColCell extends ColCell {
+  getTextStyle() {
+    const textStyle = super.getTextStyle();
+    const spreadsheet = this.spreadsheet;
+    const alignments = (spreadsheet?.options as any)?.columnAlignmentsObj || {};
+    const defaultDimensionAlign = (spreadsheet?.options as any)?.defaultDimensionAlign || 'left';
+    const defaultMetricAlign = (spreadsheet?.options as any)?.defaultMetricAlign || 'right';
+    
+    const isMetric = this.isMeasureField();
+    const fieldName = isMetric ? this.meta.value : this.meta.field;
+    const alignment = alignments[fieldName] || (isMetric ? defaultMetricAlign : defaultDimensionAlign);
+    return {
+      ...textStyle,
+      textAlign: alignment,
+    };
+  }
+}
+
+class CustomRowCell extends RowCell {
+  getTextStyle() {
+    const textStyle = super.getTextStyle();
+    const spreadsheet = this.spreadsheet;
+    const alignments = (spreadsheet?.options as any)?.columnAlignmentsObj || {};
+    const defaultDimensionAlign = (spreadsheet?.options as any)?.defaultDimensionAlign || 'left';
+    const defaultMetricAlign = (spreadsheet?.options as any)?.defaultMetricAlign || 'right';
+    
+    const isMetric = this.isMeasureField();
+    const fieldName = isMetric ? this.meta.value : this.meta.field;
+    const alignment = alignments[fieldName] || (isMetric ? defaultMetricAlign : defaultDimensionAlign);
+    return {
+      ...textStyle,
+      textAlign: alignment,
+    };
+  }
+}
+
+class CustomCornerCell extends CornerCell {
+  getTextStyle() {
+    const textStyle = super.getTextStyle();
+    const spreadsheet = this.spreadsheet;
+    const defaultDimensionAlign = (spreadsheet?.options as any)?.defaultDimensionAlign || 'left';
+    return {
+      ...textStyle,
+      textAlign: defaultDimensionAlign,
+    };
+  }
+}
 
 interface SortEntry {
   field: string;
@@ -47,6 +117,11 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     metricCols,
     showSortControls,
     advancedS2OptionsObj,
+    defaultDimensionAlign = 'left',
+    defaultMetricAlign = 'right',
+    columnAlignmentsObj = {},
+    headerColor,
+    headerColorObj,
   } = props;
 
   const divRef = useRef<HTMLDivElement>(null);
@@ -182,15 +257,22 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   const bgColor = theme?.colorBgContainer || '#ffffff';
   const isDark = isDarkMode;
   const headerBgColor =
-    theme?.colorBgLayout || theme?.colorFillAlter || '#fafafa';
+    headerColor || theme?.colorBgLayout || theme?.colorFillAlter || '#fafafa';
   const borderColor = isDark
     ? theme?.colorBorderSecondary || theme?.colorBorder || '#303030'
     : theme?.colorBorderSecondary || theme?.colorBorder || '#f0f0f0';
   const hoverBgColor = isDark
     ? theme?.colorFillContentHover || 'rgba(255, 255, 255, 0.08)'
     : theme?.colorBgTextHover || theme?.colorFillAlter || '#f5f5f5';
-  const headerTextColor =
+  const rawHeaderColor = headerColorObj;
+  let headerTextColor =
     theme?.colorTextHeading || theme?.colorText || '#262626';
+
+  if (rawHeaderColor && typeof rawHeaderColor === 'object' && 'r' in rawHeaderColor) {
+    const { r, g, b } = rawHeaderColor;
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    headerTextColor = yiq >= 128 ? '#262626' : '#ffffff';
+  }
 
   const totalText = headerTextColor;
   const totalFontWeight = 700;
@@ -250,6 +332,21 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
               bolderText: { fill: headerTextColor },
               measureText: { fill: headerTextColor },
             },
+            seriesNumberCell: {
+              cell: {
+                backgroundColor: headerBgColor,
+                horizontalBorderColor: borderColor,
+                verticalBorderColor: borderColor,
+                interactionState: {
+                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
+                },
+              },
+              text: { fill: headerTextColor },
+              bolderText: { fill: headerTextColor },
+              measureText: { fill: headerTextColor },
+            },
             rowCell: {
               cell: {
                 backgroundColor: bgColor,
@@ -264,6 +361,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
               text: { fill: textColor },
               bolderText: { fill: totalText, fontWeight: totalFontWeight },
               measureText: { fill: textColor },
+              seriesText: { fill: textColor },
             },
             colCell: {
               cell: {
@@ -412,8 +510,41 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       }
     }
 
+    // Attach custom alignment options to finalOptions so cell classes can read them
+    (finalOptions as any).columnAlignmentsObj = columnAlignmentsObj;
+    (finalOptions as any).defaultDimensionAlign = defaultDimensionAlign;
+    (finalOptions as any).defaultMetricAlign = defaultMetricAlign;
+    (finalOptions as any).metricCols = metricCols;
+
+    // Map custom cells
+    finalOptions.dataCell = (viewMeta: any, spreadsheet: any, ...args: any[]) =>
+      new CustomDataCell(viewMeta, spreadsheet || viewMeta?.spreadsheet, ...args);
+    finalOptions.colCell = (meta: any, spreadsheet: any, ...args: any[]) =>
+      new CustomColCell(meta, spreadsheet || meta?.spreadsheet, ...args);
+    finalOptions.rowCell = (meta: any, spreadsheet: any, ...args: any[]) =>
+      new CustomRowCell(meta, spreadsheet || meta?.spreadsheet, ...args);
+    finalOptions.cornerCell = (meta: any, spreadsheet: any, ...args: any[]) =>
+      new CustomCornerCell(meta, spreadsheet || meta?.spreadsheet, ...args);
+
+    // Defensively remove style overrides for cell definitions, to prevent S2 from
+    // overwriting our custom cell constructor functions when merging style block to root.
+    if (finalOptions.style) {
+      if (typeof finalOptions.style.rowCell === 'function') {
+        delete finalOptions.style.rowCell;
+      }
+      if (typeof finalOptions.style.colCell === 'function') {
+        delete finalOptions.style.colCell;
+      }
+      if (typeof finalOptions.style.cornerCell === 'function') {
+        delete finalOptions.style.cornerCell;
+      }
+      if (typeof finalOptions.style.dataCell === 'function') {
+        delete finalOptions.style.dataCell;
+      }
+    }
+
     return finalOptions;
-  }, [s2Options, advancedS2OptionsObj]);
+  }, [s2Options, advancedS2OptionsObj, defaultDimensionAlign, defaultMetricAlign, columnAlignmentsObj, headerColor, metricCols]);
 
   // Generate a key to force SheetComponent remount when options or theme changes
   const sheetKey = useMemo(() => {
@@ -424,8 +555,33 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       formData.theme || 'default',
       formData.advancedS2Options || '',
       formData.tableMode || 'grid',
+      formData.showSeriesNumber ?? false,
+      formData.layoutWidthType || 'adaptive',
+      formData.showTooltip ?? true,
+      formData.rowHeight || '',
+      formData.colHeight || '',
+      formData.defaultDimensionAlign || 'left',
+      formData.defaultMetricAlign || 'right',
+      formData.columnAlignments || '{}',
+      formData.headerColor ? `${formData.headerColor.r}_${formData.headerColor.g}_${formData.headerColor.b}_${formData.headerColor.a}` : '',
     ].join('_');
-  }, [width, height, isDark, formData.theme, formData.advancedS2Options, formData.tableMode]);
+  }, [
+    width,
+    height,
+    isDark,
+    formData.theme,
+    formData.advancedS2Options,
+    formData.tableMode,
+    formData.showSeriesNumber,
+    formData.layoutWidthType,
+    formData.showTooltip,
+    formData.rowHeight,
+    formData.colHeight,
+    formData.defaultDimensionAlign,
+    formData.defaultMetricAlign,
+    formData.columnAlignments,
+    formData.headerColor,
+  ]);
 
 
   const controlBarHeight = showSortControls ? 32 : 0;

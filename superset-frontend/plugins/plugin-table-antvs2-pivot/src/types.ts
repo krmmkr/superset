@@ -48,6 +48,19 @@ export interface S2TableFormData extends QueryFormData {
   crossfilterColumns: QueryFormColumn[];
 
   advancedS2Options?: string;
+
+  showSeriesNumber?: boolean;
+  layoutWidthType?: 'adaptive' | 'compact' | 'colAdaptive';
+  showTooltip?: boolean;
+  rowHeight?: string;
+  colHeight?: string;
+  defaultDimensionAlign?: 'left' | 'center' | 'right';
+  defaultMetricAlign?: 'left' | 'center' | 'right';
+  columnAlignments?: string;
+  columnFormats?: string;
+  headerColor?: { r: number; g: number; b: number; a: number };
+  excludeTotalsMetrics?: string[];
+  columnWidths?: string;
 }
 
 export interface S2TableChartProps extends ChartProps {
@@ -75,6 +88,12 @@ export interface S2TableTransformedProps {
   allFields: string[];
   metricCols: string[];
   advancedS2OptionsObj: any;
+  defaultDimensionAlign?: 'left' | 'center' | 'right';
+  defaultMetricAlign?: 'left' | 'center' | 'right';
+  columnAlignmentsObj?: Record<string, 'left' | 'center' | 'right'>;
+  columnFormatsObj?: Record<string, string>;
+  headerColor?: string;
+  headerColorObj?: { r: number; g: number; b: number; a: number };
 
   setDataMask: SetDataMaskHook;
   selectedValues: Record<number, string>;

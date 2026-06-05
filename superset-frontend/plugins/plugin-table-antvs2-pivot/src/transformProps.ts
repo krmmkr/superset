@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { DataRecord, getMetricLabel } from '@superset-ui/core';
+import { DataRecord, getMetricLabel, getNumberFormatter } from '@superset-ui/core';
 import { S2TableChartProps, S2TableTransformedProps, Refs } from './types';
 import type { S2DataConfig, S2Options } from '@antv/s2';
 
@@ -95,6 +95,12 @@ export default function transformProps(
   const showColTotals = formData.showColTotals ?? true;
   const showColSubtotals = formData.showColSubtotals ?? false;
   const showSortControls = formData.showSortControls ?? true;
+  const showSeriesNumber = formData.showSeriesNumber ?? false;
+  const layoutWidthType = formData.layoutWidthType || 'adaptive';
+  const showTooltip = formData.showTooltip ?? true;
+  const rowHeight = (formData.rowHeight && !isNaN(Number(formData.rowHeight))) ? Number(formData.rowHeight) : undefined;
+  const colHeight = (formData.colHeight && !isNaN(Number(formData.colHeight))) ? Number(formData.colHeight) : undefined;
+
   const advancedS2OptionsObj = safeParseJson<any>(
     formData.advancedS2Options,
     {},
@@ -104,6 +110,35 @@ export default function transformProps(
     formData.columnAggregations,
     {},
   );
+
+  const defaultDimensionAlign = formData.defaultDimensionAlign || 'left';
+  const defaultMetricAlign = formData.defaultMetricAlign || 'right';
+  const columnAlignmentsObj = safeParseJson<Record<string, 'left' | 'center' | 'right'>>(
+    formData.columnAlignments,
+    {},
+  );
+
+  const columnFormatsObj = safeParseJson<Record<string, string>>(
+    formData.columnFormats,
+    {},
+  );
+
+  const columnWidthsObj = safeParseJson<Record<string, number>>(
+    formData.columnWidths,
+    {},
+  );
+
+  const s2LayoutWidthType = layoutWidthType === 'custom' ? 'compact' : layoutWidthType;
+  const widthByField = layoutWidthType === 'custom' ? columnWidthsObj : undefined;
+
+  const excludeTotalsMetrics: string[] = formData.excludeTotalsMetrics || [];
+  const headerColorObj = formData.headerColor;
+
+  const headerColorRaw = formData.headerColor;
+  const headerColor =
+    headerColorRaw && typeof headerColorRaw === 'object' && 'r' in headerColorRaw
+      ? `rgba(${headerColorRaw.r}, ${headerColorRaw.g}, ${headerColorRaw.b}, ${headerColorRaw.a ?? 1})`
+      : undefined;
 
   const rawCrossfilterCols = formData.crossfilterColumns || [];
   const crossfilterColumns = rawCrossfilterCols.map(normalizeCol);
@@ -144,7 +179,23 @@ export default function transformProps(
       columns,
       values: metricCols,
     },
-    meta: allFields.map(f => ({ field: f, name: f })),
+    meta: allFields.map(f => {
+      const isMetric = metricCols.includes(f);
+      if (isMetric) {
+        const customFormat = columnFormatsObj[f];
+        const formatter = getNumberFormatter(customFormat || 'SMART_NUMBER');
+        return {
+          field: f,
+          name: f,
+          formatter: (val: any) =>
+            val === null || val === undefined ? '' : formatter(val),
+        };
+      }
+      return {
+        field: f,
+        name: f,
+      };
+    }),
     data: s2Data,
   };
 
@@ -155,6 +206,9 @@ export default function transformProps(
   ) => {
     const metric = query['$$extra$$'];
     if (!metric) return 0;
+    if (excludeTotalsMetrics.includes(metric)) {
+      return null;
+    }
     const values = rows.map(row => Number(row[metric]) || 0);
     return aggregate(values, columnAggregations[metric] || 'SUM');
   };
@@ -165,6 +219,7 @@ export default function transformProps(
     width,
     height,
     hierarchyType: tableMode,
+    showSeriesNumber,
     interaction: {
       hoverHighlight: true,
       // Disable cell selection behaviors that cause
@@ -177,12 +232,23 @@ export default function transformProps(
       selectedCellHighlight: false,
     },
     style: {
-      colCfg: {
-        hideMeasureColumn: metricCols.length <= 1,
+      layoutWidthType: s2LayoutWidthType,
+      colCell: {
+        widthByField,
       },
-    },
+      colCfg: {
+        hideMeasureColumn: false,
+        ...(colHeight !== undefined ? { height: colHeight } : {}),
+      },
+      ...(rowHeight !== undefined
+        ? {
+            rowCfg: { height: rowHeight },
+            cellCfg: { height: rowHeight },
+          }
+        : {}),
+    } as any,
     showDefaultHeaderActionIcon: true,
-    tooltip: { showTooltip: false },
+    tooltip: { showTooltip },
     totals: {
       row: {
         showGrandTotals: showRowTotals,
@@ -226,6 +292,12 @@ export default function transformProps(
     s2Theme: supersetTheme,
     showSortControls,
     advancedS2OptionsObj,
+    defaultDimensionAlign,
+    defaultMetricAlign,
+    columnAlignmentsObj,
+    columnFormatsObj,
+    headerColor,
+    headerColorObj,
     crossfilterColumns,
     groupby,
     allFields,
