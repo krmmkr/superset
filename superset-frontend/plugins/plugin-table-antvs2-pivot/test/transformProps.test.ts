@@ -77,7 +77,7 @@ test('should transform default chart props correctly', () => {
 
   expect(result.s2Options.showSeriesNumber).toBe(false);
   expect(result.s2Options.style.layoutWidthType).toBe('adaptive');
-  expect(result.s2Options.tooltip.showTooltip).toBe(true);
+  expect(result.s2Options.tooltip.enable).toBe(true);
   expect(result.s2Options.style.rowCfg).toBeUndefined();
   expect(result.s2Options.style.colCfg.height).toBeUndefined();
 });
@@ -92,7 +92,7 @@ test('should handle showSeriesNumber, layoutWidthType, and showTooltip', () => {
 
   expect(result.s2Options.showSeriesNumber).toBe(true);
   expect(result.s2Options.style.layoutWidthType).toBe('compact');
-  expect(result.s2Options.tooltip.showTooltip).toBe(false);
+  expect(result.s2Options.tooltip.enable).toBe(false);
 });
 
 test('should map valid custom rowHeight and colHeight to style configs', () => {

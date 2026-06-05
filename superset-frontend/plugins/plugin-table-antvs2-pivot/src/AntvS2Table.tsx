@@ -25,6 +25,7 @@ import {
   ColCell,
   RowCell,
   CornerCell,
+  S2Event,
 } from '@antv/s2';
 import '@antv/s2-react/dist/style.min.css';
 import { DataMask } from '@superset-ui/core';
@@ -97,11 +98,6 @@ class CustomCornerCell extends CornerCell {
   }
 }
 
-interface SortEntry {
-  field: string;
-  direction: 'ASC' | 'DESC';
-}
-
 export default function AntvS2Table(props: S2TableTransformedProps) {
   const {
     width,
@@ -113,9 +109,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     emitCrossFilters,
     crossfilterColumns,
     groupby,
-    allFields,
     metricCols,
-    showSortControls,
     advancedS2OptionsObj,
     defaultDimensionAlign = 'left',
     defaultMetricAlign = 'right',
@@ -126,66 +120,24 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
 
   const divRef = useRef<HTMLDivElement>(null);
 
-  // ── Multi-column sort state ──────────────────
-  const [sortEntries, setSortEntries] = useState<SortEntry[]>([]);
+  const [sortParams, setSortParams] = useState<any[]>([]);
 
-  const addSort = useCallback(() => {
-    // Find the first field not yet in the sort list
-    const usedFields = new Set(sortEntries.map(e => e.field));
-    const nextField = allFields.find(f => !usedFields.has(f)) || allFields[0];
-    if (nextField) {
-      setSortEntries(prev => [...prev, { field: nextField, direction: 'ASC' }]);
-    }
-  }, [sortEntries, allFields]);
+  const fieldsKey = JSON.stringify({
+    rows: groupby,
+    columns: props.s2DataConfig?.fields?.columns || [],
+    values: metricCols,
+  });
 
-  const removeSort = useCallback((idx: number) => {
-    setSortEntries(prev => prev.filter((_, i) => i !== idx));
-  }, []);
+  React.useEffect(() => {
+    setSortParams([]);
+  }, [fieldsKey]);
 
-  const updateSort = useCallback((idx: number, patch: Partial<SortEntry>) => {
-    setSortEntries(prev =>
-      prev.map((entry, i) => (i === idx ? { ...entry, ...patch } : entry)),
-    );
-  }, []);
-
-  const clearAllSorts = useCallback(() => setSortEntries([]), []);
-
-  // Pre-sort data by all sort entries (first entry = primary sort) and attach sortParams for S2 header sort icons
-  const sortedDataCfg = useMemo(() => {
-    const sortParams = sortEntries.map(entry => ({
-      sortFieldId: entry.field,
-      sortMethod: entry.direction,
-    }));
-
-    const baseCfg = {
+  const mergedDataCfg = useMemo(() => {
+    return {
       ...s2DataConfig,
-      sortParams,
+      sortParams: sortParams.length > 0 ? sortParams : (s2DataConfig.sortParams || []),
     };
-
-    if (sortEntries.length === 0) return baseCfg;
-
-    const sorted = [...s2DataConfig.data].sort((a: any, b: any) => {
-      for (const { field, direction } of sortEntries) {
-        const isMetric = metricCols.includes(field);
-        let cmp: number;
-
-        if (isMetric) {
-          const aNum = Number(a[field]) || 0;
-          const bNum = Number(b[field]) || 0;
-          cmp = aNum - bNum;
-        } else {
-          cmp = String(a[field] || '').localeCompare(String(b[field] || ''));
-        }
-
-        if (cmp !== 0) {
-          return direction === 'ASC' ? cmp : -cmp;
-        }
-      }
-      return 0;
-    });
-
-    return { ...baseCfg, data: sorted };
-  }, [s2DataConfig, sortEntries, metricCols]);
+  }, [s2DataConfig, sortParams]);
 
   // ── Cross-filtering (data & row cell clicks only) ──
   const handleDataClick = useCallback(
@@ -224,31 +176,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     [emitCrossFilters, setDataMask, crossfilterColumns, groupby],
   );
 
-  // ── Column Header sorting on click ──
-  const handleColCellClick = useCallback(
-    (cellItem: any) => {
-      const meta = cellItem?.viewMeta || cellItem?.meta;
-      if (!meta || !meta.field) return;
-      const clickedField = meta.field;
-
-      setSortEntries(prev => {
-        const existingIdx = prev.findIndex(e => e.field === clickedField);
-        if (existingIdx === -1) {
-          // Single-column sort: clear others and set ASC
-          return [{ field: clickedField, direction: 'ASC' }];
-        }
-        const existing = prev[existingIdx];
-        if (existing.direction === 'ASC') {
-          // Toggle to DESC
-          return [{ field: clickedField, direction: 'DESC' }];
-        }
-        // Toggle to None (clear sort)
-        return [];
-      });
-    },
-    [],
-  );
-
   // ── Theme ────────────────────────────────────
   const theme = useTheme();
   const isDarkMode = useThemeMode();
@@ -274,7 +201,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     headerTextColor = yiq >= 128 ? '#262626' : '#ffffff';
   }
 
-  const totalText = headerTextColor;
+  const totalText = textColor;
   const totalFontWeight = 700;
 
   const isDefaultTheme = !formData.theme || formData.theme === 'default';
@@ -583,142 +510,30 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     formData.headerColor,
   ]);
 
-
-  const controlBarHeight = showSortControls ? 32 : 0;
-
-  const selectStyle: any = {
-    padding: '2px 6px',
-    fontSize: '12px',
-    border: `1px solid ${borderColor}`,
-    borderRadius: '4px',
-    backgroundColor: bgColor,
-    color: textColor,
-    cursor: 'pointer',
-    outline: 'none',
-  };
-  const btnStyle: any = {
-    padding: '2px 8px',
-    fontSize: '11px',
-    border: `1px solid ${borderColor}`,
-    borderRadius: '4px',
-    backgroundColor: bgColor,
-    color: textColor,
-    cursor: 'pointer',
-  };
-
-  const usedFields = new Set(sortEntries.map(e => e.field));
-  const canAddMore = allFields.some(f => !usedFields.has(f));
-
-  const sortBar = (
-    <div
-      style={{
-        height: `${controlBarHeight}px`,
-        padding: '0 8px',
-        fontSize: '12px',
-        color: textColor,
-        backgroundColor: headerBgColor,
-        borderBottom: `1px solid ${borderColor}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        flexWrap: 'wrap',
-        overflow: 'hidden',
-      }}
-    >
-      <span style={{ fontWeight: 500 }}>Sort:</span>
-      {sortEntries.length === 0 && <span style={{ opacity: 0.6 }}>None</span>}
-      {sortEntries.map((entry, idx) => (
-        <span
-          key={idx}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '3px',
-            backgroundColor: bgColor,
-            border: `1px solid ${borderColor}`,
-            borderRadius: '4px',
-            padding: '1px 4px',
-          }}
-        >
-          <span style={{ opacity: 0.5, fontSize: '10px' }}>{idx + 1}.</span>
-          <select
-            value={entry.field}
-            onChange={e => updateSort(idx, { field: e.target.value })}
-            style={{ ...selectStyle, border: 'none', padding: '1px 2px' }}
-          >
-            {allFields.map(f => (
-              <option
-                key={f}
-                value={f}
-                disabled={usedFields.has(f) && f !== entry.field}
-              >
-                {f}
-              </option>
-            ))}
-          </select>
-          <select
-            value={entry.direction}
-            onChange={e =>
-              updateSort(idx, { direction: e.target.value as 'ASC' | 'DESC' })
-            }
-            style={{ ...selectStyle, border: 'none', padding: '1px 4px' }}
-          >
-            <option value="ASC">↑ ASC</option>
-            <option value="DESC">↓ DESC</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => removeSort(idx)}
-            style={{
-              ...btnStyle,
-              border: 'none',
-              padding: '0 2px',
-              fontSize: '10px',
-            }}
-          >
-            ✕
-          </button>
-        </span>
-      ))}
-      <button
-        type="button"
-        onClick={addSort}
-        style={btnStyle}
-        disabled={!canAddMore}
-      >
-        +
-      </button>
-      {sortEntries.length > 0 && (
-        <button type="button" onClick={clearAllSorts} style={btnStyle}>
-          Clear
-        </button>
-      )}
-    </div>
-  );
-
-  const chartHeight = height - controlBarHeight;
-
   return (
     <div
       ref={divRef}
       style={{ width: `${width}px`, height: `${height}px`, overflow: 'hidden' }}
     >
-      {showSortControls && sortBar}
       {React.createElement(SheetComponent as any, {
         key: sheetKey,
         sheetType,
         adaptive,
         loading,
         showPagination,
-        dataCfg: sortedDataCfg,
-        options: { ...optionsWithStyles, height: chartHeight },
+        dataCfg: mergedDataCfg,
+        options: { ...optionsWithStyles, height },
         themeCfg: customThemeCfg,
         onMounted: (s2: any) => {
           (window as any).s2 = s2;
+          s2.on(S2Event.RANGE_SORT, (newSortParams: any) => {
+            if (Array.isArray(newSortParams)) {
+              setSortParams(newSortParams);
+            }
+          });
         },
         onDataCellClick: handleDataClick,
         onRowCellClick: handleDataClick,
-        onColCellClick: handleColCellClick,
       })}
     </div>
   );

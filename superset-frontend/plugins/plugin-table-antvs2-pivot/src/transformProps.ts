@@ -247,8 +247,179 @@ export default function transformProps(
           }
         : {}),
     } as any,
-    showDefaultHeaderActionIcon: true,
-    tooltip: { showTooltip },
+    showDefaultHeaderActionIcon: showSortControls,
+    headerActionIcons: showSortControls
+      ? [
+          {
+            iconNames: ['SortDown'],
+            belongsCell: 'rowCell',
+            defaultHide: true,
+            action: (options: any) => {
+              const { event, meta } = options;
+              event.stopPropagation();
+              const spreadsheet = meta.spreadsheet;
+              if (!spreadsheet) return;
+
+              spreadsheet.interaction.addIntercepts(['hover']);
+
+              const isDimension = meta.field !== '$$extra$$' && !meta.isMeasure && !meta.isTotals;
+
+              if (isDimension) {
+                const currentSortParam = spreadsheet.dataCfg?.sortParams?.find(
+                  (p: any) => p.sortFieldId === meta.field,
+                );
+                const defaultSelectedKeys = currentSortParam?.sortMethod
+                  ? [currentSortParam.sortMethod.toLowerCase()]
+                  : ['none'];
+
+                const operator = {
+                  onClick: ({ key }: { key: string }) => {
+                    const sortMethod = key.toUpperCase();
+                    const prevSortParams = (spreadsheet.dataCfg?.sortParams || []).filter(
+                      (p: any) => p.sortFieldId !== meta.field,
+                    );
+                    const newSortParams =
+                      sortMethod === 'NONE'
+                        ? prevSortParams
+                        : [...prevSortParams, { sortFieldId: meta.field, sortMethod }];
+
+                    spreadsheet.emit('sort:range-sort', newSortParams);
+                    spreadsheet.setDataCfg({
+                      ...spreadsheet.dataCfg,
+                      sortParams: newSortParams,
+                    });
+                    spreadsheet.render();
+                    spreadsheet.hideTooltip();
+                  },
+                  menus: [
+                    { key: 'asc', icon: 'groupAsc', text: 'Ascending' },
+                    { key: 'desc', icon: 'groupDesc', text: 'Descending' },
+                    { key: 'none', text: 'No sort' },
+                  ],
+                  defaultSelectedKeys,
+                };
+
+                spreadsheet.showTooltipWithInfo(event, [], {
+                  operator,
+                  onlyMenu: true,
+                  forceRender: true,
+                });
+              } else {
+                const defaultSelectedKeys = spreadsheet.getMenuDefaultSelectedKeys(meta?.id);
+                const operator = {
+                  onClick: ({ key }: { key: string }) => {
+                    const sortMethod = key;
+                    if (typeof spreadsheet.groupSortByMethod === 'function') {
+                      spreadsheet.groupSortByMethod(sortMethod, meta);
+                    }
+                    spreadsheet.emit('sort:range-sorted', event);
+                    spreadsheet.hideTooltip();
+                  },
+                  menus: [
+                    { key: 'asc', icon: 'groupAsc', text: 'Group Ascending' },
+                    { key: 'desc', icon: 'groupDesc', text: 'Group Descending' },
+                    { key: 'none', text: 'No sort' },
+                  ],
+                  defaultSelectedKeys,
+                };
+
+                spreadsheet.showTooltipWithInfo(event, [], {
+                  operator,
+                  onlyMenu: true,
+                  forceRender: true,
+                });
+              }
+            },
+          },
+          {
+            iconNames: ['SortDown'],
+            belongsCell: 'colCell',
+            defaultHide: true,
+            action: (options: any) => {
+              const { event, meta } = options;
+              event.stopPropagation();
+              const spreadsheet = meta.spreadsheet;
+              if (!spreadsheet) return;
+
+              spreadsheet.interaction.addIntercepts(['hover']);
+
+              const isDimension = meta.field !== '$$extra$$' && !meta.isMeasure && !meta.isTotals;
+
+              if (isDimension) {
+                const currentSortParam = spreadsheet.dataCfg?.sortParams?.find(
+                  (p: any) => p.sortFieldId === meta.field,
+                );
+                const defaultSelectedKeys = currentSortParam?.sortMethod
+                  ? [currentSortParam.sortMethod.toLowerCase()]
+                  : ['none'];
+
+                const operator = {
+                  onClick: ({ key }: { key: string }) => {
+                    const sortMethod = key.toUpperCase();
+                    const prevSortParams = (spreadsheet.dataCfg?.sortParams || []).filter(
+                      (p: any) => p.sortFieldId !== meta.field,
+                    );
+                    const newSortParams =
+                      sortMethod === 'NONE'
+                        ? prevSortParams
+                        : [...prevSortParams, { sortFieldId: meta.field, sortMethod }];
+
+                    spreadsheet.emit('sort:range-sort', newSortParams);
+                    spreadsheet.setDataCfg({
+                      ...spreadsheet.dataCfg,
+                      sortParams: newSortParams,
+                    });
+                    spreadsheet.render();
+                    spreadsheet.hideTooltip();
+                  },
+                  menus: [
+                    { key: 'asc', icon: 'groupAsc', text: 'Ascending' },
+                    { key: 'desc', icon: 'groupDesc', text: 'Descending' },
+                    { key: 'none', text: 'No sort' },
+                  ],
+                  defaultSelectedKeys,
+                };
+
+                spreadsheet.showTooltipWithInfo(event, [], {
+                  operator,
+                  onlyMenu: true,
+                  forceRender: true,
+                });
+              } else {
+                const defaultSelectedKeys = spreadsheet.getMenuDefaultSelectedKeys(meta?.id);
+                const operator = {
+                  onClick: ({ key }: { key: string }) => {
+                    const sortMethod = key;
+                    if (typeof spreadsheet.groupSortByMethod === 'function') {
+                      spreadsheet.groupSortByMethod(sortMethod, meta);
+                    }
+                    spreadsheet.emit('sort:range-sorted', event);
+                    spreadsheet.hideTooltip();
+                  },
+                  menus: [
+                    { key: 'asc', icon: 'groupAsc', text: 'Group Ascending' },
+                    { key: 'desc', icon: 'groupDesc', text: 'Group Descending' },
+                    { key: 'none', text: 'No sort' },
+                  ],
+                  defaultSelectedKeys,
+                };
+
+                spreadsheet.showTooltipWithInfo(event, [], {
+                  operator,
+                  onlyMenu: true,
+                  forceRender: true,
+                });
+              }
+            },
+          },
+        ]
+      : [],
+    tooltip: {
+      enable: showTooltip,
+      operation: {
+        sort: showSortControls,
+      },
+    } as any,
     totals: {
       row: {
         showGrandTotals: showRowTotals,

@@ -197,9 +197,9 @@ const config: ControlPanelConfig = {
             name: 'show_sort_controls',
             config: {
               type: 'CheckboxControl',
-              label: t('Show Sort Controls'),
+              label: t('Enable Native Sorting'),
               description: t(
-                'Show the inline multi-column sort bar above the table.',
+                'Show interactive sort icons when hovering over column headers.',
               ),
               default: true,
               renderTrigger: true,
