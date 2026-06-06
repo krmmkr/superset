@@ -28,7 +28,7 @@ import {
   S2Event,
   TextAlign,
 } from '@antv/s2';
-import '@antv/s2-react/dist/style.min.css';
+import '@antv/s2-react/dist/s2-react.min.css';
 import { DataMask } from '@superset-ui/core';
 import { merge } from 'lodash';
 import { useTheme, useThemeMode } from '@apache-superset/core/theme';
