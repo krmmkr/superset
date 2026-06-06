@@ -126,7 +126,8 @@ const config: ControlPanelConfig = {
               default: '{}',
               language: 'json',
               renderTrigger: true,
-              visibility: ({ controls }: any) => controls?.layout_width_type?.value === 'custom',
+              visibility: ({ controls }: any) =>
+                controls?.layout_width_type?.value === 'custom',
               resetOnHide: false,
             },
           },
@@ -282,13 +283,16 @@ const config: ControlPanelConfig = {
             config: {
               type: 'SelectControl',
               label: t('Exclude Metrics from Totals'),
-              description: t('Select metrics to exclude from totals/subtotals calculations.'),
+              description: t(
+                'Select metrics to exclude from totals/subtotals calculations.',
+              ),
               multi: true,
               freeForm: true,
               mapStateToProps: (state: any) => {
                 const metrics = state.controls?.metrics?.value || [];
                 const choices = metrics.map((m: any) => {
-                  const metricName = typeof m === 'string' ? m : m.label || m.metric_name;
+                  const metricName =
+                    typeof m === 'string' ? m : m.label || m.metric_name;
                   return [metricName, metricName];
                 });
                 return {
@@ -328,7 +332,9 @@ const config: ControlPanelConfig = {
             config: {
               type: 'TextControl',
               label: t('Row Height (px)'),
-              description: t('Custom height for data cells and rows in pixels. Leave empty for default.'),
+              description: t(
+                'Custom height for data cells and rows in pixels. Leave empty for default.',
+              ),
               isInt: true,
               validators: [legacyValidateInteger],
               renderTrigger: true,
@@ -341,7 +347,9 @@ const config: ControlPanelConfig = {
             config: {
               type: 'TextControl',
               label: t('Column Header Height (px)'),
-              description: t('Custom height for column header cells in pixels. Leave empty for default.'),
+              description: t(
+                'Custom height for column header cells in pixels. Leave empty for default.',
+              ),
               isInt: true,
               validators: [legacyValidateInteger],
               renderTrigger: true,
@@ -420,7 +428,47 @@ const config: ControlPanelConfig = {
             config: {
               type: 'ColorPickerControl',
               label: t('Header Background Color'),
-              description: t('Custom background color for column and row headers.'),
+              description: t(
+                'Custom background color for column and row headers.',
+              ),
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'col_header_word_wrap',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Wrap Column Header Text'),
+              description: t('Wrap column header text when there is overflow.'),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'row_header_word_wrap',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Wrap Row Header Text'),
+              description: t(
+                'Wrap row header (dimension) text when there is overflow.',
+              ),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'data_cell_word_wrap',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Wrap Data Cell Text'),
+              description: t('Wrap data cell values when there is overflow.'),
+              default: false,
               renderTrigger: true,
             },
           },

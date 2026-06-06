@@ -16,7 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { DataRecord, getMetricLabel, getNumberFormatter } from '@superset-ui/core';
+import {
+  DataRecord,
+  getMetricLabel,
+  getNumberFormatter,
+} from '@superset-ui/core';
 import { S2TableChartProps, S2TableTransformedProps, Refs } from './types';
 import type { S2DataConfig, S2Options } from '@antv/s2';
 
@@ -33,9 +37,13 @@ function aggregate(values: number[], aggType: string): number {
         ? values.reduce((a, b) => a + b, 0) / values.length
         : 0;
     case 'MIN':
-      return values.length > 0 ? Math.min(...values) : 0;
+      return values.length > 0
+        ? values.reduce((a, b) => (a < b ? a : b), values[0])
+        : 0;
     case 'MAX':
-      return values.length > 0 ? Math.max(...values) : 0;
+      return values.length > 0
+        ? values.reduce((a, b) => (a > b ? a : b), values[0])
+        : 0;
     case 'COUNT':
       return values.length;
     case 'COUNT_DISTINCT':
@@ -63,6 +71,96 @@ function safeParseJson<T>(raw: string | undefined, fallback: T): T {
  */
 function normalizeCol(c: any): string {
   return typeof c === 'object' ? c.column_name || c.label : String(c);
+}
+
+/** Sort menu item definitions — static, allocated once. */
+const SORT_ITEMS_DIMENSION = [
+  { key: 'asc', icon: 'groupAsc', label: 'Ascending' },
+  { key: 'desc', icon: 'groupDesc', label: 'Descending' },
+  { key: 'none', label: 'No sort' },
+];
+const SORT_ITEMS_GROUP = [
+  { key: 'asc', icon: 'groupAsc', label: 'Group Ascending' },
+  { key: 'desc', icon: 'groupDesc', label: 'Group Descending' },
+  { key: 'none', label: 'No sort' },
+];
+
+/**
+ * Handle sort icon click for both rowCell and colCell header action icons.
+ * Extracts the duplicated ~80-line handler into a single reusable function.
+ */
+function handleSortIconClick(options: any): void {
+  const { event, meta } = options;
+  event.stopPropagation();
+  const { spreadsheet } = meta;
+  if (!spreadsheet) return;
+
+  spreadsheet.interaction.addIntercepts(['hover']);
+
+  const isDimension =
+    meta.field !== '$$extra$$' && !meta.isMeasure && !meta.isTotals;
+
+  if (isDimension) {
+    const currentSortParam = spreadsheet.dataCfg?.sortParams?.find(
+      (p: any) => p.sortFieldId === meta.field,
+    );
+    const defaultSelectedKeys = currentSortParam?.sortMethod
+      ? [currentSortParam.sortMethod.toLowerCase()]
+      : ['none'];
+
+    spreadsheet.showTooltipWithInfo(event, [], {
+      operator: {
+        menu: {
+          onClick: ({ key }: { key: string }) => {
+            const sortMethod = key.toUpperCase();
+            const prevSortParams = (
+              spreadsheet.dataCfg?.sortParams || []
+            ).filter((p: any) => p.sortFieldId !== meta.field);
+            const newSortParams =
+              sortMethod === 'NONE'
+                ? prevSortParams
+                : [
+                    ...prevSortParams,
+                    { sortFieldId: meta.field, sortMethod },
+                  ];
+
+            spreadsheet.emit('sort:range-sort', newSortParams);
+            spreadsheet.setDataCfg({
+              ...spreadsheet.dataCfg,
+              sortParams: newSortParams,
+            });
+            spreadsheet.render();
+            spreadsheet.hideTooltip();
+          },
+          items: SORT_ITEMS_DIMENSION,
+          selectedKeys: defaultSelectedKeys,
+        },
+      },
+      onlyShowOperator: true,
+      forceRender: true,
+    });
+  } else {
+    const defaultSelectedKeys =
+      spreadsheet.getMenuDefaultSelectedKeys(meta?.id);
+
+    spreadsheet.showTooltipWithInfo(event, [], {
+      operator: {
+        menu: {
+          onClick: ({ key }: { key: string }) => {
+            if (typeof spreadsheet.groupSortByMethod === 'function') {
+              spreadsheet.groupSortByMethod(key, meta);
+            }
+            spreadsheet.emit('sort:range-sorted', event);
+            spreadsheet.hideTooltip();
+          },
+          items: SORT_ITEMS_GROUP,
+          selectedKeys: defaultSelectedKeys,
+        },
+      },
+      onlyShowOperator: true,
+      forceRender: true,
+    });
+  }
 }
 
 export default function transformProps(
@@ -98,8 +196,17 @@ export default function transformProps(
   const showSeriesNumber = formData.showSeriesNumber ?? false;
   const layoutWidthType = formData.layoutWidthType || 'adaptive';
   const showTooltip = formData.showTooltip ?? true;
-  const rowHeight = (formData.rowHeight && !isNaN(Number(formData.rowHeight))) ? Number(formData.rowHeight) : undefined;
-  const colHeight = (formData.colHeight && !isNaN(Number(formData.colHeight))) ? Number(formData.colHeight) : undefined;
+  const rowHeight =
+    formData.rowHeight && !isNaN(Number(formData.rowHeight))
+      ? Number(formData.rowHeight)
+      : undefined;
+  const colHeight =
+    formData.colHeight && !isNaN(Number(formData.colHeight))
+      ? Number(formData.colHeight)
+      : undefined;
+  const colHeaderWordWrap = formData.col_header_word_wrap ?? false;
+  const rowHeaderWordWrap = formData.row_header_word_wrap ?? false;
+  const dataCellWordWrap = formData.data_cell_word_wrap ?? false;
 
   const advancedS2OptionsObj = safeParseJson<any>(
     formData.advancedS2Options,
@@ -113,10 +220,9 @@ export default function transformProps(
 
   const defaultDimensionAlign = formData.defaultDimensionAlign || 'left';
   const defaultMetricAlign = formData.defaultMetricAlign || 'right';
-  const columnAlignmentsObj = safeParseJson<Record<string, 'left' | 'center' | 'right'>>(
-    formData.columnAlignments,
-    {},
-  );
+  const columnAlignmentsObj = safeParseJson<
+    Record<string, 'left' | 'center' | 'right'>
+  >(formData.columnAlignments, {});
 
   const columnFormatsObj = safeParseJson<Record<string, string>>(
     formData.columnFormats,
@@ -128,15 +234,19 @@ export default function transformProps(
     {},
   );
 
-  const s2LayoutWidthType = layoutWidthType === 'custom' ? 'compact' : layoutWidthType;
-  const widthByField = layoutWidthType === 'custom' ? columnWidthsObj : undefined;
+  const s2LayoutWidthType =
+    layoutWidthType === 'custom' ? 'compact' : layoutWidthType;
+  const widthByField =
+    layoutWidthType === 'custom' ? columnWidthsObj : undefined;
 
   const excludeTotalsMetrics: string[] = formData.excludeTotalsMetrics || [];
   const headerColorObj = formData.headerColor;
 
   const headerColorRaw = formData.headerColor;
   const headerColor =
-    headerColorRaw && typeof headerColorRaw === 'object' && 'r' in headerColorRaw
+    headerColorRaw &&
+    typeof headerColorRaw === 'object' &&
+    'r' in headerColorRaw
       ? `rgba(${headerColorRaw.r}, ${headerColorRaw.g}, ${headerColorRaw.b}, ${headerColorRaw.a ?? 1})`
       : undefined;
 
@@ -146,30 +256,47 @@ export default function transformProps(
   // Normalize field names
   const groupby = rawGroupby.map(normalizeCol);
   const columns = rawColumns.map(normalizeCol);
-  const rawMetricNames = metricsRaw.map((m: any) => getMetricLabel(m));
+  const rawMetricNames: string[] = metricsRaw.map((m: any) => getMetricLabel(m));
 
   // Superset data payload
   const queryData = queriesData[0] || {};
   const data: DataRecord[] = queryData.data || [];
   const colnames: string[] = (queryData as any).colnames || [];
+
+  // Use Sets for O(1) metric name lookups instead of repeated Array.includes
+  const metricNameSet = new Set(rawMetricNames);
+  const metricNameLowerSet = new Set(
+    rawMetricNames.map((n: string) => n.toLowerCase()),
+  );
   const metricCols = colnames.filter(
-    c => rawMetricNames.includes(c) || rawMetricNames.includes(c.toLowerCase()),
+    c => metricNameSet.has(c) || metricNameLowerSet.has(c.toLowerCase()),
   );
 
   const allFields = [...groupby, ...columns, ...metricCols];
 
+  // Find tree dimension width in Tree mode
+  let treeWidth: number | undefined;
+  if (tableMode === 'tree' && groupby.length > 0) {
+    for (const col of groupby) {
+      if (columnWidthsObj[col] !== undefined) {
+        treeWidth = columnWidthsObj[col];
+        break;
+      }
+    }
+  }
+
   // ── S2 Data Config ───────────────────────────
   const s2Data = data.map(row => {
-    const out: any = {};
-    groupby.forEach((col: string) => {
+    const out: Record<string, string | number> = {};
+    for (const col of groupby) {
       out[col] = String(row[col]);
-    });
-    columns.forEach((col: string) => {
+    }
+    for (const col of columns) {
       out[col] = String(row[col]);
-    });
-    metricCols.forEach(col => {
+    }
+    for (const col of metricCols) {
       out[col] = Number(row[col]) || 0;
-    });
+    }
     return out;
   });
 
@@ -209,7 +336,10 @@ export default function transformProps(
     if (excludeTotalsMetrics.includes(metric)) {
       return null;
     }
-    const values = rows.map(row => Number(row[metric]) || 0);
+    const values = rows.map(row => {
+      const rawRow = row && typeof row === 'object' && 'raw' in row ? row.raw : row;
+      return Number(rawRow?.[metric]) || 0;
+    });
     return aggregate(values, columnAggregations[metric] || 'SUM');
   };
   const calcTotalsObj = { calcFunc };
@@ -219,7 +349,9 @@ export default function transformProps(
     width,
     height,
     hierarchyType: tableMode,
-    showSeriesNumber,
+    seriesNumber: {
+      enable: showSeriesNumber,
+    },
     interaction: {
       hoverHighlight: true,
       // Disable cell selection behaviors that cause
@@ -235,182 +367,30 @@ export default function transformProps(
       layoutWidthType: s2LayoutWidthType,
       colCell: {
         widthByField,
-      },
-      colCfg: {
         hideMeasureColumn: false,
         ...(colHeight !== undefined ? { height: colHeight } : {}),
       },
-      ...(rowHeight !== undefined
-        ? {
-            rowCfg: { height: rowHeight },
-            cellCfg: { height: rowHeight },
-          }
-        : {}),
+      rowCell: {
+        widthByField,
+        ...(treeWidth !== undefined ? { width: treeWidth, treeWidth } : {}),
+        ...(rowHeight !== undefined ? { height: rowHeight } : {}),
+      },
+      dataCell: rowHeight !== undefined ? { height: rowHeight } : {},
     } as any,
     showDefaultHeaderActionIcon: showSortControls,
     headerActionIcons: showSortControls
       ? [
           {
-            iconNames: ['SortDown'],
+            icons: ['SortDown'],
             belongsCell: 'rowCell',
             defaultHide: true,
-            action: (options: any) => {
-              const { event, meta } = options;
-              event.stopPropagation();
-              const spreadsheet = meta.spreadsheet;
-              if (!spreadsheet) return;
-
-              spreadsheet.interaction.addIntercepts(['hover']);
-
-              const isDimension = meta.field !== '$$extra$$' && !meta.isMeasure && !meta.isTotals;
-
-              if (isDimension) {
-                const currentSortParam = spreadsheet.dataCfg?.sortParams?.find(
-                  (p: any) => p.sortFieldId === meta.field,
-                );
-                const defaultSelectedKeys = currentSortParam?.sortMethod
-                  ? [currentSortParam.sortMethod.toLowerCase()]
-                  : ['none'];
-
-                const operator = {
-                  onClick: ({ key }: { key: string }) => {
-                    const sortMethod = key.toUpperCase();
-                    const prevSortParams = (spreadsheet.dataCfg?.sortParams || []).filter(
-                      (p: any) => p.sortFieldId !== meta.field,
-                    );
-                    const newSortParams =
-                      sortMethod === 'NONE'
-                        ? prevSortParams
-                        : [...prevSortParams, { sortFieldId: meta.field, sortMethod }];
-
-                    spreadsheet.emit('sort:range-sort', newSortParams);
-                    spreadsheet.setDataCfg({
-                      ...spreadsheet.dataCfg,
-                      sortParams: newSortParams,
-                    });
-                    spreadsheet.render();
-                    spreadsheet.hideTooltip();
-                  },
-                  menus: [
-                    { key: 'asc', icon: 'groupAsc', text: 'Ascending' },
-                    { key: 'desc', icon: 'groupDesc', text: 'Descending' },
-                    { key: 'none', text: 'No sort' },
-                  ],
-                  defaultSelectedKeys,
-                };
-
-                spreadsheet.showTooltipWithInfo(event, [], {
-                  operator,
-                  onlyMenu: true,
-                  forceRender: true,
-                });
-              } else {
-                const defaultSelectedKeys = spreadsheet.getMenuDefaultSelectedKeys(meta?.id);
-                const operator = {
-                  onClick: ({ key }: { key: string }) => {
-                    const sortMethod = key;
-                    if (typeof spreadsheet.groupSortByMethod === 'function') {
-                      spreadsheet.groupSortByMethod(sortMethod, meta);
-                    }
-                    spreadsheet.emit('sort:range-sorted', event);
-                    spreadsheet.hideTooltip();
-                  },
-                  menus: [
-                    { key: 'asc', icon: 'groupAsc', text: 'Group Ascending' },
-                    { key: 'desc', icon: 'groupDesc', text: 'Group Descending' },
-                    { key: 'none', text: 'No sort' },
-                  ],
-                  defaultSelectedKeys,
-                };
-
-                spreadsheet.showTooltipWithInfo(event, [], {
-                  operator,
-                  onlyMenu: true,
-                  forceRender: true,
-                });
-              }
-            },
+            onClick: handleSortIconClick,
           },
           {
-            iconNames: ['SortDown'],
+            icons: ['SortDown'],
             belongsCell: 'colCell',
             defaultHide: true,
-            action: (options: any) => {
-              const { event, meta } = options;
-              event.stopPropagation();
-              const spreadsheet = meta.spreadsheet;
-              if (!spreadsheet) return;
-
-              spreadsheet.interaction.addIntercepts(['hover']);
-
-              const isDimension = meta.field !== '$$extra$$' && !meta.isMeasure && !meta.isTotals;
-
-              if (isDimension) {
-                const currentSortParam = spreadsheet.dataCfg?.sortParams?.find(
-                  (p: any) => p.sortFieldId === meta.field,
-                );
-                const defaultSelectedKeys = currentSortParam?.sortMethod
-                  ? [currentSortParam.sortMethod.toLowerCase()]
-                  : ['none'];
-
-                const operator = {
-                  onClick: ({ key }: { key: string }) => {
-                    const sortMethod = key.toUpperCase();
-                    const prevSortParams = (spreadsheet.dataCfg?.sortParams || []).filter(
-                      (p: any) => p.sortFieldId !== meta.field,
-                    );
-                    const newSortParams =
-                      sortMethod === 'NONE'
-                        ? prevSortParams
-                        : [...prevSortParams, { sortFieldId: meta.field, sortMethod }];
-
-                    spreadsheet.emit('sort:range-sort', newSortParams);
-                    spreadsheet.setDataCfg({
-                      ...spreadsheet.dataCfg,
-                      sortParams: newSortParams,
-                    });
-                    spreadsheet.render();
-                    spreadsheet.hideTooltip();
-                  },
-                  menus: [
-                    { key: 'asc', icon: 'groupAsc', text: 'Ascending' },
-                    { key: 'desc', icon: 'groupDesc', text: 'Descending' },
-                    { key: 'none', text: 'No sort' },
-                  ],
-                  defaultSelectedKeys,
-                };
-
-                spreadsheet.showTooltipWithInfo(event, [], {
-                  operator,
-                  onlyMenu: true,
-                  forceRender: true,
-                });
-              } else {
-                const defaultSelectedKeys = spreadsheet.getMenuDefaultSelectedKeys(meta?.id);
-                const operator = {
-                  onClick: ({ key }: { key: string }) => {
-                    const sortMethod = key;
-                    if (typeof spreadsheet.groupSortByMethod === 'function') {
-                      spreadsheet.groupSortByMethod(sortMethod, meta);
-                    }
-                    spreadsheet.emit('sort:range-sorted', event);
-                    spreadsheet.hideTooltip();
-                  },
-                  menus: [
-                    { key: 'asc', icon: 'groupAsc', text: 'Group Ascending' },
-                    { key: 'desc', icon: 'groupDesc', text: 'Group Descending' },
-                    { key: 'none', text: 'No sort' },
-                  ],
-                  defaultSelectedKeys,
-                };
-
-                spreadsheet.showTooltipWithInfo(event, [], {
-                  operator,
-                  onlyMenu: true,
-                  forceRender: true,
-                });
-              }
-            },
+            onClick: handleSortIconClick,
           },
         ]
       : [],
@@ -418,32 +398,29 @@ export default function transformProps(
       enable: showTooltip,
       operation: {
         sort: showSortControls,
+        hiddenColumns: true,
       },
     } as any,
     totals: {
       row: {
         showGrandTotals: showRowTotals,
         showSubTotals: showRowSubtotals && groupby.length > 1,
-        reverseLayout: true,
-        reverseSubLayout: true,
-        // @ts-ignore – S2 v1 calcFunc signature
-        calcTotals: calcTotalsObj,
-        // @ts-ignore
+        reverseGrandTotalsLayout: true,
+        reverseSubTotalsLayout: true,
+        calcGrandTotals: calcTotalsObj,
         calcSubTotals: calcTotalsObj,
         subTotalsDimensions: groupby.length > 1 ? groupby.slice(0, -1) : [],
-        label: totalLabel,
-        subLabel: `Sub${totalLabel}`,
+        grandTotalsLabel: totalLabel,
+        subTotalsLabel: `Sub${totalLabel}`,
       } as any,
       col: {
         showGrandTotals: showColTotals,
         showSubTotals: showColSubtotals && columns.length > 1,
-        // @ts-ignore
-        calcTotals: calcTotalsObj,
-        // @ts-ignore
+        calcGrandTotals: calcTotalsObj,
         calcSubTotals: calcTotalsObj,
         subTotalsDimensions: columns.length > 1 ? columns.slice(0, -1) : [],
-        label: totalLabel,
-        subLabel: `Sub${totalLabel}`,
+        grandTotalsLabel: totalLabel,
+        subTotalsLabel: `Sub${totalLabel}`,
       } as any,
     },
   };
@@ -480,5 +457,8 @@ export default function transformProps(
     refs,
     onContextMenu: hooks.onContextMenu,
     setControlValue,
+    colHeaderWordWrap,
+    rowHeaderWordWrap,
+    dataCellWordWrap,
   };
 }

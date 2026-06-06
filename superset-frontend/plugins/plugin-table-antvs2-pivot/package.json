@@ -25,8 +25,8 @@
     "react": "^16.13.1 || ^17.0.0 || ^18.0.0"
   },
   "dependencies": {
-    "@antv/s2": "^1.40.0",
-    "@antv/s2-react": "^1.40.0"
+    "@antv/s2": "^2.7.1",
+    "@antv/s2-react": "^2.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.0.0",

@@ -26,26 +26,43 @@ import {
   RowCell,
   CornerCell,
   S2Event,
+  TextAlign,
 } from '@antv/s2';
 import '@antv/s2-react/dist/style.min.css';
 import { DataMask } from '@superset-ui/core';
 import { merge } from 'lodash';
 import { useTheme, useThemeMode } from '@apache-superset/core/theme';
+import { Menu } from '@superset-ui/core/components/Menu';
 import { S2TableTransformedProps } from './types';
 
 setLang('en_US');
 
+/**
+ * Shared helper: reads per-column alignment from the custom options
+ * attached to the spreadsheet instance.
+ */
+function getAlignmentFromOptions(
+  spreadsheet: any,
+  field: string,
+  isMetric: boolean,
+): TextAlign {
+  const opts = spreadsheet?.options;
+  const alignments = opts?.columnAlignmentsObj || {};
+  const dimAlign = opts?.defaultDimensionAlign || 'left';
+  const metricAlign = opts?.defaultMetricAlign || 'right';
+  return (alignments[field] || (isMetric ? metricAlign : dimAlign)) as TextAlign;
+}
+
 class CustomDataCell extends DataCell {
   getTextStyle() {
     const textStyle = super.getTextStyle();
-    const spreadsheet = this.spreadsheet;
-    const alignments = (spreadsheet?.options as any)?.columnAlignmentsObj || {};
-    const defaultMetricAlign = (spreadsheet?.options as any)?.defaultMetricAlign || 'right';
-    const field = this.meta.valueField;
-    const alignment = alignments[field] || defaultMetricAlign;
     return {
       ...textStyle,
-      textAlign: alignment,
+      textAlign: getAlignmentFromOptions(
+        this.spreadsheet,
+        this.meta.valueField,
+        true,
+      ),
     };
   }
 }
@@ -53,17 +70,14 @@ class CustomDataCell extends DataCell {
 class CustomColCell extends ColCell {
   getTextStyle() {
     const textStyle = super.getTextStyle();
-    const spreadsheet = this.spreadsheet;
-    const alignments = (spreadsheet?.options as any)?.columnAlignmentsObj || {};
-    const defaultDimensionAlign = (spreadsheet?.options as any)?.defaultDimensionAlign || 'left';
-    const defaultMetricAlign = (spreadsheet?.options as any)?.defaultMetricAlign || 'right';
-    
     const isMetric = this.isMeasureField();
-    const fieldName = isMetric ? this.meta.value : this.meta.field;
-    const alignment = alignments[fieldName] || (isMetric ? defaultMetricAlign : defaultDimensionAlign);
     return {
       ...textStyle,
-      textAlign: alignment,
+      textAlign: getAlignmentFromOptions(
+        this.spreadsheet,
+        isMetric ? this.meta.value : this.meta.field,
+        isMetric,
+      ),
     };
   }
 }
@@ -71,17 +85,14 @@ class CustomColCell extends ColCell {
 class CustomRowCell extends RowCell {
   getTextStyle() {
     const textStyle = super.getTextStyle();
-    const spreadsheet = this.spreadsheet;
-    const alignments = (spreadsheet?.options as any)?.columnAlignmentsObj || {};
-    const defaultDimensionAlign = (spreadsheet?.options as any)?.defaultDimensionAlign || 'left';
-    const defaultMetricAlign = (spreadsheet?.options as any)?.defaultMetricAlign || 'right';
-    
     const isMetric = this.isMeasureField();
-    const fieldName = isMetric ? this.meta.value : this.meta.field;
-    const alignment = alignments[fieldName] || (isMetric ? defaultMetricAlign : defaultDimensionAlign);
     return {
       ...textStyle,
-      textAlign: alignment,
+      textAlign: getAlignmentFromOptions(
+        this.spreadsheet,
+        isMetric ? this.meta.value : this.meta.field,
+        isMetric,
+      ),
     };
   }
 }
@@ -89,15 +100,52 @@ class CustomRowCell extends RowCell {
 class CustomCornerCell extends CornerCell {
   getTextStyle() {
     const textStyle = super.getTextStyle();
-    const spreadsheet = this.spreadsheet;
-    const defaultDimensionAlign = (spreadsheet?.options as any)?.defaultDimensionAlign || 'left';
     return {
       ...textStyle,
-      textAlign: defaultDimensionAlign,
+      textAlign: getAlignmentFromOptions(this.spreadsheet, '', false),
     };
   }
 }
 
+/** Static CSS for the tooltip sort menu — allocated once at module level. */
+const TOOLTIP_MENU_STYLE = `
+  .s2-tooltip-custom-menu .ant-menu {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    width: 135px !important;
+  }
+  .s2-tooltip-custom-menu .ant-menu-item {
+    height: 22px !important;
+    line-height: 22px !important;
+    padding: 0 8px !important;
+    margin: 1px 0 !important;
+    font-size: 11px !important;
+  }
+  .s2-tooltip-custom-menu .ant-menu-item .ant-menu-title-content {
+    font-size: 11px !important;
+  }
+  .s2-tooltip-custom-menu .ant-menu-item-icon,
+  .s2-tooltip-custom-menu .antv-s2-operator-icon {
+    font-size: 10px !important;
+    margin-right: 4px !important;
+  }
+`;
+
+
+/**
+ * Build cell interaction state styling. Takes hover/selected bg color and
+ * returns the interactionState block used across all cell types.
+ */
+function buildInteractionState(bg: string) {
+  return {
+    hover: { backgroundColor: bg, backgroundOpacity: 1 },
+    hoverFocus: { backgroundColor: bg, backgroundOpacity: 1 },
+    selected: { backgroundColor: bg, backgroundOpacity: 1 },
+  };
+}
+
+
+/* eslint-disable theme-colors/no-literal-colors */
 export default function AntvS2Table(props: S2TableTransformedProps) {
   const {
     width,
@@ -116,6 +164,9 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     columnAlignmentsObj = {},
     headerColor,
     headerColorObj,
+    colHeaderWordWrap,
+    rowHeaderWordWrap,
+    dataCellWordWrap,
   } = props;
 
   const divRef = useRef<HTMLDivElement>(null);
@@ -132,12 +183,14 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     setSortParams([]);
   }, [fieldsKey]);
 
-  const mergedDataCfg = useMemo(() => {
-    return {
+  const mergedDataCfg = useMemo(
+    () => ({
       ...s2DataConfig,
-      sortParams: sortParams.length > 0 ? sortParams : (s2DataConfig.sortParams || []),
-    };
-  }, [s2DataConfig, sortParams]);
+      sortParams:
+        sortParams.length > 0 ? sortParams : s2DataConfig.sortParams || [],
+    }),
+    [s2DataConfig, sortParams],
+  );
 
   // ── Cross-filtering (data & row cell clicks only) ──
   const handleDataClick = useCallback(
@@ -195,7 +248,11 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   let headerTextColor =
     theme?.colorTextHeading || theme?.colorText || '#262626';
 
-  if (rawHeaderColor && typeof rawHeaderColor === 'object' && 'r' in rawHeaderColor) {
+  if (
+    rawHeaderColor &&
+    typeof rawHeaderColor === 'object' &&
+    'r' in rawHeaderColor
+  ) {
     const { r, g, b } = rawHeaderColor;
     const yiq = (r * 299 + g * 587 + b * 114) / 1000;
     headerTextColor = yiq >= 128 ? '#262626' : '#ffffff';
@@ -217,14 +274,19 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   } = advancedS2OptionsObj || {};
 
   const customThemeCfg = useMemo(() => {
+    const hoverInteraction = buildInteractionState(hoverBgColor);
+    const cellBorders = {
+      horizontalBorderColor: borderColor,
+      verticalBorderColor: borderColor,
+    };
+
     const baseThemeCfg: any = {
       name: formData.theme || 'default',
       theme: isDefaultTheme
         ? {
             background: { color: bgColor },
             splitLine: {
-              horizontalBorderColor: borderColor,
-              verticalBorderColor: borderColor,
+              ...cellBorders,
               horizontalBorderColorOpacity: isDark ? 0.6 : 1,
               verticalBorderColorOpacity: isDark ? 0.6 : 1,
             },
@@ -232,28 +294,22 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
               cell: {
                 backgroundColor: bgColor,
                 crossBackgroundColor: hoverBgColor,
-                horizontalBorderColor: borderColor,
-                verticalBorderColor: borderColor,
-                interactionState: {
-                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                },
+                ...cellBorders,
+                interactionState: hoverInteraction,
               },
               text: { fill: textColor, textAlign: 'center' },
-              bolderText: { fill: totalText, fontWeight: totalFontWeight, textAlign: 'center' },
+              bolderText: {
+                fill: totalText,
+                fontWeight: totalFontWeight,
+                textAlign: 'center',
+              },
               measureText: { fill: textColor, textAlign: 'center' },
             },
             cornerCell: {
               cell: {
                 backgroundColor: headerBgColor,
-                horizontalBorderColor: borderColor,
-                verticalBorderColor: borderColor,
-                interactionState: {
-                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                },
+                ...cellBorders,
+                interactionState: hoverInteraction,
               },
               text: { fill: headerTextColor, fontWeight: 'bold' },
               bolderText: { fill: headerTextColor },
@@ -262,13 +318,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
             seriesNumberCell: {
               cell: {
                 backgroundColor: headerBgColor,
-                horizontalBorderColor: borderColor,
-                verticalBorderColor: borderColor,
-                interactionState: {
-                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                },
+                ...cellBorders,
+                interactionState: hoverInteraction,
               },
               text: { fill: headerTextColor },
               bolderText: { fill: headerTextColor },
@@ -277,13 +328,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
             rowCell: {
               cell: {
                 backgroundColor: bgColor,
-                horizontalBorderColor: borderColor,
-                verticalBorderColor: borderColor,
-                interactionState: {
-                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                },
+                ...cellBorders,
+                interactionState: hoverInteraction,
               },
               text: { fill: textColor },
               bolderText: { fill: totalText, fontWeight: totalFontWeight },
@@ -293,15 +339,14 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
             colCell: {
               cell: {
                 backgroundColor: headerBgColor,
-                horizontalBorderColor: borderColor,
-                verticalBorderColor: borderColor,
-                interactionState: {
-                  hover: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  hoverFocus: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                  selected: { backgroundColor: hoverBgColor, backgroundOpacity: 1 },
-                },
+                ...cellBorders,
+                interactionState: hoverInteraction,
               },
-              text: { fill: headerTextColor, fontWeight: 'bold', textAlign: 'center' },
+              text: {
+                fill: headerTextColor,
+                fontWeight: 'bold',
+                textAlign: 'center',
+              },
               bolderText: { fill: headerTextColor, textAlign: 'center' },
               measureText: { fill: headerTextColor, textAlign: 'center' },
             },
@@ -323,23 +368,44 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         : {},
     };
 
-    const userOptions = (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
+    const userOptions =
+      (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
     const finalAdvThemeCfg = advThemeCfg || userOptions.themeCfg || {};
     const merged = merge({}, baseThemeCfg, finalAdvThemeCfg);
 
-    const activeTheme = merge({}, advTheme || userOptions.theme || finalAdvThemeCfg.theme || {});
-    const themeKeys = ['background', 'splitLine', 'dataCell', 'rowCell', 'colCell', 'cornerCell', 'scrollBar', 'cell'];
+    const activeTheme = merge(
+      {},
+      advTheme || userOptions.theme || finalAdvThemeCfg.theme || {},
+    );
+    const themeKeys = [
+      'background',
+      'splitLine',
+      'dataCell',
+      'rowCell',
+      'colCell',
+      'cornerCell',
+      'scrollBar',
+      'cell',
+    ];
 
     // Auto-promote keys from root, root.options, themeCfg or themeCfg.theme to merged.theme
     themeKeys.forEach(key => {
       if (advancedS2OptionsObj && advancedS2OptionsObj[key]) {
-        activeTheme[key] = merge({}, activeTheme[key] || {}, advancedS2OptionsObj[key]);
+        activeTheme[key] = merge(
+          {},
+          activeTheme[key] || {},
+          advancedS2OptionsObj[key],
+        );
       }
       if (userOptions && userOptions[key]) {
         activeTheme[key] = merge({}, activeTheme[key] || {}, userOptions[key]);
       }
       if (finalAdvThemeCfg[key]) {
-        activeTheme[key] = merge({}, activeTheme[key] || {}, finalAdvThemeCfg[key]);
+        activeTheme[key] = merge(
+          {},
+          activeTheme[key] || {},
+          finalAdvThemeCfg[key],
+        );
       }
     });
 
@@ -347,7 +413,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       merged.theme = merge({}, merged.theme || {}, activeTheme);
     }
 
-    const activePalette = advPalette || userOptions.palette || finalAdvThemeCfg.palette;
+    const activePalette =
+      advPalette || userOptions.palette || finalAdvThemeCfg.palette;
     if (activePalette) {
       merged.palette = activePalette;
     } else {
@@ -398,20 +465,35 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       options: ignoredOptions,
       ...restOptions
     } = advancedS2OptionsObj || {};
-    
-    const userOptions = (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
+
+    const userOptions =
+      (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
     const finalOptions = merge({}, baseOptions, restOptions, userOptions);
 
     // Promote layout/style keys from root of advancedS2OptionsObj or nested options to style block
-    const styleKeys = ['colCfg', 'rowCfg', 'cellCfg', 'layoutWidthType', 'showSeriesNumber'];
+    const styleKeys = [
+      'colCell',
+      'rowCell',
+      'dataCell',
+      'layoutWidthType',
+      'seriesNumber',
+    ];
     styleKeys.forEach(key => {
       if (advancedS2OptionsObj && advancedS2OptionsObj[key]) {
         finalOptions.style = finalOptions.style || {};
-        finalOptions.style[key] = merge({}, finalOptions.style[key] || {}, advancedS2OptionsObj[key]);
+        finalOptions.style[key] = merge(
+          {},
+          finalOptions.style[key] || {},
+          advancedS2OptionsObj[key],
+        );
       }
       if (userOptions && userOptions[key]) {
         finalOptions.style = finalOptions.style || {};
-        finalOptions.style[key] = merge({}, finalOptions.style[key] || {}, userOptions[key]);
+        finalOptions.style[key] = merge(
+          {},
+          finalOptions.style[key] || {},
+          userOptions[key],
+        );
       }
     });
 
@@ -420,22 +502,41 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       const colHeight = advancedS2OptionsObj.colHeight ?? userOptions.colHeight;
       if (colHeight !== undefined) {
         finalOptions.style = finalOptions.style || {};
-        finalOptions.style.colCfg = finalOptions.style.colCfg || {};
-        finalOptions.style.colCfg.height = colHeight;
+        finalOptions.style.colCell = finalOptions.style.colCell || {};
+        finalOptions.style.colCell.height = colHeight;
       }
       const rowHeight = advancedS2OptionsObj.rowHeight ?? userOptions.rowHeight;
       if (rowHeight !== undefined) {
         finalOptions.style = finalOptions.style || {};
-        finalOptions.style.rowCfg = finalOptions.style.rowCfg || {};
-        finalOptions.style.rowCfg.height = rowHeight;
+        finalOptions.style.rowCell = finalOptions.style.rowCell || {};
+        finalOptions.style.rowCell.height = rowHeight;
       }
-      const cellHeight = advancedS2OptionsObj.cellHeight ?? userOptions.cellHeight;
+      const cellHeight =
+        advancedS2OptionsObj.cellHeight ?? userOptions.cellHeight;
       if (cellHeight !== undefined) {
         finalOptions.style = finalOptions.style || {};
-        finalOptions.style.cellCfg = finalOptions.style.cellCfg || {};
-        finalOptions.style.cellCfg.height = cellHeight;
+        finalOptions.style.dataCell = finalOptions.style.dataCell || {};
+        finalOptions.style.dataCell.height = cellHeight;
       }
     }
+
+    // Apply word wrapping options natively in S2 2.x
+    finalOptions.style = finalOptions.style || {};
+
+    finalOptions.style.colCell = finalOptions.style.colCell || {};
+    finalOptions.style.colCell.wordWrap = true;
+    finalOptions.style.colCell.maxLines = colHeaderWordWrap ? Infinity : 1;
+    finalOptions.style.colCell.textOverflow = 'ellipsis';
+
+    finalOptions.style.rowCell = finalOptions.style.rowCell || {};
+    finalOptions.style.rowCell.wordWrap = true;
+    finalOptions.style.rowCell.maxLines = rowHeaderWordWrap ? Infinity : 1;
+    finalOptions.style.rowCell.textOverflow = 'ellipsis';
+
+    finalOptions.style.dataCell = finalOptions.style.dataCell || {};
+    finalOptions.style.dataCell.wordWrap = true;
+    finalOptions.style.dataCell.maxLines = dataCellWordWrap ? Infinity : 1;
+    finalOptions.style.dataCell.textOverflow = 'ellipsis';
 
     // Attach custom alignment options to finalOptions so cell classes can read them
     (finalOptions as any).columnAlignmentsObj = columnAlignmentsObj;
@@ -445,7 +546,11 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
 
     // Map custom cells
     finalOptions.dataCell = (viewMeta: any, spreadsheet: any, ...args: any[]) =>
-      new CustomDataCell(viewMeta, spreadsheet || viewMeta?.spreadsheet, ...args);
+      new CustomDataCell(
+        viewMeta,
+        spreadsheet || viewMeta?.spreadsheet,
+        ...args,
+      );
     finalOptions.colCell = (meta: any, spreadsheet: any, ...args: any[]) =>
       new CustomColCell(meta, spreadsheet || meta?.spreadsheet, ...args);
     finalOptions.rowCell = (meta: any, spreadsheet: any, ...args: any[]) =>
@@ -470,45 +575,82 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       }
     }
 
-    return finalOptions;
-  }, [s2Options, advancedS2OptionsObj, defaultDimensionAlign, defaultMetricAlign, columnAlignmentsObj, headerColor, metricCols]);
+    // Ensure tooltip has a render function for the operation menu in 2.x
+    finalOptions.tooltip = finalOptions.tooltip || {};
+    finalOptions.tooltip.operation = finalOptions.tooltip.operation || {};
+    finalOptions.tooltip.operation.menu = {
+      render: (props: any) =>
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement('style', null, TOOLTIP_MENU_STYLE),
+          React.createElement(
+            'div',
+            { className: 's2-tooltip-custom-menu' },
+            React.createElement(Menu, { ...props, mode: 'vertical' }),
+          ),
+        ),
+      ...finalOptions.tooltip.operation.menu,
+    };
 
-  // Generate a key to force SheetComponent remount when options or theme changes
-  const sheetKey = useMemo(() => {
-    return [
-      width,
-      height,
-      isDark ? 'dark' : 'light',
-      formData.theme || 'default',
-      formData.advancedS2Options || '',
-      formData.tableMode || 'grid',
-      formData.showSeriesNumber ?? false,
-      formData.layoutWidthType || 'adaptive',
-      formData.showTooltip ?? true,
-      formData.rowHeight || '',
-      formData.colHeight || '',
-      formData.defaultDimensionAlign || 'left',
-      formData.defaultMetricAlign || 'right',
-      formData.columnAlignments || '{}',
-      formData.headerColor ? `${formData.headerColor.r}_${formData.headerColor.g}_${formData.headerColor.b}_${formData.headerColor.a}` : '',
-    ].join('_');
+    return finalOptions;
   }, [
-    width,
-    height,
-    isDark,
-    formData.theme,
-    formData.advancedS2Options,
-    formData.tableMode,
-    formData.showSeriesNumber,
-    formData.layoutWidthType,
-    formData.showTooltip,
-    formData.rowHeight,
-    formData.colHeight,
-    formData.defaultDimensionAlign,
-    formData.defaultMetricAlign,
-    formData.columnAlignments,
-    formData.headerColor,
+    s2Options,
+    advancedS2OptionsObj,
+    defaultDimensionAlign,
+    defaultMetricAlign,
+    columnAlignmentsObj,
+    headerColor,
+    metricCols,
+    colHeaderWordWrap,
+    rowHeaderWordWrap,
+    dataCellWordWrap,
   ]);
+
+  // Generate a key to force SheetComponent remount when config/theme changes.
+  // Width/height are intentionally excluded — S2 handles resize internally
+  // via options.height and the wrapper div style without needing a remount.
+  const sheetKey = useMemo(
+    () =>
+      [
+        isDark ? 'dark' : 'light',
+        formData.theme || 'default',
+        formData.advancedS2Options || '',
+        formData.tableMode || 'grid',
+        formData.showSeriesNumber ?? false,
+        formData.layoutWidthType || 'adaptive',
+        formData.showTooltip ?? true,
+        formData.rowHeight || '',
+        formData.colHeight || '',
+        formData.defaultDimensionAlign || 'left',
+        formData.defaultMetricAlign || 'right',
+        formData.columnAlignments || '{}',
+        formData.headerColor
+          ? `${formData.headerColor.r}_${formData.headerColor.g}_${formData.headerColor.b}_${formData.headerColor.a}`
+          : '',
+        formData.col_header_word_wrap ?? false,
+        formData.row_header_word_wrap ?? false,
+        formData.data_cell_word_wrap ?? false,
+      ].join('_'),
+    [
+      isDark,
+      formData.theme,
+      formData.advancedS2Options,
+      formData.tableMode,
+      formData.showSeriesNumber,
+      formData.layoutWidthType,
+      formData.showTooltip,
+      formData.rowHeight,
+      formData.colHeight,
+      formData.defaultDimensionAlign,
+      formData.defaultMetricAlign,
+      formData.columnAlignments,
+      formData.headerColor,
+      formData.col_header_word_wrap,
+      formData.row_header_word_wrap,
+      formData.data_cell_word_wrap,
+    ],
+  );
 
   return (
     <div
@@ -531,6 +673,84 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
               setSortParams(newSortParams);
             }
           });
+
+          // Intercept showTooltipWithInfo to append Sort options to the header click tooltip
+          const originalShowTooltipWithInfo = s2.showTooltipWithInfo.bind(s2);
+          s2.showTooltipWithInfo = (event: any, cellInfos: any, options: any) => {
+            const cell = s2.getTargetCell(event?.target);
+            const cellType = cell?.cellType;
+
+            // Only modify if it is a row cell or col cell, the event is a click, and has options
+            if (
+              (cellType === 'rowCell' || cellType === 'colCell') &&
+              options &&
+              event?.type === 'click'
+            ) {
+              const meta = cell.getMeta();
+              if (meta) {
+                const isDimension =
+                  meta.field !== '$$extra$$' && !meta.isMeasure && !meta.isTotals;
+
+                const currentSortParam = s2.dataCfg?.sortParams?.find(
+                  (p: any) => p.sortFieldId === meta.field,
+                );
+                const defaultSelectedKeys = isDimension
+                  ? (currentSortParam?.sortMethod
+                      ? [currentSortParam.sortMethod.toLowerCase()]
+                      : ['none'])
+                  : s2.getMenuDefaultSelectedKeys(meta?.id) || ['none'];
+
+                // Shared handler: applies sort for both dimension and metric fields
+                const applySortMethod = (method: string) => {
+                  if (isDimension) {
+                    const prevSortParams = (s2.dataCfg?.sortParams || []).filter(
+                      (p: any) => p.sortFieldId !== meta.field,
+                    );
+                    const newSortParams =
+                      method === 'none'
+                        ? prevSortParams
+                        : [
+                            ...prevSortParams,
+                            { sortFieldId: meta.field, sortMethod: method.toUpperCase() },
+                          ];
+                    s2.emit('sort:range-sort', newSortParams);
+                    s2.setDataCfg({
+                      ...s2.dataCfg,
+                      sortParams: newSortParams,
+                    });
+                    s2.render();
+                  } else {
+                    if (typeof s2.groupSortByMethod === 'function') {
+                      s2.groupSortByMethod(method, meta);
+                    }
+                    s2.emit('sort:range-sorted', event);
+                  }
+                  s2.hideTooltip();
+                };
+
+                const sortItems = [
+                  { key: 'asc', icon: 'groupAsc', label: 'Ascending', onClick: () => applySortMethod('asc') },
+                  { key: 'desc', icon: 'groupDesc', label: 'Descending', onClick: () => applySortMethod('desc') },
+                  { key: 'none', label: 'No sort', onClick: () => applySortMethod('none') },
+                ];
+
+                options.operator = options.operator || {};
+                options.operator.menu = options.operator.menu || {};
+
+                const existingItems = options.operator.menu.items || [];
+                const hasSortItem = existingItems.some(
+                  (item: any) =>
+                    item.key === 'asc' || item.key === 'desc' || item.key === 'none',
+                );
+
+                if (!hasSortItem) {
+                  options.operator.menu.items = [...existingItems, ...sortItems];
+                  options.operator.menu.selectedKeys = defaultSelectedKeys;
+                }
+              }
+            }
+            return originalShowTooltipWithInfo(event, cellInfos, options);
+          };
         },
         onDataCellClick: handleDataClick,
         onRowCellClick: handleDataClick,

@@ -106,4 +106,7 @@ export interface S2TableTransformedProps {
     filters?: ContextMenuFilters,
   ) => void;
   setControlValue?: HandlerFunction;
+  colHeaderWordWrap?: boolean;
+  rowHeaderWordWrap?: boolean;
+  dataCellWordWrap?: boolean;
 }

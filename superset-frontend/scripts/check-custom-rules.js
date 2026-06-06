@@ -67,8 +67,8 @@ function hasEslintDisable(path, ruleName = 'theme-colors/no-literal-colors') {
 
   // Check if parent is a statement with leading comments
   let current = path;
-  while (current.parent) {
-    current = current.parent;
+  while (current.parentPath) {
+    current = current.parentPath;
     if (current.node && current.node.leadingComments) {
       const hasDisable = current.node.leadingComments.some(
         comment =>
