@@ -123,7 +123,12 @@ test('should map separate alignment configurations correctly', () => {
   const chartProps = buildChartProps({
     defaultDimensionAlign: 'center',
     defaultMetricAlign: 'left',
-    columnAlignments: '{"region": "left", "sales": "right"}',
+    dimension_config: {
+      region: { horizontalAlign: 'left' },
+    },
+    metric_config: {
+      sales: { horizontalAlign: 'right' },
+    },
   });
   const result = transformProps(chartProps as any);
 
@@ -148,7 +153,9 @@ test('should map headerColor configuration correctly', () => {
 test('should map number formatting correctly', () => {
   const chartProps = buildChartProps({
     metrics: ['sales', 'profit'],
-    columnFormats: '{"sales": ".2%"}',
+    metric_config: {
+      sales: { d3NumberFormat: '.2%' },
+    },
   });
   chartProps.queriesData[0].data = [
     { region: 'East', category: 'Furniture', sales: 100, profit: 50 },
@@ -199,7 +206,12 @@ test('should return empty string in formatter if value is null or undefined', ()
 test('should map columnWidths when layoutWidthType is custom', () => {
   const chartProps = buildChartProps({
     layoutWidthType: 'custom',
-    columnWidths: '{"region": 150, "sales": 120}',
+    dimension_config: {
+      region: { columnWidth: 150 },
+    },
+    metric_config: {
+      sales: { columnWidth: 120 },
+    },
   });
   const result = transformProps(chartProps as any);
 
@@ -213,10 +225,54 @@ test('should map columnWidths when layoutWidthType is custom', () => {
 test('should ignore columnWidths when layoutWidthType is not custom', () => {
   const chartProps = buildChartProps({
     layoutWidthType: 'adaptive',
-    columnWidths: '{"region": 150, "sales": 120}',
+    dimension_config: {
+      region: { columnWidth: 150 },
+    },
+    metric_config: {
+      sales: { columnWidth: 120 },
+    },
   });
   const result = transformProps(chartProps as any);
 
   expect(result.s2Options.style.layoutWidthType).toBe('adaptive');
   expect(result.s2Options.style.colCell.widthByField).toBeUndefined();
 });
+
+test('should exclude totals for metrics configured with excludeTotals in metric_config', () => {
+  const chartProps = buildChartProps({
+    metrics: ['sales', 'profit'],
+    metric_config: {
+      profit: { excludeTotals: true },
+    },
+  });
+  const result = transformProps(chartProps as any);
+
+  const calcFunc = result.s2Options.totals.row.calcTotals.calcFunc;
+  expect(calcFunc).toBeDefined();
+
+  const salesVal = calcFunc({ '$$extra$$': 'sales' }, [{ sales: 10 }, { sales: 20 }]);
+  expect(salesVal).toBe(30);
+
+  const profitVal = calcFunc({ '$$extra$$': 'profit' }, [{ profit: 10 }, { profit: 20 }]);
+  expect(profitVal).toBeNull();
+});
+
+test('should exclude dimensions from row/col subTotalsDimensions when showSubtotal is false in dimension_config', () => {
+  const chartProps = buildChartProps({
+    groupby: ['region', 'country', 'city'],
+    columns: ['category', 'sub_category'],
+    showRowSubtotals: true,
+    showColSubtotals: true,
+    dimension_config: {
+      country: { showSubtotal: false },
+      category: { showSubtotal: false },
+    },
+  });
+  chartProps.queriesData[0].colnames = ['region', 'country', 'city', 'category', 'sub_category', 'sales'];
+  chartProps.queriesData[0].coltypes = [1, 1, 1, 1, 1, 0];
+  const result = transformProps(chartProps as any);
+
+  expect(result.s2Options.totals.row.subTotalsDimensions).toEqual(['region']);
+  expect(result.s2Options.totals.col.subTotalsDimensions).toEqual([]);
+});
+

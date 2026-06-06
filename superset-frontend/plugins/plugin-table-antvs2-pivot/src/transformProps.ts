@@ -184,65 +184,103 @@ export default function transformProps(
   const rawColumns = formData.columns || [];
   const metricsRaw = formData.metrics || [];
 
-  const tableMode = formData.tableMode || 'grid';
-  const emitFilter = formData.emitFilter ?? true;
+  const tableMode = formData.tableMode ?? formData.table_mode ?? 'grid';
+  const emitFilter = formData.emitFilter ?? formData.emit_filter ?? true;
 
-  const totalLabel = formData.totalLabel || 'Total';
-  const showRowTotals = formData.showRowTotals ?? true;
-  const showRowSubtotals = formData.showRowSubtotals ?? false;
-  const showColTotals = formData.showColTotals ?? true;
-  const showColSubtotals = formData.showColSubtotals ?? false;
-  const showSortControls = formData.showSortControls ?? true;
-  const showSeriesNumber = formData.showSeriesNumber ?? false;
-  const layoutWidthType = formData.layoutWidthType || 'adaptive';
-  const showTooltip = formData.showTooltip ?? true;
+  const totalLabel = formData.totalLabel ?? formData.total_label ?? 'Total';
+  const showRowTotals = formData.showRowTotals ?? formData.show_row_totals ?? true;
+  const showRowSubtotals = formData.showRowSubtotals ?? formData.show_row_subtotals ?? false;
+  const showColTotals = formData.showColTotals ?? formData.show_col_totals ?? true;
+  const showColSubtotals = formData.showColSubtotals ?? formData.show_col_subtotals ?? false;
+  const showSortControls = formData.showSortControls ?? formData.show_sort_controls ?? true;
+  const showSeriesNumber = formData.showSeriesNumber ?? formData.show_series_number ?? false;
+  const layoutWidthType = formData.layoutWidthType ?? formData.layout_width_type ?? 'adaptive';
+  const showTooltip = formData.showTooltip ?? formData.show_tooltip ?? true;
+
+  const rowHeightRaw = formData.rowHeight ?? formData.row_height;
   const rowHeight =
-    formData.rowHeight && !isNaN(Number(formData.rowHeight))
-      ? Number(formData.rowHeight)
+    rowHeightRaw && !isNaN(Number(rowHeightRaw))
+      ? Number(rowHeightRaw)
       : undefined;
+
+  const colHeightRaw = formData.colHeight ?? formData.col_height;
   const colHeight =
-    formData.colHeight && !isNaN(Number(formData.colHeight))
-      ? Number(formData.colHeight)
+    colHeightRaw && !isNaN(Number(colHeightRaw))
+      ? Number(colHeightRaw)
       : undefined;
-  const colHeaderWordWrap = formData.col_header_word_wrap ?? false;
-  const rowHeaderWordWrap = formData.row_header_word_wrap ?? false;
-  const dataCellWordWrap = formData.data_cell_word_wrap ?? false;
 
+  const colHeaderWordWrap = formData.colHeaderWordWrap ?? formData.col_header_word_wrap ?? false;
+  const rowHeaderWordWrap = formData.rowHeaderWordWrap ?? formData.row_header_word_wrap ?? false;
+  const dataCellWordWrap = formData.dataCellWordWrap ?? formData.data_cell_word_wrap ?? false;
+
+  const advancedS2Options = formData.advancedS2Options ?? formData.advanced_s2_options;
   const advancedS2OptionsObj = safeParseJson<any>(
-    formData.advancedS2Options,
+    advancedS2Options,
     {},
   );
 
-  const columnAggregations = safeParseJson<Record<string, string>>(
-    formData.columnAggregations,
-    {},
-  );
+  const dimensionConfig = formData.dimensionConfig || formData.dimension_config || {};
+  const metricConfig = formData.metricConfig || formData.metric_config || {};
 
-  const defaultDimensionAlign = formData.defaultDimensionAlign || 'left';
-  const defaultMetricAlign = formData.defaultMetricAlign || 'right';
-  const columnAlignmentsObj = safeParseJson<
-    Record<string, 'left' | 'center' | 'right'>
-  >(formData.columnAlignments, {});
+  const columnAggregations: Record<string, string> = {};
+  const columnAlignmentsObj: Record<string, 'left' | 'center' | 'right'> = {};
+  const columnFormatsObj: Record<string, string> = {};
+  const columnWidthsObj: Record<string, number> = {};
+  const customColumnNames: Record<string, string> = {};
+  const disabledSubtotalDimensions = new Set<string>();
 
-  const columnFormatsObj = safeParseJson<Record<string, string>>(
-    formData.columnFormats,
-    {},
-  );
+  Object.entries(dimensionConfig).forEach(([col, cfg]: [string, any]) => {
+    if (cfg?.columnWidth !== undefined) {
+      columnWidthsObj[col] = cfg.columnWidth;
+    }
+    if (cfg?.horizontalAlign) {
+      columnAlignmentsObj[col] = cfg.horizontalAlign;
+    }
+    if (cfg?.customColumnName) {
+      customColumnNames[col] = cfg.customColumnName;
+    }
+    if (cfg?.showSubtotal === false) {
+      disabledSubtotalDimensions.add(col);
+    }
+  });
 
-  const columnWidthsObj = safeParseJson<Record<string, number>>(
-    formData.columnWidths,
-    {},
-  );
+  const excludeTotalsMetricsRaw: string[] = formData.excludeTotalsMetrics ?? formData.exclude_totals_metrics ?? [];
+  const excludeTotalsSet = new Set(excludeTotalsMetricsRaw);
+
+  Object.entries(metricConfig).forEach(([col, cfg]: [string, any]) => {
+    if (cfg?.columnWidth !== undefined) {
+      columnWidthsObj[col] = cfg.columnWidth;
+    }
+    if (cfg?.horizontalAlign) {
+      columnAlignmentsObj[col] = cfg.horizontalAlign;
+    }
+    if (cfg?.d3NumberFormat) {
+      columnFormatsObj[col] = cfg.d3NumberFormat;
+    }
+    if (cfg?.totalAggregation) {
+      columnAggregations[col] = cfg.totalAggregation;
+    }
+    if (cfg?.customColumnName) {
+      customColumnNames[col] = cfg.customColumnName;
+    }
+    if (cfg?.excludeTotals) {
+      excludeTotalsSet.add(col);
+    }
+  });
+
+  const excludeTotalsMetrics = Array.from(excludeTotalsSet);
+
+  const defaultDimensionAlign = formData.defaultDimensionAlign ?? formData.default_dimension_align ?? 'left';
+  const defaultMetricAlign = formData.defaultMetricAlign ?? formData.default_metric_align ?? 'right';
 
   const s2LayoutWidthType =
     layoutWidthType === 'custom' ? 'compact' : layoutWidthType;
   const widthByField =
     layoutWidthType === 'custom' ? columnWidthsObj : undefined;
 
-  const excludeTotalsMetrics: string[] = formData.excludeTotalsMetrics || [];
-  const headerColorObj = formData.headerColor;
+  const headerColorObj = formData.headerColor ?? formData.header_color;
 
-  const headerColorRaw = formData.headerColor;
+  const headerColorRaw = formData.headerColor ?? formData.header_color;
   const headerColor =
     headerColorRaw &&
     typeof headerColorRaw === 'object' &&
@@ -250,7 +288,7 @@ export default function transformProps(
       ? `rgba(${headerColorRaw.r}, ${headerColorRaw.g}, ${headerColorRaw.b}, ${headerColorRaw.a ?? 1})`
       : undefined;
 
-  const rawCrossfilterCols = formData.crossfilterColumns || [];
+  const rawCrossfilterCols = formData.crossfilterColumns ?? formData.crossfilter_columns ?? [];
   const crossfilterColumns = rawCrossfilterCols.map(normalizeCol);
 
   // Normalize field names
@@ -308,19 +346,20 @@ export default function transformProps(
     },
     meta: allFields.map(f => {
       const isMetric = metricCols.includes(f);
+      const displayName = customColumnNames[f] || f;
       if (isMetric) {
         const customFormat = columnFormatsObj[f];
         const formatter = getNumberFormatter(customFormat || 'SMART_NUMBER');
         return {
           field: f,
-          name: f,
+          name: displayName,
           formatter: (val: any) =>
             val === null || val === undefined ? '' : formatter(val),
         };
       }
       return {
         field: f,
-        name: f,
+        name: displayName,
       };
     }),
     data: s2Data,
@@ -336,6 +375,13 @@ export default function transformProps(
     if (excludeTotalsMetrics.includes(metric)) {
       return null;
     }
+
+    // A query represents a Grand Total if it contains no dimension keys (only $$extra$$)
+    const isGrandTotal = Object.keys(query).every(key => key === '$$extra$$');
+    if (isGrandTotal && queriesData[1]?.data?.[0]) {
+      return Number(queriesData[1].data[0][metric]) || 0;
+    }
+
     const values = rows.map(row => {
       const rawRow = row && typeof row === 'object' && 'raw' in row ? row.raw : row;
       return Number(rawRow?.[metric]) || 0;
@@ -409,7 +455,9 @@ export default function transformProps(
         reverseSubTotalsLayout: true,
         calcGrandTotals: calcTotalsObj,
         calcSubTotals: calcTotalsObj,
-        subTotalsDimensions: groupby.length > 1 ? groupby.slice(0, -1) : [],
+        subTotalsDimensions: (groupby.length > 1 ? groupby.slice(0, -1) : []).filter(
+          (dim: string) => !disabledSubtotalDimensions.has(dim),
+        ),
         grandTotalsLabel: totalLabel,
         subTotalsLabel: `Sub${totalLabel}`,
       } as any,
@@ -418,7 +466,9 @@ export default function transformProps(
         showSubTotals: showColSubtotals && columns.length > 1,
         calcGrandTotals: calcTotalsObj,
         calcSubTotals: calcTotalsObj,
-        subTotalsDimensions: columns.length > 1 ? columns.slice(0, -1) : [],
+        subTotalsDimensions: (columns.length > 1 ? columns.slice(0, -1) : []).filter(
+          (dim: string) => !disabledSubtotalDimensions.has(dim),
+        ),
         grandTotalsLabel: totalLabel,
         subTotalsLabel: `Sub${totalLabel}`,
       } as any,

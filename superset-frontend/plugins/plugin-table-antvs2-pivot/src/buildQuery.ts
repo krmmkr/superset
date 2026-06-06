@@ -28,5 +28,10 @@ export default function buildQuery(formData: QueryFormData) {
       ...baseQueryObject,
       groupby: baseColumns,
     },
+    {
+      ...baseQueryObject,
+      columns: [],
+      groupby: [],
+    },
   ]);
 }

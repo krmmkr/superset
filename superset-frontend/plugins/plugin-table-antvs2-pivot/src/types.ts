@@ -33,7 +33,6 @@ export interface S2TableFormData extends QueryFormData {
   columns: QueryFormColumn[];
   metrics: QueryFormMetric[];
 
-  columnAggregations: string;
   tableMode: 'grid' | 'tree';
   theme: 'default' | 'colorful' | 'gray';
   totalLabel: string;
@@ -56,11 +55,23 @@ export interface S2TableFormData extends QueryFormData {
   colHeight?: string;
   defaultDimensionAlign?: 'left' | 'center' | 'right';
   defaultMetricAlign?: 'left' | 'center' | 'right';
-  columnAlignments?: string;
-  columnFormats?: string;
   headerColor?: { r: number; g: number; b: number; a: number };
-  excludeTotalsMetrics?: string[];
-  columnWidths?: string;
+
+  dimension_config?: Record<string, {
+    customColumnName?: string;
+    horizontalAlign?: 'left' | 'center' | 'right';
+    columnWidth?: number;
+    showSubtotal?: boolean;
+  }>;
+  metric_config?: Record<string, {
+    customColumnName?: string;
+    horizontalAlign?: 'left' | 'center' | 'right';
+    columnWidth?: number;
+    d3NumberFormat?: string;
+    currencyFormat?: any;
+    totalAggregation?: 'SUM' | 'AVG' | 'MIN' | 'MAX' | 'COUNT' | 'COUNT_DISTINCT';
+    excludeTotals?: boolean;
+  }>;
 }
 
 export interface S2TableChartProps extends ChartProps {

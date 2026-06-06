@@ -17,7 +17,8 @@
  * under the License.
  */
 import { t } from '@apache-superset/core/translation';
-import { legacyValidateInteger } from '@superset-ui/core';
+import { legacyValidateInteger, ensureIsArray, getMetricLabel } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import {
   ControlPanelConfig,
   sharedControls,
@@ -115,20 +116,123 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'column_widths',
+            name: 'dimension_config',
             config: {
-              type: 'TextAreaControl',
-              label: t('Per-Column Width (JSON)'),
-              description: t(
-                'Map column or metric fields to specific width in pixels. ' +
-                  'Example: {"region": 150, "sales": 100}',
-              ),
-              default: '{}',
-              language: 'json',
+              type: 'ColumnConfigControl',
+              label: t('Dimension Customizations'),
+              description: t('Configure display labels, alignments, and widths for row and column dimensions.'),
               renderTrigger: true,
-              visibility: ({ controls }: any) =>
-                controls?.layout_width_type?.value === 'custom',
-              resetOnHide: false,
+              configFormLayout: {
+                [GenericDataType.String]: [
+                  [
+                    'columnWidth',
+                    { name: 'horizontalAlign', override: { defaultValue: 'left' } },
+                  ],
+                  ['customColumnName'],
+                  [
+                    {
+                      name: 'showSubtotal',
+                      config: {
+                        controlType: 'Checkbox',
+                        label: t('Show Subtotal'),
+                        description: t('Whether to calculate/display subtotals for this dimension when subtotals are enabled globally'),
+                        defaultValue: true,
+                      },
+                    },
+                  ],
+                ],
+              },
+              shouldMapStateToProps() {
+                return true;
+              },
+              mapStateToProps({ controls }: any) {
+                const groupby = ensureIsArray(controls.groupby?.value || []);
+                const columns = ensureIsArray(controls.columns?.value || []);
+                const colnames = [...groupby, ...columns].map(col =>
+                  typeof col === 'object' ? col.column_name || col.label : String(col)
+                );
+                return {
+                  columnsPropsObject: {
+                    colnames,
+                    coltypes: colnames.map(() => GenericDataType.String),
+                  },
+                };
+              },
+            },
+          },
+        ],
+        [
+          {
+            name: 'metric_config',
+            config: {
+              type: 'ColumnConfigControl',
+              label: t('Metric Customizations'),
+              description: t('Configure display labels, alignments, widths, formatting, and total aggregations for metrics.'),
+              renderTrigger: true,
+              configFormLayout: {
+                [GenericDataType.Numeric]: [
+                  {
+                    tab: t('Style Settings'),
+                    children: [
+                      [
+                        'columnWidth',
+                        { name: 'horizontalAlign', override: { defaultValue: 'right' } },
+                      ],
+                      ['customColumnName'],
+                    ],
+                  },
+                  {
+                    tab: t('Totals & Formatting'),
+                    children: [
+                      ['d3NumberFormat'],
+                      ['currencyFormat'],
+                      [
+                        {
+                          name: 'totalAggregation',
+                          config: {
+                            controlType: 'Select',
+                            label: t('Total Aggregation'),
+                            description: t('The aggregation function to apply on the total row/column for this metric'),
+                            options: [
+                              { value: 'SUM', label: t('SUM') },
+                              { value: 'AVG', label: t('AVG') },
+                              { value: 'MIN', label: t('MIN') },
+                              { value: 'MAX', label: t('MAX') },
+                              { value: 'COUNT', label: t('COUNT') },
+                              { value: 'COUNT_DISTINCT', label: t('COUNT_DISTINCT') },
+                            ],
+                            defaultValue: 'SUM',
+                          },
+                        },
+                      ],
+                      [
+                        {
+                          name: 'excludeTotals',
+                          config: {
+                            controlType: 'Checkbox',
+                            label: t('Exclude from Totals'),
+                            description: t('Exclude this metric from totals and subtotals calculations'),
+                            defaultValue: false,
+                          },
+                        },
+                      ],
+                    ],
+                  },
+                ],
+              },
+              shouldMapStateToProps() {
+                return true;
+              },
+              mapStateToProps({ controls }: any) {
+                const metrics = ensureIsArray(controls.metrics?.value || []);
+                const colnames = metrics.map((m: any) => getMetricLabel(m));
+                return {
+                  columnsPropsObject: {
+                    colnames,
+                    coltypes: colnames.map(() => GenericDataType.Numeric),
+                  },
+                };
+              },
             },
           },
         ],
@@ -152,24 +256,6 @@ const config: ControlPanelConfig = {
               label: t('Show Hover Tooltip'),
               description: t('Show details tooltip when hovering over cells.'),
               default: true,
-              renderTrigger: true,
-            },
-          },
-        ],
-
-        [
-          {
-            name: 'column_aggregations',
-            config: {
-              type: 'TextAreaControl',
-              label: t('Per-Column Aggregation (JSON)'),
-              description: t(
-                'Map each metric to an aggregation type. Omitted metrics default to SUM. ' +
-                  'Supported: SUM, AVG, MIN, MAX, COUNT, COUNT_DISTINCT. ' +
-                  'Example: {"revenue": "SUM", "customers": "COUNT_DISTINCT"}',
-              ),
-              default: '{}',
-              language: 'json',
               renderTrigger: true,
             },
           },
@@ -277,33 +363,6 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-        [
-          {
-            name: 'exclude_totals_metrics',
-            config: {
-              type: 'SelectControl',
-              label: t('Exclude Metrics from Totals'),
-              description: t(
-                'Select metrics to exclude from totals/subtotals calculations.',
-              ),
-              multi: true,
-              freeForm: true,
-              mapStateToProps: (state: any) => {
-                const metrics = state.controls?.metrics?.value || [];
-                const choices = metrics.map((m: any) => {
-                  const metricName =
-                    typeof m === 'string' ? m : m.label || m.metric_name;
-                  return [metricName, metricName];
-                });
-                return {
-                  choices,
-                };
-              },
-              default: [],
-              renderTrigger: true,
-            },
-          },
-        ],
       ],
     },
     {
@@ -388,39 +447,7 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-        [
-          {
-            name: 'column_alignments',
-            config: {
-              type: 'TextAreaControl',
-              label: t('Per-Column Alignment (JSON)'),
-              description: t(
-                'Map column or metric fields to text alignment. ' +
-                  'Supported values: left, center, right. ' +
-                  'Example: {"region": "left", "sales": "right"}',
-              ),
-              default: '{}',
-              language: 'json',
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'column_formats',
-            config: {
-              type: 'TextAreaControl',
-              label: t('Per-Column Format (JSON)'),
-              description: t(
-                'Map metric fields to specific number formats (e.g., percentages, currencies). ' +
-                  'Example: {"sales": "$,.2f", "growth": ".1%"}',
-              ),
-              default: '{}',
-              language: 'json',
-              renderTrigger: true,
-            },
-          },
-        ],
+
 
         [
           {
