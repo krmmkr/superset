@@ -54,16 +54,32 @@ function getAlignmentFromOptions(
     (isMetric ? metricAlign : dimAlign)) as TextAlign;
 }
 
+/**
+ * Shared helper: reads per-column bold preference from the custom options
+ * attached to the spreadsheet instance.
+ */
+function getBoldTextFromOptions(
+  spreadsheet: any,
+  field: string,
+): boolean {
+  const opts = spreadsheet?.options;
+  const boldTextObj = opts?.columnBoldTextObj || {};
+  return !!boldTextObj[field];
+}
+
 class CustomDataCell extends DataCell {
   getTextStyle() {
     const textStyle = super.getTextStyle();
+    const field = this.meta.valueField;
+    const isBold = getBoldTextFromOptions(this.spreadsheet, field);
     return {
       ...textStyle,
       textAlign: getAlignmentFromOptions(
         this.spreadsheet,
-        this.meta.valueField,
+        field,
         true,
       ),
+      fontWeight: isBold ? 'bold' : textStyle.fontWeight,
     };
   }
 }
@@ -72,13 +88,16 @@ class CustomColCell extends ColCell {
   getTextStyle() {
     const textStyle = super.getTextStyle();
     const isMetric = this.isMeasureField();
+    const field = isMetric ? this.meta.value : this.meta.field;
+    const isBold = getBoldTextFromOptions(this.spreadsheet, field);
     return {
       ...textStyle,
       textAlign: getAlignmentFromOptions(
         this.spreadsheet,
-        isMetric ? this.meta.value : this.meta.field,
+        field,
         isMetric,
       ),
+      fontWeight: isBold ? 'bold' : textStyle.fontWeight,
     };
   }
 }
@@ -87,13 +106,16 @@ class CustomRowCell extends RowCell {
   getTextStyle() {
     const textStyle = super.getTextStyle();
     const isMetric = this.isMeasureField();
+    const field = isMetric ? this.meta.value : this.meta.field;
+    const isBold = getBoldTextFromOptions(this.spreadsheet, field);
     return {
       ...textStyle,
       textAlign: getAlignmentFromOptions(
         this.spreadsheet,
-        isMetric ? this.meta.value : this.meta.field,
+        field,
         isMetric,
       ),
+      fontWeight: isBold ? 'bold' : textStyle.fontWeight,
     };
   }
 }
@@ -161,6 +183,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     defaultDimensionAlign = 'left',
     defaultMetricAlign = 'right',
     columnAlignmentsObj = {},
+    columnBoldTextObj = {},
     headerColor,
     headerColorObj,
     borderColor,
@@ -548,6 +571,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
 
     // Attach custom alignment options to finalOptions so cell classes can read them
     (finalOptions as any).columnAlignmentsObj = columnAlignmentsObj;
+    (finalOptions as any).columnBoldTextObj = columnBoldTextObj;
     (finalOptions as any).defaultDimensionAlign = defaultDimensionAlign;
     (finalOptions as any).defaultMetricAlign = defaultMetricAlign;
     (finalOptions as any).metricCols = metricCols;

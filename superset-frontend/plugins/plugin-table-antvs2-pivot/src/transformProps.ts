@@ -231,6 +231,7 @@ export default function transformProps(
 
   const columnAggregations: Record<string, string> = {};
   const columnAlignmentsObj: Record<string, 'left' | 'center' | 'right'> = {};
+  const columnBoldTextObj: Record<string, boolean> = {};
   const columnFormatsObj: Record<string, string> = {};
   const columnWidthsObj: Record<string, number> = {};
   const customColumnNames: Record<string, string> = {};
@@ -248,6 +249,9 @@ export default function transformProps(
     }
     if (cfg?.showSubtotal === false) {
       disabledSubtotalDimensions.add(col);
+    }
+    if (cfg?.boldText !== undefined) {
+      columnBoldTextObj[col] = cfg.boldText;
     }
   });
 
@@ -273,6 +277,9 @@ export default function transformProps(
     }
     if (cfg?.excludeTotals) {
       excludeTotalsSet.add(col);
+    }
+    if (cfg?.boldText !== undefined) {
+      columnBoldTextObj[col] = cfg.boldText;
     }
   });
 
@@ -531,6 +538,7 @@ export default function transformProps(
     defaultDimensionAlign,
     defaultMetricAlign,
     columnAlignmentsObj,
+    columnBoldTextObj,
     columnFormatsObj,
     headerColor,
     headerColorObj,

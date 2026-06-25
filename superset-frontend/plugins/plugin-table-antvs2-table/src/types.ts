@@ -58,6 +58,7 @@ export interface S2TableFormData extends QueryFormData {
       customColumnName?: string;
       horizontalAlign?: 'left' | 'center' | 'right';
       columnWidth?: number;
+      boldText?: boolean;
     }
   >;
   metric_config?: Record<
@@ -68,6 +69,7 @@ export interface S2TableFormData extends QueryFormData {
       columnWidth?: number;
       d3NumberFormat?: string;
       currencyFormat?: any;
+      boldText?: boolean;
     }
   >;
 }
@@ -101,6 +103,7 @@ export interface S2TableTransformedProps {
   defaultDimensionAlign?: 'left' | 'center' | 'right';
   defaultMetricAlign?: 'left' | 'center' | 'right';
   columnAlignmentsObj?: Record<string, 'left' | 'center' | 'right'>;
+  columnBoldTextObj?: Record<string, boolean>;
   columnFormatsObj?: Record<string, string>;
   headerColor?: string;
   headerColorObj?: { r: number; g: number; b: number; a: number };

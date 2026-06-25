@@ -67,6 +67,7 @@ export interface S2TableFormData extends QueryFormData {
       horizontalAlign?: 'left' | 'center' | 'right';
       columnWidth?: number;
       showSubtotal?: boolean;
+      boldText?: boolean;
     }
   >;
   metric_config?: Record<
@@ -85,6 +86,7 @@ export interface S2TableFormData extends QueryFormData {
         | 'COUNT'
         | 'COUNT_DISTINCT';
       excludeTotals?: boolean;
+      boldText?: boolean;
     }
   >;
 }
@@ -117,6 +119,7 @@ export interface S2TableTransformedProps {
   defaultDimensionAlign?: 'left' | 'center' | 'right';
   defaultMetricAlign?: 'left' | 'center' | 'right';
   columnAlignmentsObj?: Record<string, 'left' | 'center' | 'right'>;
+  columnBoldTextObj?: Record<string, boolean>;
   columnFormatsObj?: Record<string, string>;
   headerColor?: string;
   headerColorObj?: { r: number; g: number; b: number; a: number };

@@ -110,7 +110,19 @@ const config: ControlPanelConfig = {
                       override: { defaultValue: 'left' },
                     },
                   ],
-                  ['customColumnName'],
+                  [
+                    'customColumnName',
+                    {
+                      name: 'boldText',
+                      config: {
+                        controlType: 'Checkbox',
+                        label: t('Bold text'),
+                        description: t('Whether to make the text in this column bolder'),
+                        defaultValue: false,
+                        debounceDelay: 200,
+                      },
+                    },
+                  ],
                 ],
               },
               shouldMapStateToProps() {
@@ -155,7 +167,19 @@ const config: ControlPanelConfig = {
                           override: { defaultValue: 'right' },
                         },
                       ],
-                      ['customColumnName'],
+                      [
+                        'customColumnName',
+                        {
+                          name: 'boldText',
+                          config: {
+                            controlType: 'Checkbox',
+                            label: t('Bold text'),
+                            description: t('Whether to make the text in this column bolder'),
+                            defaultValue: false,
+                            debounceDelay: 200,
+                          },
+                        },
+                      ],
                     ],
                   },
                   {
