@@ -22,7 +22,7 @@ import {
   getNumberFormatter,
 } from '@superset-ui/core';
 import { S2TableChartProps, S2TableTransformedProps, Refs } from './types';
-import type { S2DataConfig, S2Options } from '@antv/s2';
+import type { S2DataConfig } from '@antv/s2';
 
 /**
  * Aggregate helper: computes a single value from an array of numbers
@@ -434,9 +434,10 @@ export default function transformProps(
   const calcTotalsObj = { calcFunc };
 
   // ── S2 Options ───────────────────────────────
-  const s2Options: S2Options = {
+  const s2Options: any = {
     width,
     height,
+    widthByField,
     hierarchyType: tableMode,
     seriesNumber: {
       enable: showSeriesNumber,

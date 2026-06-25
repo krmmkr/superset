@@ -22,7 +22,7 @@ import {
   getNumberFormatter,
 } from '@superset-ui/core';
 import { S2TableChartProps, S2TableTransformedProps, Refs } from './types';
-import type { S2DataConfig, S2Options } from '@antv/s2';
+import type { S2DataConfig } from '@antv/s2';
 
 /**
  * Safely parse a JSON string, returning fallback on failure.
@@ -382,9 +382,10 @@ export default function transformProps(
   }
 
   // ── S2 Options ───────────────────────────────
-  const s2Options: S2Options = {
+  const s2Options: any = {
     width,
     height,
+    widthByField,
     mergedCellsInfo,
     seriesNumber: {
       enable: showSeriesNumber,
