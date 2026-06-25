@@ -39,18 +39,10 @@ const config: ControlPanelConfig = {
             name: 'groupby',
             config: {
               ...sharedControls.groupby,
-              label: t('Rows (Group By)'),
-              description: t('Columns to group by on the rows of the table.'),
-            },
-          },
-        ],
-        [
-          {
-            name: 'columns',
-            config: {
-              ...sharedControls.groupby,
-              label: t('Columns (Pivot)'),
-              description: t('Columns to pivot on the x-axis of the table.'),
+              label: t('Columns (Dimensions)'),
+              description: t(
+                'Select dimension columns to display in the flat table.',
+              ),
             },
           },
         ],
@@ -59,8 +51,8 @@ const config: ControlPanelConfig = {
             name: 'metrics',
             config: {
               ...sharedControls.metrics,
-              label: t('Metrics'),
-              description: t('Metrics to calculate and display.'),
+              label: t('Columns (Metrics)'),
+              description: t('Select metric columns to calculate and display.'),
             },
           },
         ],
@@ -77,25 +69,6 @@ const config: ControlPanelConfig = {
       label: t('Table Configuration'),
       expanded: true,
       controlSetRows: [
-        [
-          {
-            name: 'table_mode',
-            config: {
-              type: 'SelectControl',
-              label: t('Table Layout Mode'),
-              description: t(
-                'Grid: each dimension gets its own column. ' +
-                  'Tree: dimensions are nested/indented with expand/collapse.',
-              ),
-              default: 'grid',
-              choices: [
-                ['grid', t('Grid (Separate Columns)')],
-                ['tree', t('Tree (Indented / Expand-Collapse)')],
-              ],
-              renderTrigger: true,
-            },
-          },
-        ],
         [
           {
             name: 'layout_width_type',
@@ -125,7 +98,7 @@ const config: ControlPanelConfig = {
               type: 'ColumnConfigControl',
               label: t('Dimension Customizations'),
               description: t(
-                'Configure display labels, alignments, and widths for row and column dimensions.',
+                'Configure display labels, alignments, and widths for dimensions.',
               ),
               renderTrigger: true,
               configFormLayout: {
@@ -138,19 +111,6 @@ const config: ControlPanelConfig = {
                     },
                   ],
                   ['customColumnName'],
-                  [
-                    {
-                      name: 'showSubtotal',
-                      config: {
-                        controlType: 'Checkbox',
-                        label: t('Show Subtotal'),
-                        description: t(
-                          'Whether to calculate/display subtotals for this dimension when subtotals are enabled globally',
-                        ),
-                        defaultValue: true,
-                      },
-                    },
-                  ],
                 ],
               },
               shouldMapStateToProps() {
@@ -158,8 +118,7 @@ const config: ControlPanelConfig = {
               },
               mapStateToProps({ controls }: any) {
                 const groupby = ensureIsArray(controls.groupby?.value || []);
-                const columns = ensureIsArray(controls.columns?.value || []);
-                const colnames = [...groupby, ...columns].map(col =>
+                const colnames = groupby.map(col =>
                   typeof col === 'object'
                     ? col.column_name || col.label
                     : String(col),
@@ -181,7 +140,7 @@ const config: ControlPanelConfig = {
               type: 'ColumnConfigControl',
               label: t('Metric Customizations'),
               description: t(
-                'Configure display labels, alignments, widths, formatting, and total aggregations for metrics.',
+                'Configure display labels, alignments, widths, and formatting for metrics.',
               ),
               renderTrigger: true,
               configFormLayout: {
@@ -200,48 +159,8 @@ const config: ControlPanelConfig = {
                     ],
                   },
                   {
-                    tab: t('Totals & Formatting'),
-                    children: [
-                      ['d3NumberFormat'],
-                      ['currencyFormat'],
-                      [
-                        {
-                          name: 'totalAggregation',
-                          config: {
-                            controlType: 'Select',
-                            label: t('Total Aggregation'),
-                            description: t(
-                              'The aggregation function to apply on the total row/column for this metric',
-                            ),
-                            options: [
-                              { value: 'SUM', label: t('SUM') },
-                              { value: 'AVG', label: t('AVG') },
-                              { value: 'MIN', label: t('MIN') },
-                              { value: 'MAX', label: t('MAX') },
-                              { value: 'COUNT', label: t('COUNT') },
-                              {
-                                value: 'COUNT_DISTINCT',
-                                label: t('COUNT_DISTINCT'),
-                              },
-                            ],
-                            defaultValue: 'SUM',
-                          },
-                        },
-                      ],
-                      [
-                        {
-                          name: 'excludeTotals',
-                          config: {
-                            controlType: 'Checkbox',
-                            label: t('Exclude from Totals'),
-                            description: t(
-                              'Exclude this metric from totals and subtotals calculations',
-                            ),
-                            defaultValue: false,
-                          },
-                        },
-                      ],
-                    ],
+                    tab: t('Formatting'),
+                    children: [['d3NumberFormat'], ['currencyFormat']],
                   },
                 ],
               },
@@ -275,6 +194,20 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'enable_rowspan',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Enable Rowspan / Merge Cells'),
+              description: t(
+                'Automatically merge adjacent row cells with identical values for dimension columns.',
+              ),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
             name: 'show_tooltip',
             config: {
               type: 'CheckboxControl',
@@ -293,7 +226,7 @@ const config: ControlPanelConfig = {
               label: t('Advanced S2 Options (JSON)'),
               description: t(
                 'Deeply override any AntV S2 config (options, styles, multi-column interaction). ' +
-                  'Example: {"style": {"rowCfg": {"widthByField": {"Region": 120}}}}',
+                  'Example: {"style": {"colCell": {"widthByField": {"Region": 120}}}}',
               ),
               default: '{}',
               language: 'json',
@@ -314,76 +247,6 @@ const config: ControlPanelConfig = {
                 'Show interactive sort icons when hovering over column headers.',
               ),
               default: true,
-              renderTrigger: true,
-            },
-          },
-        ],
-      ],
-    },
-    {
-      label: t('Totals & Subtotals'),
-      expanded: true,
-      controlSetRows: [
-        [
-          {
-            name: 'total_label',
-            config: {
-              type: 'TextControl',
-              label: t('Total Label'),
-              description: t('Custom label for total rows/columns.'),
-              default: 'Total',
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'show_row_totals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show Row Grand Totals'),
-              default: true,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'show_row_subtotals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show Row Subtotals'),
-              description: t(
-                'Show subtotals for each parent dimension group. ' +
-                  'Requires 2+ Row dimensions.',
-              ),
-              default: false,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'show_col_totals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show Column Grand Totals'),
-              default: true,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'show_col_subtotals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show Column Subtotals'),
-              description: t(
-                'Show subtotals for each parent dimension group. ' +
-                  'Requires 2+ Column dimensions.',
-              ),
-              default: false,
               renderTrigger: true,
             },
           },
@@ -472,7 +335,6 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-
         [
           {
             name: 'header_color',
@@ -550,7 +412,6 @@ const config: ControlPanelConfig = {
         ],
       ],
     },
-
     {
       label: t('Cross-filtering'),
       expanded: false,

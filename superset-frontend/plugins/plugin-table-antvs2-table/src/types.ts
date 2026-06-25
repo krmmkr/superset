@@ -30,23 +30,15 @@ import {
 
 export interface S2TableFormData extends QueryFormData {
   groupby: QueryFormColumn[];
-  columns: QueryFormColumn[];
   metrics: QueryFormMetric[];
 
-  tableMode: 'grid' | 'tree';
   theme: 'default' | 'colorful' | 'gray';
-  totalLabel: string;
-  showRowTotals: boolean;
-  showRowSubtotals: boolean;
-  showColTotals: boolean;
-  showColSubtotals: boolean;
-
   showSortControls: boolean;
-
   emitFilter: boolean;
   crossfilterColumns: QueryFormColumn[];
 
   advancedS2Options?: string;
+  enableRowspan?: boolean;
 
   showSeriesNumber?: boolean;
   layoutWidthType?: 'adaptive' | 'compact' | 'colAdaptive';
@@ -66,7 +58,6 @@ export interface S2TableFormData extends QueryFormData {
       customColumnName?: string;
       horizontalAlign?: 'left' | 'center' | 'right';
       columnWidth?: number;
-      showSubtotal?: boolean;
     }
   >;
   metric_config?: Record<
@@ -77,14 +68,6 @@ export interface S2TableFormData extends QueryFormData {
       columnWidth?: number;
       d3NumberFormat?: string;
       currencyFormat?: any;
-      totalAggregation?:
-        | 'SUM'
-        | 'AVG'
-        | 'MIN'
-        | 'MAX'
-        | 'COUNT'
-        | 'COUNT_DISTINCT';
-      excludeTotals?: boolean;
     }
   >;
 }
@@ -106,6 +89,7 @@ export interface S2TableTransformedProps {
   s2DataConfig: any;
   s2Options: any;
   s2Theme: any;
+  sheetType: 'table';
 
   showSortControls: boolean;
 

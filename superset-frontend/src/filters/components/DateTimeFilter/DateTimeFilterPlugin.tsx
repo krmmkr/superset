@@ -34,28 +34,22 @@ import {
   CustomFrame,
 } from 'src/explore/components/controls/DateFilterControl/components';
 import ControlPopover from 'src/explore/components/controls/ControlPopover/ControlPopover';
-import {
-  DateFilterTestKey,
-} from 'src/explore/components/controls/DateFilterControl/utils';
+import { DateFilterTestKey } from 'src/explore/components/controls/DateFilterControl/utils';
 import { FilterPluginStyle } from '../common';
 import { PluginFilterDateTimeProps } from './types';
 import { useLocale } from 'src/hooks/useLocale';
 import dayjs from 'dayjs';
-
 
 // Matches date strings returned by fetchTimeRange, e.g.:
 //   "2026-04-23 ≤ col < 2026-04-29"
 //   "2026-04-23 00:00:00 ≤ col < 2026-04-29 00:00:00"
 const RESOLVED_DATE_RE = /(\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}:\d{2})?)/g;
 
-
 /* ------------------------------------------------------------------ */
 /*  Frame → Tab mapping                                                 */
 /* ------------------------------------------------------------------ */
 
-
 type TabKey = 'basic' | 'last' | 'previous' | 'current' | 'custom' | 'advanced';
-
 
 const TAB_CONFIG: { key: TabKey; label: string }[] = [
   { key: 'basic', label: 'Basic' },
@@ -65,20 +59,15 @@ const TAB_CONFIG: { key: TabKey; label: string }[] = [
   { key: 'custom', label: 'Custom' },
 ];
 
-
-
-
 /* ------------------------------------------------------------------ */
 /*  Styled wrappers                                                     */
 /* ------------------------------------------------------------------ */
-
 
 const DateTimeFilterStyles = styled(FilterPluginStyle)`
   display: flex;
   align-items: center;
   overflow-x: visible;
 `;
-
 
 const ControlContainer = styled.div<{
   validateStatus?: 'error' | 'warning' | 'info';
@@ -88,18 +77,15 @@ const ControlContainer = styled.div<{
   max-width: 100%;
   width: 100%;
 
-
   & > .ant-picker {
     width: 100%;
     flex: 1;
   }
 `;
 
-
 const PopoverContent = styled.div`
   width: 600px;
   max-width: 90vw;
-
 
   .tab-nav {
     display: flex;
@@ -107,7 +93,6 @@ const PopoverContent = styled.div`
     padding: 0 8px;
     margin-bottom: 0;
   }
-
 
   .tab-nav-item {
     padding: 6px 10px;
@@ -120,11 +105,9 @@ const PopoverContent = styled.div`
     margin-bottom: -1px;
     transition: all 0.2s;
 
-
     &:hover {
       color: ${({ theme }) => theme.colorPrimary};
     }
-
 
     &.active {
       color: ${({ theme }) => theme.colorPrimary};
@@ -132,11 +115,9 @@ const PopoverContent = styled.div`
     }
   }
 
-
   .tab-body {
     padding: 8px 16px;
     min-height: 100px;
-
 
     .section-title {
       font-weight: 600;
@@ -145,7 +126,6 @@ const PopoverContent = styled.div`
       margin-bottom: 6px;
       letter-spacing: -0.01em;
     }
-
 
     .control-label {
       font-size: 11px;
@@ -156,7 +136,6 @@ const PopoverContent = styled.div`
       letter-spacing: 0.03em;
     }
 
-
     .ant-input {
       background: ${({ theme }) => theme.colorBgContainer} !important;
       border: 1px solid ${({ theme }) => theme.colorBorder} !important;
@@ -165,27 +144,36 @@ const PopoverContent = styled.div`
       font-size: 12px;
       border-radius: 4px;
 
-
       &:focus {
         border-color: ${({ theme }) => theme.colorPrimary} !important;
         box-shadow: 0 0 0 2px ${({ theme }) => theme.colorPrimary}22 !important;
       }
 
-
       &::placeholder {
-        color: ${({ theme }) => theme.colorTextPlaceholder || theme.colorTextQuaternary} !important;
+        color: ${({ theme }) =>
+          theme.colorTextPlaceholder || theme.colorTextQuaternary} !important;
       }
     }
 
-
-    .ant-row { margin-top: 8px; }
-    .ant-picker { padding: 4px 17px 4px; border-radius: 4px; }
-    .ant-divider-horizontal { margin: 16px 0; border-color: ${({ theme }) => theme.colorBorderSecondary}; }
-    .control-anchor-to { margin-top: 16px; }
-    .control-anchor-to-datetime { width: 217px; }
+    .ant-row {
+      margin-top: 8px;
+    }
+    .ant-picker {
+      padding: 4px 17px 4px;
+      border-radius: 4px;
+    }
+    .ant-divider-horizontal {
+      margin: 16px 0;
+      border-color: ${({ theme }) => theme.colorBorderSecondary};
+    }
+    .control-anchor-to {
+      margin-top: 16px;
+    }
+    .control-anchor-to-datetime {
+      width: 217px;
+    }
   }
 `;
-
 
 const ActualTimeRange = styled.div`
   font-size: 12px;
@@ -201,7 +189,6 @@ const ActualTimeRange = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
 
-
   .label {
     font-size: 11px;
     font-weight: 500;
@@ -211,7 +198,6 @@ const ActualTimeRange = styled.div`
     flex-shrink: 0;
   }
 `;
-
 
 /**
  * Container that holds the inline calendar.
@@ -229,7 +215,6 @@ const InlineCalendarContainer = styled.div`
   min-height: 290px;
   margin-bottom: 12px;
 
-
   /* Collapse the picker INPUT element */
   .ant-picker {
     position: absolute !important;
@@ -244,7 +229,6 @@ const InlineCalendarContainer = styled.div`
     opacity: 0 !important;
   }
 
-
   /* Make the dropdown render statically inside this div */
   .ant-picker-dropdown {
     position: static !important;
@@ -253,13 +237,11 @@ const InlineCalendarContainer = styled.div`
     background: transparent !important;
   }
 
-
   .ant-picker-panel-container {
     box-shadow: none !important;
     border: none !important;
     background: transparent !important;
   }
-
 
   .ant-picker-header-view {
     font-weight: 600;
@@ -267,13 +249,11 @@ const InlineCalendarContainer = styled.div`
     letter-spacing: -0.01em;
   }
 
-
   .ant-picker-content th {
     font-size: 11px;
     color: ${({ theme }) => theme.colorTextDescription};
     font-weight: 500;
   }
-
 
   /* Range selection colors — Preset Green */
   .ant-picker-cell-in-view.ant-picker-cell-in-range::before {
@@ -284,10 +264,10 @@ const InlineCalendarContainer = styled.div`
     background: ${({ theme }) => theme.colorPrimary} !important;
     color: white !important;
   }
-  .ant-picker-cell-in-view.ant-picker-cell-today .ant-picker-cell-inner::before {
+  .ant-picker-cell-in-view.ant-picker-cell-today
+    .ant-picker-cell-inner::before {
     border-color: ${({ theme }) => theme.colorPrimary} !important;
   }
-
 
   /* Restore click events on the actual calendar UI */
   .ant-picker-panel-container,
@@ -303,7 +283,6 @@ const InlineCalendarContainer = styled.div`
   }
 `;
 
-
 const StatusTag = styled.span`
   background: ${({ theme }) => theme.colorSuccessBg};
   color: ${({ theme }) => theme.colorSuccess};
@@ -318,7 +297,6 @@ const StatusTag = styled.span`
   align-items: center;
   gap: 4px;
 
-
   &::before {
     content: '';
     width: 6px;
@@ -328,11 +306,9 @@ const StatusTag = styled.span`
   }
 `;
 
-
 const InputWrapper = styled.div`
   position: relative;
   width: 100%;
-
 
   .clear-icon {
     position: absolute;
@@ -340,7 +316,8 @@ const InputWrapper = styled.div`
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
-    color: ${({ theme }) => theme.colorTextDescription || theme.colorTextTertiary};
+    color: ${({ theme }) =>
+      theme.colorTextDescription || theme.colorTextTertiary};
     font-size: 12px;
     transition: color 0.2s;
 
@@ -350,11 +327,9 @@ const InputWrapper = styled.div`
   }
 `;
 
-
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
-
 
 export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
   const theme = useTheme();
@@ -373,9 +348,7 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     formData,
   } = props;
 
-
   const col: string = (formData as any).columnName?.trim() || '';
-
 
   // ---- State ----
   const [show, setShow] = useState(false);
@@ -392,10 +365,8 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     [dayjs.Dayjs, dayjs.Dayjs] | undefined
   >(undefined);
 
-
   const datePickerLocale = useLocale();
   const calendarContainerRef = useRef<HTMLDivElement>(null);
-
 
   // Parse since/until for the inline calendar value
   const [since, until] = useMemo(() => {
@@ -410,11 +381,14 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     return ['', ''];
   }, [timeRangeValue]);
 
-
   const calValue: [dayjs.Dayjs | null, dayjs.Dayjs | null] = useMemo(() => {
     // If we have a successful resolved range string (e.g. "2026-04-23 <= col < 2026-04-29"),
     // use those dates to drive the calendar highlights even if the input is a formula.
-    if (evalResponse && !evalResponse.includes('Invalid') && evalResponse.includes('col')) {
+    if (
+      evalResponse &&
+      !evalResponse.includes('Invalid') &&
+      evalResponse.includes('col')
+    ) {
       const matches = [...evalResponse.matchAll(RESOLVED_DATE_RE)];
       if (matches.length >= 2) {
         const start = dayjs(matches[0][1]);
@@ -425,18 +399,12 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
       }
     }
 
-
     // Fallback to direct parsing if it's a fixed date string
     return [
       since && dayjs(since).isValid() ? dayjs(since) : null,
       until && dayjs(until).isValid() ? dayjs(until) : null,
     ];
   }, [since, until, evalResponse]);
-
-
-
-
-
 
   /* ---- Resolve filterState.value → trigger display --------------- */
   // Watch the dashboard's confirmed value and derive actual dates for the
@@ -447,7 +415,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
       setTriggerDates([null, null]);
       return;
     }
-
 
     // Synchronous path: value is already ISO date strings (e.g. "2026-04-01 : 2026-05-01")
     if (value.includes(SEPARATOR)) {
@@ -463,7 +430,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
         return;
       }
     }
-
 
     // Async path: resolve formula strings (e.g. "30 days ago : now")
     fetchTimeRange(value).then(({ value: resolved, error }) => {
@@ -488,7 +454,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     return undefined;
   }, [show, activeTab]);
 
-
   /* ---- Resolve actual time range preview ------------------------- */
   useEffect(() => {
     let isCurrent = true;
@@ -512,7 +477,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     };
   }, [timeRangeValue]);
 
-
   /* ---- Emit filter ---------------------------------------------- */
   const emitFilter = useCallback(
     async (rangeStr: string) => {
@@ -525,9 +489,7 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
         return;
       }
 
-
       const extra: Record<string, any> = { time_range: rangeStr };
-
 
       try {
         const { value: resolved, error } = await fetchTimeRange(rangeStr);
@@ -548,7 +510,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
         // fall back to time_range only
       }
 
-
       setDataMask({
         extraFormData: extra,
         filterState: { value: rangeStr, label: rangeStr },
@@ -556,7 +517,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     },
     [col, setDataMask],
   );
-
 
   /* ---- Popover lifecycle ----------------------------------------- */
   function onOpen() {
@@ -587,7 +547,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     setFilterActive(true);
   }
 
-
   function onClose() {
     setShow(false);
     setFilterActive(false);
@@ -595,12 +554,10 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     unsetHoveredFilter();
   }
 
-
   async function onApply() {
     await emitFilter(timeRangeValue);
     onClose();
   }
-
 
   function onTabChange(key: TabKey) {
     setActiveTab(key);
@@ -608,7 +565,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
       setTimeRangeValue(NO_TIME_RANGE);
     }
   }
-
 
   /* ---- Apply on mount if existing value -------------------------- */
   useEffect(() => {
@@ -618,7 +574,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   /* ---- Tab content ---------------------------------------------- */
   const frameProps = {
     value: timeRangeValue,
@@ -626,18 +581,21 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     isOverflowingFilterBar,
   };
 
-
   // ---- Helpers ----
   const isDynamic = (val: string) => {
     if (!val) return false;
     const lower = val.toLowerCase();
-    if (lower === 'now' || lower === 'today' || lower.includes('ago') || lower.includes('last')) return true;
+    if (
+      lower === 'now' ||
+      lower === 'today' ||
+      lower.includes('ago') ||
+      lower.includes('last')
+    )
+      return true;
     return !/^\d{4}-\d{2}-\d{2}/.test(val);
   };
 
-
   const isRangeDynamic = isDynamic(since) || isDynamic(until);
-
 
   const renderBasicTab = () => (
     <AntdThemeProvider locale={datePickerLocale ?? undefined}>
@@ -648,7 +606,9 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
           open
           value={calValue}
           defaultPickerValue={defaultPickerValue}
-          onCalendarChange={(dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) => {
+          onCalendarChange={(
+            dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null,
+          ) => {
             if (dates && (dates[0] || dates[1])) {
               const start = dates[0] ? dates[0].format('YYYY-MM-DD') : '';
               const end = dates[1] ? dates[1].format('YYYY-MM-DD') : '';
@@ -656,14 +616,19 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
               if (dates[0]) {
                 setDefaultPickerValue([dates[0], dates[0].add(1, 'month')]);
               } else if (dates[1]) {
-                setDefaultPickerValue([dates[1].subtract(1, 'month'), dates[1]]);
+                setDefaultPickerValue([
+                  dates[1].subtract(1, 'month'),
+                  dates[1],
+                ]);
               }
             } else {
               setTimeRangeValue(NO_TIME_RANGE);
               setDefaultPickerValue(undefined);
             }
           }}
-          onChange={(dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) => {
+          onChange={(
+            dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null,
+          ) => {
             if (dates && dates[0] && dates[1]) {
               setTimeRangeValue(
                 `${dates[0].format('YYYY-MM-DD')}${SEPARATOR}${dates[1].format('YYYY-MM-DD')}`,
@@ -680,7 +645,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
           }
         />
       </InlineCalendarContainer>
-
 
       {/* Start / End text inputs with formula hints */}
       <div style={{ display: 'flex', gap: 16, boxSizing: 'border-box' }}>
@@ -700,7 +664,11 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
                 setTimeRangeValue(`${e.target.value}${SEPARATOR}${until}`)
               }
               placeholder={t('Select in calendar or type')}
-              style={{ width: '100%', boxSizing: 'border-box', paddingRight: 30 }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                paddingRight: 30,
+              }}
             />
             {since && (
               <span
@@ -725,7 +693,9 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
                 textDecoration: 'none',
                 display: 'inline',
               }}
-              onClick={() => setTimeRangeValue(`7 days ago${SEPARATOR}${until}`)}
+              onClick={() =>
+                setTimeRangeValue(`7 days ago${SEPARATOR}${until}`)
+              }
             >
               {t('7 days ago')}
             </button>
@@ -742,7 +712,9 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
                 textDecoration: 'none',
                 display: 'inline',
               }}
-              onClick={() => setTimeRangeValue(`30 days ago${SEPARATOR}${until}`)}
+              onClick={() =>
+                setTimeRangeValue(`30 days ago${SEPARATOR}${until}`)
+              }
             >
               {t('30 days ago')}
             </button>
@@ -759,7 +731,9 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
                 textDecoration: 'none',
                 display: 'inline',
               }}
-              onClick={() => setTimeRangeValue(`45 days ago${SEPARATOR}${until}`)}
+              onClick={() =>
+                setTimeRangeValue(`45 days ago${SEPARATOR}${until}`)
+              }
             >
               {t('45 days ago')}
             </button>
@@ -776,13 +750,14 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
                 textDecoration: 'none',
                 display: 'inline',
               }}
-              onClick={() => setTimeRangeValue(`90 days ago${SEPARATOR}${until}`)}
+              onClick={() =>
+                setTimeRangeValue(`90 days ago${SEPARATOR}${until}`)
+              }
             >
               {t('90 days ago')}
             </button>
           </div>
         </div>
-
 
         <div style={{ flex: '1 1 0', minWidth: 0 }}>
           <div className="control-label">
@@ -800,7 +775,11 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
                 setTimeRangeValue(`${since}${SEPARATOR}${e.target.value}`)
               }
               placeholder={t('Select in calendar or type')}
-              style={{ width: '100%', boxSizing: 'border-box', paddingRight: 30 }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                paddingRight: 30,
+              }}
             />
             {until && (
               <span
@@ -869,17 +848,20 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
     </AntdThemeProvider>
   );
 
-
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'last': return <CommonFrame {...frameProps} />;
-      case 'previous': return <CalendarFrame {...frameProps} />;
-      case 'current': return <CurrentCalendarFrame {...frameProps} />;
-      case 'custom': return <CustomFrame {...frameProps} />;
-      default: return renderBasicTab();
+      case 'last':
+        return <CommonFrame {...frameProps} />;
+      case 'previous':
+        return <CalendarFrame {...frameProps} />;
+      case 'current':
+        return <CurrentCalendarFrame {...frameProps} />;
+      case 'custom':
+        return <CustomFrame {...frameProps} />;
+      default:
+        return renderBasicTab();
     }
   };
-
 
   /* ---------------------------------------------------------------- */
   /*  Popover overlay                                                   */
@@ -898,12 +880,9 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
         ))}
       </div>
 
-
       <div className="tab-body">{renderTabContent()}</div>
 
-
       <Divider />
-
 
       <div style={{ padding: '0 16px' }}>
         <ActualTimeRange title={evalResponse}>
@@ -913,9 +892,7 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
         </ActualTimeRange>
       </div>
 
-
       <Divider style={{ margin: '8px 0' }} />
-
 
       <div
         style={{
@@ -952,7 +929,6 @@ export default function DateTimeFilterPlugin(props: PluginFilterDateTimeProps) {
       </div>
     </PopoverContent>
   );
-
 
   /* ---------------------------------------------------------------- */
   /*  Render                                                            */

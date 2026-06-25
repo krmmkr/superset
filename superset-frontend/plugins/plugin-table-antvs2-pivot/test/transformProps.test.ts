@@ -42,27 +42,25 @@ const baseFormData = {
   datasource: '1__table',
 };
 
-const buildChartProps = (formDataOverrides: Partial<QueryFormData> = {}) => {
-  return new ChartProps({
-    formData: { ...baseFormData, ...formDataOverrides },
-    width: 800,
-    height: 600,
-    queriesData: [
-      {
-        data: [
-          { region: 'East', category: 'Furniture', sales: 100 },
-          { region: 'West', category: 'Office Supplies', sales: 200 },
-        ],
-        colnames: ['region', 'category', 'sales'],
-        coltypes: [1, 1, 0],
-      },
-    ],
-    hooks: { setDataMask },
-    filterState: { selectedFilters: {} },
-    datasource: { verboseMap: {}, columnFormats: {} },
-    theme: {} as any,
-  });
-};
+const buildChartProps = (formDataOverrides: Partial<QueryFormData> = {}) => new ChartProps({
+  formData: { ...baseFormData, ...formDataOverrides },
+  width: 800,
+  height: 600,
+  queriesData: [
+    {
+      data: [
+        { region: 'East', category: 'Furniture', sales: 100 },
+        { region: 'West', category: 'Office Supplies', sales: 200 },
+      ],
+      colnames: ['region', 'category', 'sales'],
+      coltypes: [1, 1, 0],
+    },
+  ],
+  hooks: { setDataMask },
+  filterState: { selectedFilters: {} },
+  datasource: { verboseMap: {}, columnFormats: {} },
+  theme: {} as any,
+});
 
 test('should transform default chart props correctly', () => {
   const chartProps = buildChartProps();
@@ -160,17 +158,26 @@ test('should map number formatting correctly', () => {
   chartProps.queriesData[0].data = [
     { region: 'East', category: 'Furniture', sales: 100, profit: 50 },
   ];
-  chartProps.queriesData[0].colnames = ['region', 'category', 'sales', 'profit'];
+  chartProps.queriesData[0].colnames = [
+    'region',
+    'category',
+    'sales',
+    'profit',
+  ];
   chartProps.queriesData[0].coltypes = [1, 1, 0, 0];
   const result = transformProps(chartProps as any);
 
   // Check formatter mapping on meta values: sales should format to percentage
-  const salesMeta = result.s2DataConfig.meta.find((m: any) => m.field === 'sales');
+  const salesMeta = result.s2DataConfig.meta.find(
+    (m: any) => m.field === 'sales',
+  );
   expect(salesMeta.formatter).toBeDefined();
   expect(salesMeta.formatter(0.1234)).toBe('12.34%');
 
   // profit should fall back to default SMART_NUMBER ('1.23k' for 1234.56)
-  const profitMeta = result.s2DataConfig.meta.find((m: any) => m.field === 'profit');
+  const profitMeta = result.s2DataConfig.meta.find(
+    (m: any) => m.field === 'profit',
+  );
   expect(profitMeta.formatter).toBeDefined();
   expect(profitMeta.formatter(1234.56)).toBe('1.23k');
 });
@@ -182,13 +189,19 @@ test('should exclude totals for metrics specified in excludeTotalsMetrics', () =
   });
   const result = transformProps(chartProps as any);
 
-  const calcFunc = result.s2Options.totals.row.calcTotals.calcFunc;
+  const { calcFunc } = result.s2Options.totals.row.calcTotals;
   expect(calcFunc).toBeDefined();
 
-  const salesVal = calcFunc({ '$$extra$$': 'sales' }, [{ sales: 10 }, { sales: 20 }]);
+  const salesVal = calcFunc({ $$extra$$: 'sales' }, [
+    { sales: 10 },
+    { sales: 20 },
+  ]);
   expect(salesVal).toBe(30);
 
-  const profitVal = calcFunc({ '$$extra$$': 'profit' }, [{ profit: 10 }, { profit: 20 }]);
+  const profitVal = calcFunc({ $$extra$$: 'profit' }, [
+    { profit: 10 },
+    { profit: 20 },
+  ]);
   expect(profitVal).toBeNull();
 });
 
@@ -197,7 +210,9 @@ test('should return empty string in formatter if value is null or undefined', ()
     metrics: ['sales'],
   });
   const result = transformProps(chartProps as any);
-  const salesMeta = result.s2DataConfig.meta.find((m: any) => m.field === 'sales');
+  const salesMeta = result.s2DataConfig.meta.find(
+    (m: any) => m.field === 'sales',
+  );
 
   expect(salesMeta.formatter(null)).toBe('');
   expect(salesMeta.formatter(undefined)).toBe('');
@@ -247,13 +262,19 @@ test('should exclude totals for metrics configured with excludeTotals in metric_
   });
   const result = transformProps(chartProps as any);
 
-  const calcFunc = result.s2Options.totals.row.calcTotals.calcFunc;
+  const { calcFunc } = result.s2Options.totals.row.calcTotals;
   expect(calcFunc).toBeDefined();
 
-  const salesVal = calcFunc({ '$$extra$$': 'sales' }, [{ sales: 10 }, { sales: 20 }]);
+  const salesVal = calcFunc({ $$extra$$: 'sales' }, [
+    { sales: 10 },
+    { sales: 20 },
+  ]);
   expect(salesVal).toBe(30);
 
-  const profitVal = calcFunc({ '$$extra$$': 'profit' }, [{ profit: 10 }, { profit: 20 }]);
+  const profitVal = calcFunc({ $$extra$$: 'profit' }, [
+    { profit: 10 },
+    { profit: 20 },
+  ]);
   expect(profitVal).toBeNull();
 });
 
@@ -268,11 +289,17 @@ test('should exclude dimensions from row/col subTotalsDimensions when showSubtot
       category: { showSubtotal: false },
     },
   });
-  chartProps.queriesData[0].colnames = ['region', 'country', 'city', 'category', 'sub_category', 'sales'];
+  chartProps.queriesData[0].colnames = [
+    'region',
+    'country',
+    'city',
+    'category',
+    'sub_category',
+    'sales',
+  ];
   chartProps.queriesData[0].coltypes = [1, 1, 1, 1, 1, 0];
   const result = transformProps(chartProps as any);
 
   expect(result.s2Options.totals.row.subTotalsDimensions).toEqual(['region']);
   expect(result.s2Options.totals.col.subTotalsDimensions).toEqual([]);
 });
-

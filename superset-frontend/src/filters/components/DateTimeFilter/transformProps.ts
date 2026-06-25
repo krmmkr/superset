@@ -19,7 +19,6 @@
 import { ChartProps } from '@superset-ui/core';
 import { noOp } from 'src/utils/common';
 
-
 export default function transformProps(chartProps: ChartProps) {
   const {
     formData,
@@ -32,7 +31,6 @@ export default function transformProps(chartProps: ChartProps) {
     displaySettings,
   } = chartProps;
 
-
   const {
     setDataMask = noOp,
     setFocusedFilter = noOp,
@@ -41,7 +39,6 @@ export default function transformProps(chartProps: ChartProps) {
     unsetHoveredFilter = noOp,
     setFilterActive = noOp,
   } = hooks;
-
 
   return {
     formData,

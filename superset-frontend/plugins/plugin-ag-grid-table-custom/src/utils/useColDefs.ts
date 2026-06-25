@@ -393,7 +393,9 @@ export const useColDefs = ({
             const val = params.data?.[colId];
             if (val == null) return 1;
 
-            const allData = params.node.parent?.childrenAfterSort || params.node.parent?.childrenAfterFilter;
+            const allData =
+              params.node.parent?.childrenAfterSort ||
+              params.node.parent?.childrenAfterFilter;
             if (!allData) return 1;
 
             const rowIndex = allData.indexOf(params.node);

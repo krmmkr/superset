@@ -5,81 +5,80 @@
 
 // Calendar orientation
 export enum CalendarOrient {
-    Horizontal = 'horizontal',
-    Vertical = 'vertical',
+  Horizontal = 'horizontal',
+  Vertical = 'vertical',
 }
 
 // VisualMap type
 export enum VisualMapType {
-    Continuous = 'continuous',
-    Piecewise = 'piecewise',
+  Continuous = 'continuous',
+  Piecewise = 'piecewise',
 }
 
 // VisualMap orientation
 export enum VisualMapOrient {
-    Horizontal = 'horizontal',
-    Vertical = 'vertical',
+  Horizontal = 'horizontal',
+  Vertical = 'vertical',
 }
 
 // VisualMap position
 export enum VisualMapPosition {
-    TopLeft = 'top-left',
-    TopRight = 'top-right',
-    BottomLeft = 'bottom-left',
-    BottomRight = 'bottom-right',
+  TopLeft = 'top-left',
+  TopRight = 'top-right',
+  BottomLeft = 'bottom-left',
+  BottomRight = 'bottom-right',
 }
 
 // Day label format
 export enum DayLabelFormat {
-    Short = 'short',    // M, T, W, ...
-    Medium = 'medium',  // Mon, Tue, Wed, ...
-    Full = 'full',      // Monday, Tuesday, ...
+  Short = 'short', // M, T, W, ...
+  Medium = 'medium', // Mon, Tue, Wed, ...
+  Full = 'full', // Monday, Tuesday, ...
 }
 
 // Month label format
 export enum MonthLabelFormat {
-    Short = 'short',    // Jan, Feb, ...
-    Full = 'full',      // January, February, ...
+  Short = 'short', // Jan, Feb, ...
+  Full = 'full', // January, February, ...
 }
 
 export const DEFAULT_FORM_DATA = {
-    // Calendar layout
-    calendarOrient: CalendarOrient.Horizontal,
-    cellSize: 16,
-    showMonthSeparator: true,
-    monthSeparatorColor: '#000000',
-    monthSeparatorWidth: 2,
+  // Calendar layout
+  calendarOrient: CalendarOrient.Horizontal,
+  cellSize: 16,
+  showMonthSeparator: true,
+  monthSeparatorColor: '#000000',
+  monthSeparatorWidth: 2,
 
-    // Day labels
-    showDayLabel: true,
-    dayLabelFormat: DayLabelFormat.Short,
-    showMonthLabel: true,
-    monthLabelFormat: MonthLabelFormat.Short,
+  // Day labels
+  showDayLabel: true,
+  dayLabelFormat: DayLabelFormat.Short,
+  showMonthLabel: true,
+  monthLabelFormat: MonthLabelFormat.Short,
 
+  // VisualMap
+  visualMapType: VisualMapType.Continuous,
+  visualMapOrient: VisualMapOrient.Horizontal,
+  visualMapPosition: VisualMapPosition.BottomLeft,
+  showVisualMap: true,
+  piecewiseNum: 5,
+  emptyCellColor: '#efefef',
 
-    // VisualMap
-    visualMapType: VisualMapType.Continuous,
-    visualMapOrient: VisualMapOrient.Horizontal,
-    visualMapPosition: VisualMapPosition.BottomLeft,
-    showVisualMap: true,
-    piecewiseNum: 5,
-    emptyCellColor: '#efefef',
+  // Cell styling
+  cellBorderColor: '#ffffff',
+  cellBorderWidth: 1,
+  cellBorderRadius: 1,
 
-    // Cell styling
-    cellBorderColor: '#ffffff',
-    cellBorderWidth: 1,
-    cellBorderRadius: 1,
+  // Cell labels
+  showCellLabel: false,
+  showCellDate: false,
+  labelFontSize: 11,
+  dayLabelFontSize: 9,
 
-    // Cell labels
-    showCellLabel: false,
-    showCellDate: false,
-    labelFontSize: 11,
-    dayLabelFontSize: 9,
+  // Tooltip
+  dateFormat: '%Y-%m-%d',
+  numberFormat: 'SMART_NUMBER',
 
-    // Tooltip
-    dateFormat: '%Y-%m-%d',
-    numberFormat: 'SMART_NUMBER',
-
-    // Crossfilter
-    emitFilter: true,
+  // Crossfilter
+  emitFilter: true,
 };

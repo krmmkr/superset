@@ -152,14 +152,16 @@ const AgGridDataTable: FunctionComponent<AgGridTableProps> = memo(
     const inputRef = useRef<HTMLInputElement>(null);
     const rowData = useMemo(() => {
       if (!data || data.length === 0) return [];
-      
+
       // Identify non-metric columns in order
       const nonMetricCols = colDefsFromProps
-        .filter(c => c.field && !c.context?.isMetric && !c.context?.isPercentMetric)
+        .filter(
+          c => c.field && !c.context?.isMetric && !c.context?.isPercentMetric,
+        )
         .map(c => c.field as string);
-        
+
       if (nonMetricCols.length === 0) return data;
-      
+
       // Sort data by non-metric columns sequentially to group identical dimensions together
       return [...data].sort((a, b) => {
         for (const col of nonMetricCols) {
@@ -527,7 +529,7 @@ const AgGridDataTable: FunctionComponent<AgGridTableProps> = memo(
           onGridReady={onGridReady}
           className="ag-container"
           rowData={rowData}
-          suppressRowTransform={true}
+          suppressRowTransform
           getRowStyle={params => ({
             zIndex: String(10000 - (params.node.rowIndex ?? 0)),
           })}

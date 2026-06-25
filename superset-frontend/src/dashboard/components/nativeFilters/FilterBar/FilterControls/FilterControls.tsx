@@ -131,7 +131,7 @@ const StyledDivider = styled.div`
   margin: ${({ theme }) => theme.sizeUnit * 2}px 0;
 `;
 
-const StyledIcon = styled(Icons.UpOutlined) <{ isOpen: boolean }>`
+const StyledIcon = styled(Icons.UpOutlined)<{ isOpen: boolean }>`
   transform: ${({ isOpen }) => (isOpen ? 'rotate(0deg)' : 'rotate(180deg)')};
   transition: transform 0.2s ease;
   color: ${({ theme }) => theme.colorTextSecondary};
@@ -460,7 +460,7 @@ const FilterControls: FC<FilterControlsProps> = ({
         last={
           filtersInScope.length > 0 &&
           `${last.name}${last.emitterId}` ===
-          `${crossFilter.name}${crossFilter.emitterId}`
+            `${crossFilter.name}${crossFilter.emitterId}`
         }
       />
     ),
@@ -574,21 +574,21 @@ const FilterControls: FC<FilterControlsProps> = ({
       <>
         <div
           css={(theme: SupersetTheme) => css`
-          padding: 0 ${theme.sizeUnit * 4}px;
-          min-width: 0;
-          flex: 1;
-        `}
+            padding: 0 ${theme.sizeUnit * 4}px;
+            min-width: 0;
+            flex: 1;
+          `}
         >
           <DropdownContainer
             items={items}
             dropdownTriggerIcon={
               <Icons.FilterOutlined
                 css={css`
-                && {
-                  margin-right: -4px;
-                  display: flex;
-                }
-              `}
+                  && {
+                    margin-right: -4px;
+                    display: flex;
+                  }
+                `}
               />
             }
             dropdownTriggerText={t('More filters')}
@@ -597,36 +597,37 @@ const FilterControls: FC<FilterControlsProps> = ({
               activeOverflowedFiltersInScope.length === 0
                 ? t('No applied filters')
                 : t(
-                  'Applied filters: %s',
-                  activeOverflowedFiltersInScope
-                    .map(filter => filter.name)
-                    .join(', '),
-                )
+                    'Applied filters: %s',
+                    activeOverflowedFiltersInScope
+                      .map(filter => filter.name)
+                      .join(', '),
+                  )
             }
             dropdownContent={
               overflowedFiltersInScope.length ||
-                (filtersOutOfScope.length && showCollapsePanel) ||
-                (customizationsOutOfScope.length && showCustomizationCollapsePanel)
+              (filtersOutOfScope.length && showCollapsePanel) ||
+              (customizationsOutOfScope.length &&
+                showCustomizationCollapsePanel)
                 ? () => (
-                  <>
-                    <FiltersDropdownContent
-                      overflowedCrossFilters={[]}
-                      filtersInScope={overflowedFiltersInScope}
-                      filtersOutOfScope={filtersOutOfScope}
-                      renderer={renderer}
-                      rendererCrossFilter={rendererCrossFilter}
-                      showCollapsePanel={showCollapsePanel}
-                      forceRenderOutOfScope={hasRequiredFirst}
-                    />
-                    {showCustomizationCollapsePanel && (
-                      <CustomizationsOutOfScopeCollapsible
-                        customizationsOutOfScope={customizationsOutOfScope}
-                        renderer={customizationRenderer}
-                        forceRender={false}
+                    <>
+                      <FiltersDropdownContent
+                        overflowedCrossFilters={[]}
+                        filtersInScope={overflowedFiltersInScope}
+                        filtersOutOfScope={filtersOutOfScope}
+                        renderer={renderer}
+                        rendererCrossFilter={rendererCrossFilter}
+                        showCollapsePanel={showCollapsePanel}
+                        forceRenderOutOfScope={hasRequiredFirst}
                       />
-                    )}
-                  </>
-                )
+                      {showCustomizationCollapsePanel && (
+                        <CustomizationsOutOfScopeCollapsible
+                          customizationsOutOfScope={customizationsOutOfScope}
+                          renderer={customizationRenderer}
+                          forceRender={false}
+                        />
+                      )}
+                    </>
+                  )
                 : undefined
             }
             forceRender={hasRequiredFirst}
@@ -647,20 +648,20 @@ const FilterControls: FC<FilterControlsProps> = ({
         {selectedCrossFilters.length > 0 && (
           <div
             css={(theme: SupersetTheme) => css`
-            padding: 0 ${theme.sizeUnit}px;
-            flex-shrink: 0;
-          `}
+              padding: 0 ${theme.sizeUnit}px;
+              flex-shrink: 0;
+            `}
           >
             <DropdownContainer
               items={[]}
               dropdownTriggerIcon={
                 <Icons.FilterOutlined
                   css={css`
-                  && {
-                    margin-right: -4px;
-                    display: flex;
-                  }
-                `}
+                    && {
+                      margin-right: -4px;
+                      display: flex;
+                    }
+                  `}
                 />
               }
               dropdownTriggerText={t('Cross filters')}

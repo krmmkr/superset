@@ -95,6 +95,7 @@ import { CustomControlsChartPlugin } from 'plugins/custom_controls/custom_filter
 import EchartsSankeyMultiLevelChartPlugin from 'plugins/plugin-chart-echarts-custom/src/Sankey';
 import EchartsCalendarHeatmapChartPlugin from 'plugins/plugin-chart-echarts-custom/src/CalendarChart1/src';
 import AntvS2TableChartPlugin from 'plugins/plugin-table-antvs2-pivot/src';
+import AntvS2FlatTableChartPlugin from 'plugins/plugin-table-antvs2-table/src';
 
 export default class MainPreset extends Preset {
   constructor() {
@@ -102,16 +103,18 @@ export default class MainPreset extends Preset {
       FeatureFlag.ChartPluginsExperimental,
     )
       ? [
-        new BigNumberPeriodOverPeriodChartPlugin().configure({
-          key: VizType.BigNumberPeriodOverPeriod,
-        }),
-      ]
+          new BigNumberPeriodOverPeriodChartPlugin().configure({
+            key: VizType.BigNumberPeriodOverPeriod,
+          }),
+        ]
       : [];
 
     const agGridTablePlugin = isFeatureEnabled(FeatureFlag.AgGridTableEnabled)
       ? [
           new AgGridTableChartPlugin().configure({ key: VizType.TableAgGrid }),
-          new AgGridTableCustomChartPlugin().configure({ key: 'ag_grid_table_custom' }),
+          new AgGridTableCustomChartPlugin().configure({
+            key: 'ag_grid_table_custom',
+          }),
         ]
       : [];
 
@@ -232,6 +235,9 @@ export default class MainPreset extends Preset {
         }),
         new AntvS2TableChartPlugin().configure({
           key: 'antvs2_table_pivot',
+        }),
+        new AntvS2FlatTableChartPlugin().configure({
+          key: 'antvs2_table',
         }),
       ],
     });

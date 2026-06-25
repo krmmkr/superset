@@ -5,7 +5,7 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * with the License.  See the License for the -
  *
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -23,35 +23,6 @@ import {
 } from '@superset-ui/core';
 import { S2TableChartProps, S2TableTransformedProps, Refs } from './types';
 import type { S2DataConfig, S2Options } from '@antv/s2';
-
-/**
- * Aggregate helper: computes a single value from an array of numbers
- * based on the given aggregation type.
- */
-function aggregate(values: number[], aggType: string): number {
-  switch (aggType) {
-    case 'SUM':
-      return values.reduce((a, b) => a + b, 0);
-    case 'AVG':
-      return values.length > 0
-        ? values.reduce((a, b) => a + b, 0) / values.length
-        : 0;
-    case 'MIN':
-      return values.length > 0
-        ? values.reduce((a, b) => (a < b ? a : b), values[0])
-        : 0;
-    case 'MAX':
-      return values.length > 0
-        ? values.reduce((a, b) => (a > b ? a : b), values[0])
-        : 0;
-    case 'COUNT':
-      return values.length;
-    case 'COUNT_DISTINCT':
-      return new Set(values).size;
-    default:
-      return values.reduce((a, b) => a + b, 0);
-  }
-}
 
 /**
  * Safely parse a JSON string, returning fallback on failure.
@@ -179,21 +150,9 @@ export default function transformProps(
 
   // ── Form data extraction ─────────────────────
   const rawGroupby = formData.groupby || [];
-  const rawColumns = formData.columns || [];
   const metricsRaw = formData.metrics || [];
-
-  const tableMode = formData.tableMode ?? formData.table_mode ?? 'grid';
   const emitFilter = formData.emitFilter ?? formData.emit_filter ?? true;
 
-  const totalLabel = formData.totalLabel ?? formData.total_label ?? 'Total';
-  const showRowTotals =
-    formData.showRowTotals ?? formData.show_row_totals ?? true;
-  const showRowSubtotals =
-    formData.showRowSubtotals ?? formData.show_row_subtotals ?? false;
-  const showColTotals =
-    formData.showColTotals ?? formData.show_col_totals ?? true;
-  const showColSubtotals =
-    formData.showColSubtotals ?? formData.show_col_subtotals ?? false;
   const showSortControls =
     formData.showSortControls ?? formData.show_sort_controls ?? true;
   const showSeriesNumber =
@@ -220,6 +179,8 @@ export default function transformProps(
     formData.rowHeaderWordWrap ?? formData.row_header_word_wrap ?? false;
   const dataCellWordWrap =
     formData.dataCellWordWrap ?? formData.data_cell_word_wrap ?? false;
+  const enableRowspan =
+    formData.enableRowspan ?? formData.enable_rowspan ?? false;
 
   const advancedS2Options =
     formData.advancedS2Options ?? formData.advanced_s2_options;
@@ -229,12 +190,10 @@ export default function transformProps(
     formData.dimensionConfig || formData.dimension_config || {};
   const metricConfig = formData.metricConfig || formData.metric_config || {};
 
-  const columnAggregations: Record<string, string> = {};
   const columnAlignmentsObj: Record<string, 'left' | 'center' | 'right'> = {};
   const columnFormatsObj: Record<string, string> = {};
   const columnWidthsObj: Record<string, number> = {};
   const customColumnNames: Record<string, string> = {};
-  const disabledSubtotalDimensions = new Set<string>();
 
   Object.entries(dimensionConfig).forEach(([col, cfg]: [string, any]) => {
     if (cfg?.columnWidth !== undefined) {
@@ -246,14 +205,7 @@ export default function transformProps(
     if (cfg?.customColumnName) {
       customColumnNames[col] = cfg.customColumnName;
     }
-    if (cfg?.showSubtotal === false) {
-      disabledSubtotalDimensions.add(col);
-    }
   });
-
-  const excludeTotalsMetricsRaw: string[] =
-    formData.excludeTotalsMetrics ?? formData.exclude_totals_metrics ?? [];
-  const excludeTotalsSet = new Set(excludeTotalsMetricsRaw);
 
   Object.entries(metricConfig).forEach(([col, cfg]: [string, any]) => {
     if (cfg?.columnWidth !== undefined) {
@@ -265,18 +217,10 @@ export default function transformProps(
     if (cfg?.d3NumberFormat) {
       columnFormatsObj[col] = cfg.d3NumberFormat;
     }
-    if (cfg?.totalAggregation) {
-      columnAggregations[col] = cfg.totalAggregation;
-    }
     if (cfg?.customColumnName) {
       customColumnNames[col] = cfg.customColumnName;
     }
-    if (cfg?.excludeTotals) {
-      excludeTotalsSet.add(col);
-    }
   });
-
-  const excludeTotalsMetrics = Array.from(excludeTotalsSet);
 
   const defaultDimensionAlign =
     formData.defaultDimensionAlign ??
@@ -326,7 +270,6 @@ export default function transformProps(
 
   // Normalize field names
   const groupby = rawGroupby.map(normalizeCol);
-  const columns = rawColumns.map(normalizeCol);
   const rawMetricNames: string[] = metricsRaw.map((m: any) =>
     getMetricLabel(m),
   );
@@ -336,7 +279,7 @@ export default function transformProps(
   const data: DataRecord[] = queryData.data || [];
   const colnames: string[] = (queryData as any).colnames || [];
 
-  // Use Sets for O(1) metric name lookups instead of repeated Array.includes
+  // Use Sets for O(1) lookup
   const metricNameSet = new Set(rawMetricNames);
   const metricNameLowerSet = new Set(
     rawMetricNames.map((n: string) => n.toLowerCase()),
@@ -345,26 +288,12 @@ export default function transformProps(
     c => metricNameSet.has(c) || metricNameLowerSet.has(c.toLowerCase()),
   );
 
-  const allFields = [...groupby, ...columns, ...metricCols];
-
-  // Find tree dimension width in Tree mode
-  let treeWidth: number | undefined;
-  if (tableMode === 'tree' && groupby.length > 0) {
-    for (const col of groupby) {
-      if (columnWidthsObj[col] !== undefined) {
-        treeWidth = columnWidthsObj[col];
-        break;
-      }
-    }
-  }
+  const allFields = [...groupby, ...metricCols];
 
   // ── S2 Data Config ───────────────────────────
   const s2Data = data.map(row => {
     const out: Record<string, string | number> = {};
     for (const col of groupby) {
-      out[col] = String(row[col]);
-    }
-    for (const col of columns) {
       out[col] = String(row[col]);
     }
     for (const col of metricCols) {
@@ -375,9 +304,7 @@ export default function transformProps(
 
   const s2DataConfig: S2DataConfig = {
     fields: {
-      rows: groupby,
-      columns,
-      values: metricCols,
+      columns: [...groupby, ...metricCols],
     },
     meta: allFields.map(f => {
       const isMetric = metricCols.includes(f);
@@ -399,45 +326,64 @@ export default function transformProps(
     }),
     data: s2Data,
   };
+  const mergedCellsInfo: any[] = [];
+  if (enableRowspan && groupby.length > 0 && s2Data.length > 0) {
+    groupby.forEach((colField: string, colIdx: number) => {
+      const globalColIdx = [...groupby, ...metricCols].indexOf(colField);
+      if (globalColIdx === -1) return;
 
-  // ── Per-column aggregation calcFunc ───────────
-  const calcFunc = (
-    query: Record<string, any>,
-    rows: Record<string, any>[],
-  ) => {
-    const metric = query['$$extra$$'];
-    if (!metric) return 0;
-    if (excludeTotalsMetrics.includes(metric)) {
-      return null;
-    }
+      let runStart = 0;
+      for (let r = 1; r < s2Data.length; r += 1) {
+        let canMerge = true;
+        for (let prevIdx = 0; prevIdx <= colIdx; prevIdx += 1) {
+          const checkField = groupby[prevIdx];
+          if (s2Data[r][checkField] !== s2Data[runStart][checkField]) {
+            canMerge = false;
+            break;
+          }
+        }
 
-    // A query represents a Grand Total if it contains no dimension keys (only $$extra$$)
-    const isGrandTotal = Object.keys(query).every(key => key === '$$extra$$');
-    if (isGrandTotal && queriesData[1]?.data?.[0]) {
-      return Number(queriesData[1].data[0][metric]) || 0;
-    }
-
-    const values = rows.map(row => {
-      const rawRow =
-        row && typeof row === 'object' && 'raw' in row ? row.raw : row;
-      return Number(rawRow?.[metric]) || 0;
+        if (!canMerge) {
+          const runLength = r - runStart;
+          if (runLength > 1) {
+            const cells = [];
+            for (let runR = runStart; runR < r; runR += 1) {
+              cells.push({
+                rowIndex: runR,
+                colIndex: globalColIdx,
+                showText: runR === runStart,
+              });
+            }
+            mergedCellsInfo.push(cells);
+          }
+          runStart = r;
+        }
+      }
+      const lastRunLength = s2Data.length - runStart;
+      if (lastRunLength > 1) {
+        const cells = [];
+        for (let runR = runStart; runR < s2Data.length; runR += 1) {
+          cells.push({
+            rowIndex: runR,
+            colIndex: globalColIdx,
+            showText: runR === runStart,
+          });
+        }
+        mergedCellsInfo.push(cells);
+      }
     });
-    return aggregate(values, columnAggregations[metric] || 'SUM');
-  };
-  const calcTotalsObj = { calcFunc };
+  }
 
   // ── S2 Options ───────────────────────────────
   const s2Options: S2Options = {
     width,
     height,
-    hierarchyType: tableMode,
+    mergedCellsInfo,
     seriesNumber: {
       enable: showSeriesNumber,
     },
     interaction: {
       hoverHighlight: true,
-      // Disable cell selection behaviors that cause
-      // "N items selected" summary bar at bottom
       selectedCellsSpotlight: false,
       multiSelection: false,
       brushSelection: false,
@@ -454,7 +400,6 @@ export default function transformProps(
       },
       rowCell: {
         widthByField,
-        ...(treeWidth !== undefined ? { width: treeWidth, treeWidth } : {}),
         ...(rowHeight !== undefined ? { height: rowHeight } : {}),
       },
       dataCell: rowHeight !== undefined ? { height: rowHeight } : {},
@@ -483,34 +428,6 @@ export default function transformProps(
         hiddenColumns: true,
       },
     } as any,
-    totals: {
-      row: {
-        showGrandTotals: showRowTotals,
-        showSubTotals: showRowSubtotals && groupby.length > 1,
-        reverseGrandTotalsLayout: true,
-        reverseSubTotalsLayout: true,
-        calcGrandTotals: calcTotalsObj,
-        calcSubTotals: calcTotalsObj,
-        subTotalsDimensions: (groupby.length > 1
-          ? groupby.slice(0, -1)
-          : []
-        ).filter((dim: string) => !disabledSubtotalDimensions.has(dim)),
-        grandTotalsLabel: totalLabel,
-        subTotalsLabel: `Sub${totalLabel}`,
-      } as any,
-      col: {
-        showGrandTotals: showColTotals,
-        showSubTotals: showColSubtotals && columns.length > 1,
-        calcGrandTotals: calcTotalsObj,
-        calcSubTotals: calcTotalsObj,
-        subTotalsDimensions: (columns.length > 1
-          ? columns.slice(0, -1)
-          : []
-        ).filter((dim: string) => !disabledSubtotalDimensions.has(dim)),
-        grandTotalsLabel: totalLabel,
-        subTotalsLabel: `Sub${totalLabel}`,
-      } as any,
-    },
   };
 
   // ── Return ────────────────────────────────────
@@ -526,6 +443,7 @@ export default function transformProps(
     s2DataConfig,
     s2Options,
     s2Theme: supersetTheme,
+    sheetType: 'table',
     showSortControls,
     advancedS2OptionsObj,
     defaultDimensionAlign,

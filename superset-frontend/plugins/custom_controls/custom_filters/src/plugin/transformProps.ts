@@ -17,34 +17,39 @@
  * under the License.
  */
 import { ChartProps, TimeseriesDataRecord } from '@superset-ui/core';
-import { CustomControlsTransformedProps, SupersetPluginChartCustomControlsQueryFormData } from '../types';
+import {
+  CustomControlsTransformedProps,
+  SupersetPluginChartCustomControlsQueryFormData,
+} from '../types';
 
+export default function transformProps(
+  chartProps: ChartProps,
+): CustomControlsTransformedProps {
+  const { width, height, formData, queriesData, hooks, filterState } =
+    chartProps;
+  const {theme} = (chartProps as any);
 
-export default function transformProps(chartProps: ChartProps): CustomControlsTransformedProps {
-    const { width, height, formData, queriesData, hooks, filterState } = chartProps;
-    const theme = (chartProps as any).theme;
+  const customControlsFormData =
+    formData as SupersetPluginChartCustomControlsQueryFormData;
+  const data =
+    Array.isArray(queriesData) && queriesData.length > 0
+      ? (queriesData[0].data as TimeseriesDataRecord[]) || []
+      : [];
 
-
-    const customControlsFormData = formData as SupersetPluginChartCustomControlsQueryFormData;
-    const data = Array.isArray(queriesData) && queriesData.length > 0
-        ? (queriesData[0].data as TimeseriesDataRecord[]) || []
-        : [];
-
-
-    return {
-        width,
-        height,
-        data,
-        controlType: customControlsFormData.controlType || 'Dropdown',
-        filterColumn: customControlsFormData.filterColumn,
-        orientation: customControlsFormData.orientation || 'vertical',
-        includeAllOption: customControlsFormData.includeAllOption || false,
-        multiSelect: customControlsFormData.multiSelect ?? true,
-        defaultValue: customControlsFormData.defaultValue || '',
-        hideTitle: customControlsFormData.hideTitle ?? false,
-        boldTitle: customControlsFormData.boldTitle ?? true,
-        hooks,
-        filterState,
-        theme,
-    };
+  return {
+    width,
+    height,
+    data,
+    controlType: customControlsFormData.controlType || 'Dropdown',
+    filterColumn: customControlsFormData.filterColumn,
+    orientation: customControlsFormData.orientation || 'vertical',
+    includeAllOption: customControlsFormData.includeAllOption || false,
+    multiSelect: customControlsFormData.multiSelect ?? true,
+    defaultValue: customControlsFormData.defaultValue || '',
+    hideTitle: customControlsFormData.hideTitle ?? false,
+    boldTitle: customControlsFormData.boldTitle ?? true,
+    hooks,
+    filterState,
+    theme,
+  };
 }

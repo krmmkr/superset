@@ -8,8 +8,7 @@ import transformProps from '../../src/CalendarChart1/src/transformProps';
 import { CalendarHeatmapChartProps } from '../../src/CalendarChart1/src/types';
 
 describe('Echarts Calendar Heatmap transformProps', () => {
-  const getChartProps = (formOverrides = {}, data: any[] = []) => {
-    return new ChartProps({
+  const getChartProps = (formOverrides = {}, data: any[] = []) => new ChartProps({
       formData: {
         colorScheme: 'bnbColors',
         datasource: '3__table',
@@ -29,7 +28,6 @@ describe('Echarts Calendar Heatmap transformProps', () => {
       ],
       theme: supersetTheme,
     }) as unknown as CalendarHeatmapChartProps;
-  };
 
   test('should transform numeric data correctly', () => {
     const chartProps = getChartProps(
@@ -40,16 +38,16 @@ describe('Echarts Calendar Heatmap transformProps', () => {
       [
         { ds: '2026-03-01', count: 100 },
         { ds: '2026-03-02', count: 200 },
-      ]
+      ],
     );
 
     const result = transformProps(chartProps);
     expect(result.width).toBe(800);
     expect(result.height).toBe(600);
-    
+
     const option = result.echartOptions;
     expect(option.calendar).toBeDefined();
-    
+
     const series = (option.series as any[])[0];
     expect(series.type).toBe('heatmap');
     expect(series.data).toEqual([
@@ -73,7 +71,7 @@ describe('Echarts Calendar Heatmap transformProps', () => {
       [
         { ds: '2026-03-01', count: 'Success' },
         { ds: '2026-03-02', count: 'Failed' },
-      ]
+      ],
     );
 
     const result = transformProps(chartProps);

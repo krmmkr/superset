@@ -21,17 +21,14 @@ import { RefObject } from 'react';
 import { PluginFilterHooks, PluginFilterStylesProps } from '../types';
 import { FilterBarOrientation } from '../../../dashboard/types';
 
-
 interface PluginFilterDateTimeCustomizeProps {
   columnName?: string;
   enableEmptyFilter?: boolean;
 }
 
-
 export type PluginFilterDateTimeQueryFormData = QueryFormData &
   PluginFilterStylesProps &
   PluginFilterDateTimeCustomizeProps;
-
 
 export type PluginFilterDateTimeProps = PluginFilterStylesProps & {
   formData: PluginFilterDateTimeQueryFormData;

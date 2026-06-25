@@ -16,28 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { t } from '@apache-superset/core/translation';
 import { Behavior, ChartMetadata, ChartPlugin } from '@superset-ui/core';
+import buildQuery from './buildQuery';
 import controlPanel from './controlPanel';
 import transformProps from './transformProps';
-import thumbnail from '../Range/images/thumbnail.png';
+import { S2TableFormData, S2TableChartProps } from './types';
+import thumbnail from './images/thumbnail.png';
+import thumbnailDark from './images/thumbnail-dark.png';
 
-export default class DateTimeFilterPlugin extends ChartPlugin {
+const metadata = new ChartMetadata({
+  description:
+    'A highly customizable flat list table powered by AntV S2 featuring native sorting, formatting, and alignment controls.',
+  name: 'AntV S2 Flat Table (Custom)',
+  thumbnail,
+  thumbnailDark,
+  behaviors: [Behavior.InteractiveChart],
+  tags: ['Table', 'AntV S2', 'Custom', 'Flat Table'],
+});
+
+export default class AntvS2FlatTableChartPlugin extends ChartPlugin<
+  S2TableFormData,
+  S2TableChartProps
+> {
   constructor() {
-    const metadata = new ChartMetadata({
-      name: t('Date / Time Picker'),
-      description: t(
-        'An Ant Design date picker native filter. Supports single date and date range selection.',
-      ),
-      behaviors: [Behavior.InteractiveChart, Behavior.NativeFilter],
-      tags: [],
-      thumbnail,
-      datasourceCount: 0,
-    });
-
     super({
+      buildQuery,
       controlPanel,
-      loadChart: () => import('./DateTimeFilterPlugin'),
+      loadChart: () => import('./AntvS2Table'),
       metadata,
       transformProps,
     });

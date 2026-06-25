@@ -37,9 +37,7 @@ const config: ControlPanelConfig = {
               ...dndGroupByControl,
               label: t('Stages / Group By'),
               multi: true,
-              description: t(
-                'Columns to use as stages in the Sankey flow.',
-              ),
+              description: t('Columns to use as stages in the Sankey flow.'),
               validators: [validateNonEmpty],
               freeForm: false,
             },
@@ -64,7 +62,9 @@ const config: ControlPanelConfig = {
               label: t('Show Stage Percentage next to Label'),
               default: false,
               renderTrigger: true,
-              description: t("Show the node's stage flow percentage next to the label on the chart."),
+              description: t(
+                "Show the node's stage flow percentage next to the label on the chart.",
+              ),
             },
           },
         ],
@@ -81,7 +81,9 @@ const config: ControlPanelConfig = {
                 ['both', t('Both')],
               ],
               renderTrigger: true,
-              description: t('Choose whether to display percentage of stage, percentage of whole data, or both next to the label.'),
+              description: t(
+                'Choose whether to display percentage of stage, percentage of whole data, or both next to the label.',
+              ),
               visibility: ({ controls }: ControlPanelsContainerProps) =>
                 Boolean(controls?.show_label_percentage?.value),
             },
@@ -101,7 +103,9 @@ const config: ControlPanelConfig = {
               label: t('Show Stage Name'),
               default: true,
               renderTrigger: true,
-              description: t('Show the stage name (column name) in the node tooltip.'),
+              description: t(
+                'Show the stage name (column name) in the node tooltip.',
+              ),
             },
           },
         ],
@@ -113,7 +117,9 @@ const config: ControlPanelConfig = {
               label: t('Show Stage Percentage'),
               default: true,
               renderTrigger: true,
-              description: t("Show the node's percentage of the total flow for that stage."),
+              description: t(
+                "Show the node's percentage of the total flow for that stage.",
+              ),
             },
           },
         ],
@@ -125,7 +131,9 @@ const config: ControlPanelConfig = {
               label: t('Show Percent of Whole Data'),
               default: true,
               renderTrigger: true,
-              description: t("Show the node's percentage of the total flow for the whole data."),
+              description: t(
+                "Show the node's percentage of the total flow for the whole data.",
+              ),
             },
           },
         ],
@@ -137,7 +145,9 @@ const config: ControlPanelConfig = {
               label: t('Show Stage Total Value'),
               default: true,
               renderTrigger: true,
-              description: t('Show the total value of the stage in the tooltip.'),
+              description: t(
+                'Show the total value of the stage in the tooltip.',
+              ),
             },
           },
         ],
@@ -149,7 +159,9 @@ const config: ControlPanelConfig = {
               label: t('Show Overall Total Value'),
               default: true,
               renderTrigger: true,
-              description: t('Show the overall total value of the dataset in the tooltip.'),
+              description: t(
+                'Show the overall total value of the dataset in the tooltip.',
+              ),
             },
           },
         ],

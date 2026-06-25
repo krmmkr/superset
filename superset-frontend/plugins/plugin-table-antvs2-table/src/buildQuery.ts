@@ -17,20 +17,16 @@
  * under the License.
  */
 import { buildQueryContext, QueryFormData } from '@superset-ui/core';
-import { SupersetPluginChartCustomControlsQueryFormData } from '../types';
 
 export default function buildQuery(formData: QueryFormData) {
-  const customControlsFormData =
-    formData as SupersetPluginChartCustomControlsQueryFormData;
+  const { groupby, columns } = formData;
 
-  return buildQueryContext(formData, baseQueryObject => [
+  const baseColumns = [...(groupby || []), ...(columns || [])];
+
+  return buildQueryContext(formData, (baseQueryObject: any) => [
     {
       ...baseQueryObject,
-      groupby: customControlsFormData.filterColumn
-        ? [customControlsFormData.filterColumn]
-        : [],
-      metrics: [],
-      series_limit: 1000,
+      groupby: baseColumns,
     },
   ]);
 }

@@ -1,4 +1,3 @@
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,27 +23,24 @@ import controlPanel from './controlPanel';
 import transformProps from './transformProps';
 import thumbnail from '../images/thumbnail.png';
 
-
 const metadata = new ChartMetadata({
-    description: 'Custom interactive controls that emit cross filters.',
-    name: t('Custom Controls'),
-    thumbnail,
-    behaviors: [Behavior.InteractiveChart],
-    tags: [t('Filter'), t('Interactive')],
+  description: 'Custom interactive controls that emit cross filters.',
+  name: t('Custom Controls'),
+  thumbnail,
+  behaviors: [Behavior.InteractiveChart],
+  tags: [t('Filter'), t('Interactive')],
 });
 
-
 export default class CustomControlsChartPlugin extends ChartPlugin {
-    constructor() {
-        super({
-            buildQuery,
-            controlPanel,
-            loadChart: () => import('../SupersetPluginChartCustomControls'),
-            metadata,
-            transformProps,
-        });
-    }
+  constructor() {
+    super({
+      buildQuery,
+      controlPanel,
+      loadChart: () => import('../SupersetPluginChartCustomControls'),
+      metadata,
+      transformProps,
+    });
+  }
 }
-
 
 export { CustomControlsChartPlugin };

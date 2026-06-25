@@ -5,113 +5,139 @@
  * Transforms Superset query results into ECharts calendar heatmap options.
  */
 import {
-    getMetricLabel,
-    getNumberFormatter,
-    getSequentialSchemeRegistry,
-    NumberFormats,
-    DataRecord,
-    tooltipHtml,
-    CategoricalColorNamespace,
+  getMetricLabel,
+  getNumberFormatter,
+  getSequentialSchemeRegistry,
+  NumberFormats,
+  DataRecord,
+  tooltipHtml,
+  CategoricalColorNamespace,
 } from '@superset-ui/core';
 import type { EChartsCoreOption } from 'echarts/core';
 import {
-    CalendarHeatmapChartProps,
-    CalendarHeatmapTransformedProps,
-    Refs,
+  CalendarHeatmapChartProps,
+  CalendarHeatmapTransformedProps,
+  Refs,
 } from './types';
 import {
-    DEFAULT_FORM_DATA,
-    CalendarOrient,
-    VisualMapType,
-    VisualMapPosition,
-    DayLabelFormat,
-    MonthLabelFormat,
+  DEFAULT_FORM_DATA,
+  CalendarOrient,
+  VisualMapType,
+  VisualMapPosition,
+  DayLabelFormat,
+  MonthLabelFormat,
 } from './constants';
 
 // Day-of-week labels for different formats
 const DAY_LABELS: Record<string, string[]> = {
-    [DayLabelFormat.Short]: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
-    [DayLabelFormat.Medium]: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    [DayLabelFormat.Full]: [
-        'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
-    ],
+  [DayLabelFormat.Short]: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
+  [DayLabelFormat.Medium]: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  [DayLabelFormat.Full]: [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ],
 };
 
 const MONTH_LABELS: Record<string, string[]> = {
-    [MonthLabelFormat.Short]: [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ],
-    [MonthLabelFormat.Full]: [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December',
-    ],
+  [MonthLabelFormat.Short]: [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ],
+  [MonthLabelFormat.Full]: [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ],
 };
 
 /**
  * Extract visual map position into ECharts left/top/right/bottom props
  */
 function getVisualMapPositionProps(position: string) {
-    switch (position) {
-        case VisualMapPosition.TopLeft:
-            return { left: 'left', top: 'top' };
-        case VisualMapPosition.TopRight:
-            return { right: 0, top: 'top' };
-        case VisualMapPosition.BottomRight:
-            return { right: 0, bottom: 0 };
-        case VisualMapPosition.BottomLeft:
-        default:
-            return { left: 'left', bottom: 0 };
-    }
+  switch (position) {
+    case VisualMapPosition.TopLeft:
+      return { left: 'left', top: 'top' };
+    case VisualMapPosition.TopRight:
+      return { right: 0, top: 'top' };
+    case VisualMapPosition.BottomRight:
+      return { right: 0, bottom: 0 };
+    case VisualMapPosition.BottomLeft:
+    default:
+      return { left: 'left', bottom: 0 };
+  }
 }
 
 /**
  * Resolve sequential color scheme into an array of hex colors
  */
 function getSequentialColors(colorScheme: string, steps: number): string[] {
-    const registry = getSequentialSchemeRegistry();
-    const scheme = registry.get(colorScheme);
-    if (scheme && scheme.colors) {
-        const colors = scheme.colors as string[];
-        if (colors.length >= steps) {
-            const result: string[] = [];
-            for (let i = 0; i < steps; i++) {
-                const idx = Math.round((i / (steps - 1)) * (colors.length - 1));
-                result.push(colors[idx]);
-            }
-            return result;
-        }
-        return [...colors];
+  const registry = getSequentialSchemeRegistry();
+  const scheme = registry.get(colorScheme);
+  if (scheme && scheme.colors) {
+    const colors = scheme.colors as string[];
+    if (colors.length >= steps) {
+      const result: string[] = [];
+      for (let i = 0; i < steps; i++) {
+        const idx = Math.round((i / (steps - 1)) * (colors.length - 1));
+        result.push(colors[idx]);
+      }
+      return result;
     }
-    // Explicit Fallback if scheme is missing
-    return ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127'];
+    return [...colors];
+  }
+  // Explicit Fallback if scheme is missing
+  return ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127'];
 }
 
 /**
  * Parses a YYYY-MM-DD string tightly into a local Date object.
- * Prevents the ES5 UTC trap where `new Date("2026-03-01")` is treated as UTC midnight 
+ * Prevents the ES5 UTC trap where `new Date("2026-03-01")` is treated as UTC midnight
  * and shifts to "Feb 28" in American timezones.
  */
 function parseLocalDate(dateStr: string | Date | number): Date {
-    if (typeof dateStr === 'string') {
-        const parts = dateStr.split(' ')[0].split('-');
-        if (parts.length >= 3) {
-            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-        }
+  if (typeof dateStr === 'string') {
+    const parts = dateStr.split(' ')[0].split('-');
+    if (parts.length >= 3) {
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
     }
-    return new Date(dateStr);
+  }
+  return new Date(dateStr);
 }
 
 /**
  * Format a date to YYYY-MM-DD string securely in the local timezone
  */
 function toDateString(date: Date | string | number): string {
-    const d = parseLocalDate(date);
-    if (isNaN(d.getTime())) return '';
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  const d = parseLocalDate(date);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
@@ -119,705 +145,834 @@ function toDateString(date: Date | string | number): string {
  * into a physical Date object synchronously for ECharts boundary logic.
  */
 function evaluateRelativeDate(dateStr: string): Date | null {
-    if (!dateStr || dateStr === '' || dateStr.toLowerCase() === 'no filter') return null;
-
-    const lower = dateStr.trim().toLowerCase();
-    const now = new Date();
-    // Default to midnight for consistent boundary logic
-    now.setHours(0, 0, 0, 0);
-
-    if (lower === 'now' || lower === 'today') return new Date(now);
-
-    // ISO 8601 or standard formatting (e.g. 2025-01-01)
-    if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
-        return parseLocalDate(dateStr);
-    }
-
-    // Match "Last X days/weeks/months/years" or "Next X days/weeks/months/years"
-    const simpleMatch = lower.match(/^(last|previous|next)\s+(\d+)?\s*(day|week|month|year)s?/);
-    if (simpleMatch) {
-        const direction = simpleMatch[1] === 'next' ? 1 : -1;
-        const amount = parseInt(simpleMatch[2] || '1', 10);
-        const unit = simpleMatch[3];
-        const d = new Date(now);
-        if (unit === 'day') d.setDate(d.getDate() + (amount * direction));
-        if (unit === 'week') d.setDate(d.getDate() + (amount * 7 * direction));
-        if (unit === 'month') d.setMonth(d.getMonth() + (amount * direction));
-        if (unit === 'year') d.setFullYear(d.getFullYear() + (amount * direction));
-        return d;
-    }
-
-    // Match Superset internal parsing output: DATEADD(DATETIME("now"), -2, MONTH)
-    const dateAddMatch = dateStr.match(/DATEADD\(DATETIME\("([^"]+)"\),\s*(-?\d+),\s*([A-Za-z]+)\)/i);
-    if (dateAddMatch) {
-        const anchorStr = dateAddMatch[1].toLowerCase();
-        const anchor = (anchorStr === 'now' || anchorStr === 'today')
-            ? new Date(now)
-            : parseLocalDate(dateAddMatch[1]);
-        const amount = parseInt(dateAddMatch[2], 10);
-        const unit = dateAddMatch[3].toLowerCase();
-
-        if (unit === 'day') anchor.setDate(anchor.getDate() + amount);
-        if (unit === 'week') anchor.setDate(anchor.getDate() + (amount * 7));
-        if (unit === 'month') anchor.setMonth(anchor.getMonth() + amount);
-        if (unit === 'year') anchor.setFullYear(anchor.getFullYear() + amount);
-        return anchor;
-    }
-
+  if (!dateStr || dateStr === '' || dateStr.toLowerCase() === 'no filter')
     return null;
+
+  const lower = dateStr.trim().toLowerCase();
+  const now = new Date();
+  // Default to midnight for consistent boundary logic
+  now.setHours(0, 0, 0, 0);
+
+  if (lower === 'now' || lower === 'today') return new Date(now);
+
+  // ISO 8601 or standard formatting (e.g. 2025-01-01)
+  if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+    return parseLocalDate(dateStr);
+  }
+
+  // Match "Last X days/weeks/months/years" or "Next X days/weeks/months/years"
+  const simpleMatch = lower.match(
+    /^(last|previous|next)\s+(\d+)?\s*(day|week|month|year)s?/,
+  );
+  if (simpleMatch) {
+    const direction = simpleMatch[1] === 'next' ? 1 : -1;
+    const amount = parseInt(simpleMatch[2] || '1', 10);
+    const unit = simpleMatch[3];
+    const d = new Date(now);
+    if (unit === 'day') d.setDate(d.getDate() + amount * direction);
+    if (unit === 'week') d.setDate(d.getDate() + amount * 7 * direction);
+    if (unit === 'month') d.setMonth(d.getMonth() + amount * direction);
+    if (unit === 'year') d.setFullYear(d.getFullYear() + amount * direction);
+    return d;
+  }
+
+  // Match Superset internal parsing output: DATEADD(DATETIME("now"), -2, MONTH)
+  const dateAddMatch = dateStr.match(
+    /DATEADD\(DATETIME\("([^"]+)"\),\s*(-?\d+),\s*([A-Za-z]+)\)/i,
+  );
+  if (dateAddMatch) {
+    const anchorStr = dateAddMatch[1].toLowerCase();
+    const anchor =
+      anchorStr === 'now' || anchorStr === 'today'
+        ? new Date(now)
+        : parseLocalDate(dateAddMatch[1]);
+    const amount = parseInt(dateAddMatch[2], 10);
+    const unit = dateAddMatch[3].toLowerCase();
+
+    if (unit === 'day') anchor.setDate(anchor.getDate() + amount);
+    if (unit === 'week') anchor.setDate(anchor.getDate() + amount * 7);
+    if (unit === 'month') anchor.setMonth(anchor.getMonth() + amount);
+    if (unit === 'year') anchor.setFullYear(anchor.getFullYear() + amount);
+    return anchor;
+  }
+
+  return null;
 }
 
 /**
  * Detect if a color is "dark" by hex or rgb value.
  */
 function isColorDark(color: string): boolean {
-    if (!color) return false;
+  if (!color) return false;
 
-    let r = 0, g = 0, b = 0;
+  let r = 0,
+    g = 0,
+    b = 0;
 
-    if (color.startsWith('#')) {
-        const clean = color.replace('#', '');
-        if (clean.length === 3) {
-            r = parseInt(clean[0] + clean[0], 16);
-            g = parseInt(clean[1] + clean[1], 16);
-            b = parseInt(clean[2] + clean[2], 16);
-        } else {
-            r = parseInt(clean.substring(0, 2), 16) || 0;
-            g = parseInt(clean.substring(2, 4), 16) || 0;
-            b = parseInt(clean.substring(4, 6), 16) || 0;
-        }
-    } else if (color.startsWith('rgb')) {
-        const parts = color.match(/\d+/g);
-        if (parts && parts.length >= 3) {
-            r = parseInt(parts[0], 10);
-            g = parseInt(parts[1], 10);
-            b = parseInt(parts[2], 10);
-        }
+  if (color.startsWith('#')) {
+    const clean = color.replace('#', '');
+    if (clean.length === 3) {
+      r = parseInt(clean[0] + clean[0], 16);
+      g = parseInt(clean[1] + clean[1], 16);
+      b = parseInt(clean[2] + clean[2], 16);
     } else {
-        return false; // Default to treating unknown colors as "light" (dark text)
+      r = parseInt(clean.substring(0, 2), 16) || 0;
+      g = parseInt(clean.substring(2, 4), 16) || 0;
+      b = parseInt(clean.substring(4, 6), 16) || 0;
     }
+  } else if (color.startsWith('rgb')) {
+    const parts = color.match(/\d+/g);
+    if (parts && parts.length >= 3) {
+      r = parseInt(parts[0], 10);
+      g = parseInt(parts[1], 10);
+      b = parseInt(parts[2], 10);
+    }
+  } else {
+    return false; // Default to treating unknown colors as "light" (dark text)
+  }
 
-    // Perceived brightness formula
-    return (0.299 * r + 0.587 * g + 0.114 * b) > 127 ? false : true;
+  // Perceived brightness formula
+  return 0.299 * r + 0.587 * g + 0.114 * b > 127 ? false : true;
 }
 
 /**
  * Main transform function
  */
 export default function transformProps(
-    chartProps: CalendarHeatmapChartProps,
+  chartProps: CalendarHeatmapChartProps,
 ): CalendarHeatmapTransformedProps {
-    const {
-        formData,
-        height,
-        width,
-        hooks,
-        filterState,
-        queriesData,
-        emitCrossFilters,
-    } = chartProps;
+  const {
+    formData,
+    height,
+    width,
+    hooks,
+    filterState,
+    queriesData,
+    emitCrossFilters,
+  } = chartProps;
 
-    // Access theme via Ant Design token properties
-    const theme = (chartProps as any).theme || {};
+  // Access theme via Ant Design token properties
+  const theme = (chartProps as any).theme || {};
 
-    // ──────────────────────────────────────────────
-    // Read all form data controls
-    // ──────────────────────────────────────────────
-    // ──────────────────────────────────────────────
-    // Normalize FormData (handle snake_case vs camelCase, string bools)
-    // ──────────────────────────────────────────────
-    const fd = formData as any;
+  // ──────────────────────────────────────────────
+  // Read all form data controls
+  // ──────────────────────────────────────────────
+  // ──────────────────────────────────────────────
+  // Normalize FormData (handle snake_case vs camelCase, string bools)
+  // ──────────────────────────────────────────────
+  const fd = formData as any;
 
-    const getBool = (val: any, def: boolean): boolean => {
-        if (val === 'true') return true;
-        if (val === 'false') return false;
-        if (typeof val === 'boolean') return val;
-        return def;
-    };
+  const getBool = (val: any, def: boolean): boolean => {
+    if (val === 'true') return true;
+    if (val === 'false') return false;
+    if (typeof val === 'boolean') return val;
+    return def;
+  };
 
-    // Helper to try both keys
-    const getVal = (keyCamel: string, keySnake: string, def: any) => {
-        return fd[keyCamel] ?? fd[keySnake] ?? def;
-    };
+  // Helper to try both keys
+  const getVal = (keyCamel: string, keySnake: string, def: any) => fd[keyCamel] ?? fd[keySnake] ?? def;
 
-    const sliceId = fd.sliceId;
-    const granularitySqla = getVal('granularitySqla', 'granularity_sqla', undefined);
-    const metricsRaw: any[] = fd.metrics || [];
-    const linearColorScheme = getVal('linearColorScheme', 'linear_color_scheme', undefined);
-    const colorSchemeAlt = getVal('colorScheme', 'color_scheme', undefined);
-    const calendarOrient = getVal('calendarOrient', 'calendar_orient', DEFAULT_FORM_DATA.calendarOrient);
-    const cellSize = Number(getVal('cellSize', 'cell_size', DEFAULT_FORM_DATA.cellSize));
-    const isVertical = calendarOrient === CalendarOrient.Vertical;
+  const {sliceId} = fd;
+  const granularitySqla = getVal(
+    'granularitySqla',
+    'granularity_sqla',
+    undefined,
+  );
+  const metricsRaw: any[] = fd.metrics || [];
+  const linearColorScheme = getVal(
+    'linearColorScheme',
+    'linear_color_scheme',
+    undefined,
+  );
+  const colorSchemeAlt = getVal('colorScheme', 'color_scheme', undefined);
+  const calendarOrient = getVal(
+    'calendarOrient',
+    'calendar_orient',
+    DEFAULT_FORM_DATA.calendarOrient,
+  );
+  const cellSize = Number(
+    getVal('cellSize', 'cell_size', DEFAULT_FORM_DATA.cellSize),
+  );
+  const isVertical = calendarOrient === CalendarOrient.Vertical;
 
-    const showMonthSeparator = getBool(getVal('showMonthSeparator', 'show_month_separator', DEFAULT_FORM_DATA.showMonthSeparator), true);
-    // Inherit from controls, but explicitly cap at 5px because ECharts Calendar `splitLine` natively stretches the entire Global Grid to match its max stroke width!
-    const monthSeparatorWidth = Math.max(1, Math.min(Number(getVal('monthSeparatorWidth', 'month_separator_width', 3)), 5));
+  const showMonthSeparator = getBool(
+    getVal(
+      'showMonthSeparator',
+      'show_month_separator',
+      DEFAULT_FORM_DATA.showMonthSeparator,
+    ),
+    true,
+  );
+  // Inherit from controls, but explicitly cap at 5px because ECharts Calendar `splitLine` natively stretches the entire Global Grid to match its max stroke width!
+  const monthSeparatorWidth = Math.max(
+    1,
+    Math.min(
+      Number(getVal('monthSeparatorWidth', 'month_separator_width', 3)),
+      5,
+    ),
+  );
 
-    const showDayLabel = getBool(getVal('showDayLabel', 'show_day_label', DEFAULT_FORM_DATA.showDayLabel), true);
-    const dayLabelFormat = getVal('dayLabelFormat', 'day_label_format', DEFAULT_FORM_DATA.dayLabelFormat);
+  const showDayLabel = getBool(
+    getVal('showDayLabel', 'show_day_label', DEFAULT_FORM_DATA.showDayLabel),
+    true,
+  );
+  const dayLabelFormat = getVal(
+    'dayLabelFormat',
+    'day_label_format',
+    DEFAULT_FORM_DATA.dayLabelFormat,
+  );
 
-    const showMonthLabel = getBool(getVal('showMonthLabel', 'show_month_label', DEFAULT_FORM_DATA.showMonthLabel), true);
-    const monthLabelFormat = getVal('monthLabelFormat', 'month_label_format', DEFAULT_FORM_DATA.monthLabelFormat);
+  const showMonthLabel = getBool(
+    getVal(
+      'showMonthLabel',
+      'show_month_label',
+      DEFAULT_FORM_DATA.showMonthLabel,
+    ),
+    true,
+  );
+  const monthLabelFormat = getVal(
+    'monthLabelFormat',
+    'month_label_format',
+    DEFAULT_FORM_DATA.monthLabelFormat,
+  );
 
-    // Force hide year label as requested by user ("remove option for year label")
-    // We'll ignore the control value unless they explicitly enable it? 
-    // Actually, user said "remove option", so let's default it to false but allow override if controls exist.
-    // Year label is hidden by default and control is removed
-    const showYearLabel = false;
+  // Force hide year label as requested by user ("remove option for year label")
+  // We'll ignore the control value unless they explicitly enable it?
+  // Actually, user said "remove option", so let's default it to false but allow override if controls exist.
+  // Year label is hidden by default and control is removed
+  const showYearLabel = false;
 
-    const visualMapType = getVal('visualMapType', 'visual_map_type', DEFAULT_FORM_DATA.visualMapType);
-    const visualMapOrient = getVal('visualMapOrient', 'visual_map_orient', DEFAULT_FORM_DATA.visualMapOrient);
-    const visualMapPosition = getVal('visualMapPosition', 'visual_map_position', DEFAULT_FORM_DATA.visualMapPosition);
-    const showVisualMap = getBool(getVal('showVisualMap', 'show_visual_map', DEFAULT_FORM_DATA.showVisualMap), true);
-    const piecewiseNum = getVal('piecewiseNum', 'piecewise_num', DEFAULT_FORM_DATA.piecewiseNum);
-    const visualMapMinRaw = getVal('visualMapMin', 'visual_map_min', undefined);
-    const visualMapMaxRaw = getVal('visualMapMax', 'visual_map_max', undefined);
+  const visualMapType = getVal(
+    'visualMapType',
+    'visual_map_type',
+    DEFAULT_FORM_DATA.visualMapType,
+  );
+  const visualMapOrient = getVal(
+    'visualMapOrient',
+    'visual_map_orient',
+    DEFAULT_FORM_DATA.visualMapOrient,
+  );
+  const visualMapPosition = getVal(
+    'visualMapPosition',
+    'visual_map_position',
+    DEFAULT_FORM_DATA.visualMapPosition,
+  );
+  const showVisualMap = getBool(
+    getVal('showVisualMap', 'show_visual_map', DEFAULT_FORM_DATA.showVisualMap),
+    true,
+  );
+  const piecewiseNum = getVal(
+    'piecewiseNum',
+    'piecewise_num',
+    DEFAULT_FORM_DATA.piecewiseNum,
+  );
+  const visualMapMinRaw = getVal('visualMapMin', 'visual_map_min', undefined);
+  const visualMapMaxRaw = getVal('visualMapMax', 'visual_map_max', undefined);
 
-    const cellBorderWidth = getVal('cellBorderWidth', 'cell_border_width', DEFAULT_FORM_DATA.cellBorderWidth);
-    const cellBorderRadius = getVal('cellBorderRadius', 'cell_border_radius', DEFAULT_FORM_DATA.cellBorderRadius);
-    const numberFormat = getVal('numberFormat', 'number_format', DEFAULT_FORM_DATA.numberFormat);
-    const emitFilter = getBool(getVal('emitFilter', 'emit_filter', DEFAULT_FORM_DATA.emitFilter), true);
-    const crossfilterMode = getVal('crossfilterMode', 'crossfilter_mode', 'temporal');
+  const cellBorderWidth = getVal(
+    'cellBorderWidth',
+    'cell_border_width',
+    DEFAULT_FORM_DATA.cellBorderWidth,
+  );
+  const cellBorderRadius = getVal(
+    'cellBorderRadius',
+    'cell_border_radius',
+    DEFAULT_FORM_DATA.cellBorderRadius,
+  );
+  const numberFormat = getVal(
+    'numberFormat',
+    'number_format',
+    DEFAULT_FORM_DATA.numberFormat,
+  );
+  const emitFilter = getBool(
+    getVal('emitFilter', 'emit_filter', DEFAULT_FORM_DATA.emitFilter),
+    true,
+  );
+  const crossfilterMode = getVal(
+    'crossfilterMode',
+    'crossfilter_mode',
+    'temporal',
+  );
 
-    const showCellLabel = getBool(getVal('showCellLabel', 'show_cell_label', DEFAULT_FORM_DATA.showCellLabel), false);
-    const showCellDate = getBool(getVal('showCellDate', 'show_cell_date', DEFAULT_FORM_DATA.showCellDate), false);
+  const showCellLabel = getBool(
+    getVal('showCellLabel', 'show_cell_label', DEFAULT_FORM_DATA.showCellLabel),
+    false,
+  );
+  const showCellDate = getBool(
+    getVal('showCellDate', 'show_cell_date', DEFAULT_FORM_DATA.showCellDate),
+    false,
+  );
 
-    const labelFontSizeUser = getVal('labelFontSize', 'label_font_size', DEFAULT_FORM_DATA.labelFontSize);
-    const labelFontSize = Number(labelFontSizeUser) || 11;
+  const labelFontSizeUser = getVal(
+    'labelFontSize',
+    'label_font_size',
+    DEFAULT_FORM_DATA.labelFontSize,
+  );
+  const labelFontSize = Number(labelFontSizeUser) || 11;
 
-    const dayLabelFontSizeUser = getVal('dayLabelFontSize', 'day_label_font_size', DEFAULT_FORM_DATA.dayLabelFontSize);
-    const dayLabelFontSize = Number(dayLabelFontSizeUser) || 9;
+  const dayLabelFontSizeUser = getVal(
+    'dayLabelFontSize',
+    'day_label_font_size',
+    DEFAULT_FORM_DATA.dayLabelFontSize,
+  );
+  const dayLabelFontSize = Number(dayLabelFontSizeUser) || 9;
 
+  // ──────────────────────────────────────────────
+  // Theme-aware colors using Ant Design tokens
+  // ──────────────────────────────────────────────
+  const bgContainer: string = theme.colorBgContainer || '#ffffff';
+  const darkMode = isColorDark(bgContainer);
 
+  // Fallback to light text in dark mode if theme doesn't provide it
+  const textColor: string =
+    theme.colorText || (darkMode ? '#E0E0E0' : '#333333');
+  const secondaryTextColor: string = theme.colorTextSecondary || '#666666';
+  // Removed duplicate bgContainer and darkMode declarations
 
+  const emptyCellColor = darkMode ? '#2a2a2a' : '#efefef';
+  const cellBorderColor = darkMode ? '#1a1a1a' : '#ffffff';
+  const tooltipBg = darkMode ? 'rgba(30,30,30,0.96)' : 'rgba(255,255,255,0.96)';
+  const tooltipTextColor = darkMode ? '#e0e0e0' : '#333333';
+  const tooltipBorderColor = darkMode ? '#555' : '#e0e0e0';
 
+  const colorScheme = linearColorScheme || colorSchemeAlt || 'greens';
 
-    // ──────────────────────────────────────────────
-    // Theme-aware colors using Ant Design tokens
-    // ──────────────────────────────────────────────
-    const bgContainer: string = theme.colorBgContainer || '#ffffff';
-    const darkMode = isColorDark(bgContainer);
+  const { setDataMask = () => {}, setControlValue } = hooks;
+  const queryData = queriesData[0] || {};
+  const data: DataRecord[] = queryData.data || [];
+  const colnames: string[] = (queryData as any).colnames || [];
 
-    // Fallback to light text in dark mode if theme doesn't provide it
-    const textColor: string = theme.colorText || (darkMode ? '#E0E0E0' : '#333333');
-    const secondaryTextColor: string = theme.colorTextSecondary || '#666666';
-    // Removed duplicate bgContainer and darkMode declarations
+  // ──────────────────────────────────────────────
+  // Resolve column and metric labels
+  // ──────────────────────────────────────────────
+  const temporalColumnRawStr =
+    typeof granularitySqla === 'object'
+      ? (granularitySqla as any)?.label ||
+        (granularitySqla as any)?.column_name ||
+        String(granularitySqla)
+      : String(granularitySqla || '');
 
-    const emptyCellColor = darkMode ? '#2a2a2a' : '#efefef';
-    const cellBorderColor = darkMode ? '#1a1a1a' : '#ffffff';
-    const tooltipBg = darkMode ? 'rgba(30,30,30,0.96)' : 'rgba(255,255,255,0.96)';
-    const tooltipTextColor = darkMode ? '#e0e0e0' : '#333333';
-    const tooltipBorderColor = darkMode ? '#555' : '#e0e0e0';
+  const metricLabel = metricsRaw.length ? getMetricLabel(metricsRaw[0]) : '';
 
-    const colorScheme = linearColorScheme || colorSchemeAlt || 'greens';
+  const temporalColumn =
+    colnames.find(c => c === temporalColumnRawStr) ||
+    colnames.find(
+      c => c.toLowerCase() === temporalColumnRawStr.toLowerCase(),
+    ) ||
+    colnames[0] ||
+    temporalColumnRawStr;
 
-    const { setDataMask = () => { }, setControlValue } = hooks;
-    const queryData = queriesData[0] || {};
-    const data: DataRecord[] = queryData.data || [];
-    const colnames: string[] = (queryData as any).colnames || [];
+  const metricColName =
+    colnames.find(c => c === metricLabel) ||
+    colnames.find(c => c.toLowerCase() === metricLabel.toLowerCase()) ||
+    (colnames.length > 1 ? colnames[1] : metricLabel);
 
-    // ──────────────────────────────────────────────
-    // Resolve column and metric labels
-    // ──────────────────────────────────────────────
-    const temporalColumnRawStr = typeof granularitySqla === 'object'
-        ? (granularitySqla as any)?.label || (granularitySqla as any)?.column_name || String(granularitySqla)
-        : String(granularitySqla || '');
+  // ──────────────────────────────────────────────
+  // Transform data: [dateStr, value, row] tuples
+  // ──────────────────────────────────────────────
+  const calendarData: [string, number | string, DataRecord][] = [];
+  let minValue = Infinity;
+  let maxValue = -Infinity;
+  let minDateStr = '';
+  let maxDateStr = '';
 
-    const metricLabel = metricsRaw.length
-        ? getMetricLabel(metricsRaw[0])
-        : '';
+  const labelMap: Record<string, string[]> = {};
+  const numberFormatter = getNumberFormatter(
+    numberFormat || NumberFormats.SMART_NUMBER,
+  );
 
-    const temporalColumn = colnames.find(c => c === temporalColumnRawStr)
-        || colnames.find(c => c.toLowerCase() === temporalColumnRawStr.toLowerCase())
-        || colnames[0]
-        || temporalColumnRawStr;
+  data.forEach((row: DataRecord) => {
+    const dateRaw = row[temporalColumn];
+    const value = row[metricColName];
 
-    const metricColName = colnames.find(c => c === metricLabel)
-        || colnames.find(c => c.toLowerCase() === metricLabel.toLowerCase())
-        || (colnames.length > 1 ? colnames[1] : metricLabel);
+    if (dateRaw == null || value == null) return;
 
-
-
-    // ──────────────────────────────────────────────
-    // Transform data: [dateStr, value, row] tuples
-    // ──────────────────────────────────────────────
-    const calendarData: [string, number | string, DataRecord][] = [];
-    let minValue = Infinity;
-    let maxValue = -Infinity;
-    let minDateStr = '';
-    let maxDateStr = '';
-
-    const labelMap: Record<string, string[]> = {};
-    const numberFormatter = getNumberFormatter(numberFormat || NumberFormats.SMART_NUMBER);
-
-    data.forEach((row: DataRecord) => {
-        const dateRaw = row[temporalColumn];
-        const value = row[metricColName];
-
-        if (dateRaw == null || value == null) return;
-
-        let dateStr: string;
-        if (typeof dateRaw === 'number') {
-            const ts = dateRaw > 1e12 ? dateRaw : dateRaw * 1000;
-            dateStr = toDateString(new Date(ts));
-        } else {
-            dateStr = toDateString(dateRaw as string | Date);
-        }
-
-        if (!dateStr) return;
-
-        const numValue = Number(value);
-        let displayVal: number | string;
-        if (isNaN(numValue)) {
-            displayVal = String(value);
-        } else {
-            displayVal = numValue;
-            minValue = Math.min(minValue, numValue);
-            maxValue = Math.max(maxValue, numValue);
-        }
-
-        calendarData.push([dateStr, displayVal, row]);
-
-        labelMap[dateStr] = [String(dateRaw)];
-
-        if (!minDateStr || dateStr < minDateStr) minDateStr = dateStr;
-        if (!maxDateStr || dateStr > maxDateStr) maxDateStr = dateStr;
-    });
-
-    if (minValue === Infinity) minValue = 0;
-    if (maxValue === -Infinity) maxValue = 1;
-
-
-
-    const calendarTimeRange = getVal('calendarTimeRange', 'calendar_time_range', undefined);
-
-    // Helper to completely override data-driven boundaries if custom range specifies bounds
-    const applyCustomTimeRangeOverrides = () => {
-        if (!calendarTimeRange || typeof calendarTimeRange !== 'string') return;
-
-        // Superset's DateFilterControl joins start and end bounds by ' : '
-        const parts = calendarTimeRange.split(' : ');
-        if (parts.length > 0) {
-            const startStr = parts[0].trim();
-            const endStr = parts.length > 1 ? parts[1].trim() : '';
-
-            const explicitStart = evaluateRelativeDate(startStr);
-            const explicitEnd = evaluateRelativeDate(endStr);
-
-            if (explicitStart) {
-                // Snap purely visual boundary exactly to the 1st day of the given month so blocks align
-                explicitStart.setDate(1);
-                minDateStr = toDateString(explicitStart);
-            }
-            if (explicitEnd) {
-                // Snap visual boundary to the last day of its month
-                explicitEnd.setMonth(explicitEnd.getMonth() + 1);
-                explicitEnd.setDate(0);
-                maxDateStr = toDateString(explicitEnd);
-            }
-        }
-    };
-
-    if (calendarData.length === 0) {
-        minValue = 0;
-        maxValue = 1;
-        // Default to current year if no data
-        const now = new Date();
-        maxDateStr = `${now.getFullYear()}-12-31`;
-        minDateStr = `${now.getFullYear()}-01-01`;
-
-        applyCustomTimeRangeOverrides();
+    let dateStr: string;
+    if (typeof dateRaw === 'number') {
+      const ts = dateRaw > 1e12 ? dateRaw : dateRaw * 1000;
+      dateStr = toDateString(new Date(ts));
     } else {
-        // Snap the absolute highest date to the end of its containing month
-        const maxD = parseLocalDate(maxDateStr);
-        maxD.setMonth(maxD.getMonth() + 1);
-        maxD.setDate(0);
-        maxDateStr = toDateString(maxD);
-
-        // Snap the lowest actual data point to the 1st of its month
-        const minD = parseLocalDate(minDateStr);
-        minD.setDate(1);
-        minDateStr = toDateString(minD);
-
-        applyCustomTimeRangeOverrides();
+      dateStr = toDateString(dateRaw as string | Date);
     }
 
-    let resolvedMin = visualMapMinRaw !== '' && visualMapMinRaw != null
-        ? Number(visualMapMinRaw)
-        : minValue;
-    let resolvedMax = visualMapMaxRaw !== '' && visualMapMaxRaw != null
-        ? Number(visualMapMaxRaw)
-        : maxValue;
+    if (!dateStr) return;
 
-    if (resolvedMax <= resolvedMin) {
-        resolvedMax = resolvedMin + 1;
-    }
-
-    // ──────────────────────────────────────────────
-    // Build month labels (Dynamic Month+Year if possible)
-    // ──────────────────────────────────────────────
-    let monthNameMap = MONTH_LABELS[monthLabelFormat] || MONTH_LABELS[MonthLabelFormat.Short];
-
-    // If the data spans <= 12 months, we can be smart and append the Year to the month label
-    // e.g. "Dec" -> "Dec 2022", "Jan" -> "Jan 2023"
-    // This works because ECharts maps month index (0-11) to the name.
-    // If we have distinct months (no index repeats), we can map specific indices to specific strings.
-    // If span > 12 months, indices repeat (e.g. Jan 2022 and Jan 2023 both map to index 0), so we definitely can't do this.
-
-    const startDate = parseLocalDate(minDateStr);
-    const endDate = parseLocalDate(maxDateStr);
-    const monthSpan = (endDate.getFullYear() - startDate.getFullYear()) * 12
-        + (endDate.getMonth() - startDate.getMonth()) + 1;
-
-    if (monthSpan <= 12 && monthSpan > 0) {
-        // Clone the base map to avoid mutating global constant
-        const customMap = [...monthNameMap];
-
-        // Iterate through each month in the range
-        let curr = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-        const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-
-        // Safety break
-        let loops = 0;
-        while (curr <= end && loops < 20) {
-            const mIndex = curr.getMonth();
-            const yyyy = curr.getFullYear();
-            // Append year. e.g. "Dec" -> "Dec 2022"
-            // Use Short format always for this? Or respect format?
-            // "Dec 2022" is nicer than "December 2022" usually.
-            const baseName = (MONTH_LABELS[MonthLabelFormat.Short][mIndex]);
-            customMap[mIndex] = `${baseName} ${yyyy}`;
-
-            curr.setMonth(curr.getMonth() + 1);
-            loops++;
-        }
-        monthNameMap = customMap;
-    }
-
-    const layoutMode = getVal('layoutMode', 'layout_mode', 'scrollable');
-
-    // For larger cellSizes, we calculate explicit scrolling height.
-    // However, if we are in 'fit' mode, Echarts flexes to the container height, so we don't need padding offsets.
-    let calendarHeight = height;
-    let explicitCellSize: any = [cellSize, cellSize];
-
-    if (layoutMode === 'scrollable') {
-        calendarHeight = isVertical
-            ? cellSize * (Math.ceil(monthSpan * 4.5)) + 100
-            : cellSize * 8 + 60;
+    const numValue = Number(value);
+    let displayVal: number | string;
+    if (isNaN(numValue)) {
+      displayVal = String(value);
     } else {
-        explicitCellSize = ['auto', 'auto'];
-        // Reduce the top margin significantly in fit mode so it doesn't push the chart out of bounds
+      displayVal = numValue;
+      minValue = Math.min(minValue, numValue);
+      maxValue = Math.max(maxValue, numValue);
     }
 
-    // Single calendar with a date range instead of multiple year-based calendars
-    const calendar = {
-        range: [minDateStr, maxDateStr],
-        orient: calendarOrient,
-        cellSize: explicitCellSize,
-        top: layoutMode === 'fit' ? 30 : 60,
-        left: 80,
-        right: 30,
-        bottom: 50,
-        yearLabel: {
-            show: showYearLabel,
-            fontSize: 24,
-            fontWeight: 'bold' as const,
-            color: textColor,
-            position: 'top',
-            margin: 10,
-        },
-        monthLabel: {
-            show: showMonthLabel,
-            nameMap: monthNameMap,
-            fontSize: 12,
-            color: textColor,
-            fontWeight: 'bold' as const,
-        },
-        // ... existing ...
-        dayLabel: {
-            show: showDayLabel,
-            nameMap: DAY_LABELS[dayLabelFormat] || DAY_LABELS[DayLabelFormat.Short],
-            firstDay: 0,
-            fontSize: 10,
-            color: secondaryTextColor,
-        },
-        splitLine: {
-            show: showMonthSeparator,
-            lineStyle: {
-                color: bgContainer, // Match the exact dashboard background to simulate a physical void/gap
-                width: monthSeparatorWidth,
-                type: 'solid' as const,
-            },
-        },
-        itemStyle: {
-            color: emptyCellColor,
-            borderColor: cellBorderColor,
-            borderWidth: cellBorderWidth,
-        },
-    };
+    calendarData.push([dateStr, displayVal, row]);
 
-    // ──────────────────────────────────────────────
-    // Resolve Categories and Colors
-    // ──────────────────────────────────────────────
-    let isCategorical = false;
-    const uniqueValues = new Set<string>();
-    calendarData.forEach(item => {
-        const val = item[1];
-        if (val !== undefined && val !== null) {
-            uniqueValues.add(String(val));
-            if (typeof val === 'string') {
-                isCategorical = true;
+    labelMap[dateStr] = [String(dateRaw)];
+
+    if (!minDateStr || dateStr < minDateStr) minDateStr = dateStr;
+    if (!maxDateStr || dateStr > maxDateStr) maxDateStr = dateStr;
+  });
+
+  if (minValue === Infinity) minValue = 0;
+  if (maxValue === -Infinity) maxValue = 1;
+
+  const calendarTimeRange = getVal(
+    'calendarTimeRange',
+    'calendar_time_range',
+    undefined,
+  );
+
+  // Helper to completely override data-driven boundaries if custom range specifies bounds
+  const applyCustomTimeRangeOverrides = () => {
+    if (!calendarTimeRange || typeof calendarTimeRange !== 'string') return;
+
+    // Superset's DateFilterControl joins start and end bounds by ' : '
+    const parts = calendarTimeRange.split(' : ');
+    if (parts.length > 0) {
+      const startStr = parts[0].trim();
+      const endStr = parts.length > 1 ? parts[1].trim() : '';
+
+      const explicitStart = evaluateRelativeDate(startStr);
+      const explicitEnd = evaluateRelativeDate(endStr);
+
+      if (explicitStart) {
+        // Snap purely visual boundary exactly to the 1st day of the given month so blocks align
+        explicitStart.setDate(1);
+        minDateStr = toDateString(explicitStart);
+      }
+      if (explicitEnd) {
+        // Snap visual boundary to the last day of its month
+        explicitEnd.setMonth(explicitEnd.getMonth() + 1);
+        explicitEnd.setDate(0);
+        maxDateStr = toDateString(explicitEnd);
+      }
+    }
+  };
+
+  if (calendarData.length === 0) {
+    minValue = 0;
+    maxValue = 1;
+    // Default to current year if no data
+    const now = new Date();
+    maxDateStr = `${now.getFullYear()}-12-31`;
+    minDateStr = `${now.getFullYear()}-01-01`;
+
+    applyCustomTimeRangeOverrides();
+  } else {
+    // Snap the absolute highest date to the end of its containing month
+    const maxD = parseLocalDate(maxDateStr);
+    maxD.setMonth(maxD.getMonth() + 1);
+    maxD.setDate(0);
+    maxDateStr = toDateString(maxD);
+
+    // Snap the lowest actual data point to the 1st of its month
+    const minD = parseLocalDate(minDateStr);
+    minD.setDate(1);
+    minDateStr = toDateString(minD);
+
+    applyCustomTimeRangeOverrides();
+  }
+
+  const resolvedMin =
+    visualMapMinRaw !== '' && visualMapMinRaw != null
+      ? Number(visualMapMinRaw)
+      : minValue;
+  let resolvedMax =
+    visualMapMaxRaw !== '' && visualMapMaxRaw != null
+      ? Number(visualMapMaxRaw)
+      : maxValue;
+
+  if (resolvedMax <= resolvedMin) {
+    resolvedMax = resolvedMin + 1;
+  }
+
+  // ──────────────────────────────────────────────
+  // Build month labels (Dynamic Month+Year if possible)
+  // ──────────────────────────────────────────────
+  let monthNameMap =
+    MONTH_LABELS[monthLabelFormat] || MONTH_LABELS[MonthLabelFormat.Short];
+
+  // If the data spans <= 12 months, we can be smart and append the Year to the month label
+  // e.g. "Dec" -> "Dec 2022", "Jan" -> "Jan 2023"
+  // This works because ECharts maps month index (0-11) to the name.
+  // If we have distinct months (no index repeats), we can map specific indices to specific strings.
+  // If span > 12 months, indices repeat (e.g. Jan 2022 and Jan 2023 both map to index 0), so we definitely can't do this.
+
+  const startDate = parseLocalDate(minDateStr);
+  const endDate = parseLocalDate(maxDateStr);
+  const monthSpan =
+    (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+    (endDate.getMonth() - startDate.getMonth()) +
+    1;
+
+  if (monthSpan <= 12 && monthSpan > 0) {
+    // Clone the base map to avoid mutating global constant
+    const customMap = [...monthNameMap];
+
+    // Iterate through each month in the range
+    const curr = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+    // Safety break
+    let loops = 0;
+    while (curr <= end && loops < 20) {
+      const mIndex = curr.getMonth();
+      const yyyy = curr.getFullYear();
+      // Append year. e.g. "Dec" -> "Dec 2022"
+      // Use Short format always for this? Or respect format?
+      // "Dec 2022" is nicer than "December 2022" usually.
+      const baseName = MONTH_LABELS[MonthLabelFormat.Short][mIndex];
+      customMap[mIndex] = `${baseName} ${yyyy}`;
+
+      curr.setMonth(curr.getMonth() + 1);
+      loops++;
+    }
+    monthNameMap = customMap;
+  }
+
+  const layoutMode = getVal('layoutMode', 'layout_mode', 'scrollable');
+
+  // For larger cellSizes, we calculate explicit scrolling height.
+  // However, if we are in 'fit' mode, Echarts flexes to the container height, so we don't need padding offsets.
+  let calendarHeight = height;
+  let explicitCellSize: any = [cellSize, cellSize];
+
+  if (layoutMode === 'scrollable') {
+    calendarHeight = isVertical
+      ? cellSize * Math.ceil(monthSpan * 4.5) + 100
+      : cellSize * 8 + 60;
+  } else {
+    explicitCellSize = ['auto', 'auto'];
+    // Reduce the top margin significantly in fit mode so it doesn't push the chart out of bounds
+  }
+
+  // Single calendar with a date range instead of multiple year-based calendars
+  const calendar = {
+    range: [minDateStr, maxDateStr],
+    orient: calendarOrient,
+    cellSize: explicitCellSize,
+    top: layoutMode === 'fit' ? 30 : 60,
+    left: 80,
+    right: 30,
+    bottom: 50,
+    yearLabel: {
+      show: showYearLabel,
+      fontSize: 24,
+      fontWeight: 'bold' as const,
+      color: textColor,
+      position: 'top',
+      margin: 10,
+    },
+    monthLabel: {
+      show: showMonthLabel,
+      nameMap: monthNameMap,
+      fontSize: 12,
+      color: textColor,
+      fontWeight: 'bold' as const,
+    },
+    // ... existing ...
+    dayLabel: {
+      show: showDayLabel,
+      nameMap: DAY_LABELS[dayLabelFormat] || DAY_LABELS[DayLabelFormat.Short],
+      firstDay: 0,
+      fontSize: 10,
+      color: secondaryTextColor,
+    },
+    splitLine: {
+      show: showMonthSeparator,
+      lineStyle: {
+        color: bgContainer, // Match the exact dashboard background to simulate a physical void/gap
+        width: monthSeparatorWidth,
+        type: 'solid' as const,
+      },
+    },
+    itemStyle: {
+      color: emptyCellColor,
+      borderColor: cellBorderColor,
+      borderWidth: cellBorderWidth,
+    },
+  };
+
+  // ──────────────────────────────────────────────
+  // Resolve Categories and Colors
+  // ──────────────────────────────────────────────
+  let isCategorical = false;
+  const uniqueValues = new Set<string>();
+  calendarData.forEach(item => {
+    const val = item[1];
+    if (val !== undefined && val !== null) {
+      uniqueValues.add(String(val));
+      if (typeof val === 'string') {
+        isCategorical = true;
+      }
+    }
+  });
+
+  const categories = Array.from(uniqueValues).sort();
+  const colorFn = CategoricalColorNamespace.getScale(colorScheme);
+  const categoryColors = categories.map(cat => colorFn(cat, sliceId));
+
+  const colorSteps =
+    visualMapType === VisualMapType.Piecewise ? piecewiseNum : 7;
+  const colors = getSequentialColors(colorScheme, colorSteps);
+
+  // ──────────────────────────────────────────────
+  // Build series with optional cell labels
+  // ──────────────────────────────────────────────
+  const showLabel = !!(showCellLabel || showCellDate);
+
+  const series = {
+    type: 'heatmap' as const,
+    coordinateSystem: 'calendar' as const,
+    calendarIndex: 0,
+    data: calendarData,
+    label: {
+      show: showLabel,
+      formatter: (params: any) => {
+        if (!params || !params.data || !Array.isArray(params.data)) return '';
+        const dateStr = params.data[0] as string;
+        const value = params.data[1];
+
+        // ECharts doesn't always pass the computed `color` to the calendar formatter.
+        // To guarantee high contrast text, we must manually deduce the background color
+        // by finding its position on our gradient scale.
+        let cellColor = params.color;
+        if (!cellColor && colors.length > 0) {
+          if (typeof value === 'number' && resolvedMax > resolvedMin) {
+            const ratio = Math.max(
+              0,
+              Math.min(1, (value - resolvedMin) / (resolvedMax - resolvedMin)),
+            );
+            const colorIndex = Math.min(
+              colors.length - 1,
+              Math.floor(ratio * colors.length),
+            );
+            cellColor = colors[colorIndex];
+          } else if (typeof value === 'string') {
+            const catIdx = categories.indexOf(value);
+            if (catIdx !== -1 && categoryColors.length > 0) {
+              cellColor = categoryColors[catIdx];
             }
+          }
         }
-    });
 
-    const categories = Array.from(uniqueValues).sort();
-    const colorFn = CategoricalColorNamespace.getScale(colorScheme);
-    const categoryColors = categories.map(cat => colorFn(cat, sliceId));
+        // Default empty cells to the emptyCellColor
+        const actualColor = cellColor || emptyCellColor;
+        const isDark = isColorDark(actualColor);
+        const suffix = isDark ? '_light' : '_dark';
 
-    const colorSteps = visualMapType === VisualMapType.Piecewise ? piecewiseNum : 7;
-    const colors = getSequentialColors(colorScheme, colorSteps);
+        const parts: string[] = [];
+        // Date ALWAYS first if exists
+        if (showCellDate && dateStr) {
+          const dateParts = dateStr.split('-');
+          if (dateParts.length === 3) {
+            // Day number
+            parts.push(`{date${suffix}|${parseInt(dateParts[2], 10)}}`);
+          }
+        }
 
-    // ──────────────────────────────────────────────
-    // Build series with optional cell labels
-    // ──────────────────────────────────────────────
-    const showLabel = !!(showCellLabel || showCellDate);
+        if (showCellLabel) {
+          // Force new line for metric
+          parts.push('\n');
+          const formatted =
+            typeof value === 'number'
+              ? numberFormatter
+                ? numberFormatter(value)
+                : String(value)
+              : String(value);
+          parts.push(`{metric${suffix}|${formatted}}`);
+        }
 
-    const series = {
-        type: 'heatmap' as const,
-        coordinateSystem: 'calendar' as const,
-        calendarIndex: 0,
-        data: calendarData,
-        label: {
-            show: showLabel,
-            formatter: (params: any) => {
-                if (!params || !params.data || !Array.isArray(params.data)) return '';
-                const dateStr = params.data[0] as string;
-                const value = params.data[1];
-
-                // ECharts doesn't always pass the computed `color` to the calendar formatter.
-                // To guarantee high contrast text, we must manually deduce the background color 
-                // by finding its position on our gradient scale.
-                let cellColor = params.color;
-                if (!cellColor && colors.length > 0) {
-                    if (typeof value === 'number' && resolvedMax > resolvedMin) {
-                        const ratio = Math.max(0, Math.min(1, (value - resolvedMin) / (resolvedMax - resolvedMin)));
-                        const colorIndex = Math.min(colors.length - 1, Math.floor(ratio * colors.length));
-                        cellColor = colors[colorIndex];
-                    } else if (typeof value === 'string') {
-                        const catIdx = categories.indexOf(value);
-                        if (catIdx !== -1 && categoryColors.length > 0) {
-                            cellColor = categoryColors[catIdx];
-                        }
-                    }
-                }
-
-                // Default empty cells to the emptyCellColor
-                const actualColor = cellColor || emptyCellColor;
-                const isDark = isColorDark(actualColor);
-                const suffix = isDark ? '_light' : '_dark';
-
-                const parts: string[] = [];
-                // Date ALWAYS first if exists
-                if (showCellDate && dateStr) {
-                    const dateParts = dateStr.split('-');
-                    if (dateParts.length === 3) {
-                        // Day number
-                        parts.push(`{date${suffix}|${parseInt(dateParts[2], 10)}}`);
-                    }
-                }
-
-                if (showCellLabel) {
-                    // Force new line for metric
-                    parts.push('\n');
-                    const formatted = typeof value === 'number'
-                        ? (numberFormatter ? numberFormatter(value) : String(value))
-                        : String(value);
-                    parts.push(`{metric${suffix}|${formatted}}`);
-                }
-
-                return parts.join('');
-            },
-            rich: {
-                // LIGHT TEXT (Dark Background)
-                date_light: {
-                    fontSize: dayLabelFontSize,
-                    color: '#ffffff',
-                    align: 'center',
-                },
-                metric_light: {
-                    fontSize: labelFontSize,
-                    color: '#ffffff',
-                    fontWeight: 600,
-                    align: 'center',
-                },
-
-                // DARK TEXT (Light Background)
-                date_dark: {
-                    fontSize: dayLabelFontSize,
-                    color: '#000000',
-                    align: 'center',
-                },
-                metric_dark: {
-                    fontSize: labelFontSize,
-                    color: '#2c3e50',
-                    fontWeight: 600,
-                    align: 'center',
-                },
-            },
-            position: 'inside',
-            distance: 0,
+        return parts.join('');
+      },
+      rich: {
+        // LIGHT TEXT (Dark Background)
+        date_light: {
+          fontSize: dayLabelFontSize,
+          color: '#ffffff',
+          align: 'center',
         },
-        emphasis: {
-            itemStyle: {
-                shadowBlur: 10,
-                shadowColor: 'rgba(0, 0, 0, 0.3)',
-                borderColor: textColor,
-                borderWidth: 2,
-            },
+        metric_light: {
+          fontSize: labelFontSize,
+          color: '#ffffff',
+          fontWeight: 600,
+          align: 'center',
         },
-        itemStyle: {
-            borderColor: cellBorderColor,
-            borderWidth: cellBorderWidth,
-            borderRadius: cellBorderRadius,
+
+        // DARK TEXT (Light Background)
+        date_dark: {
+          fontSize: dayLabelFontSize,
+          color: '#000000',
+          align: 'center',
         },
-        progressive: 0,
+        metric_dark: {
+          fontSize: labelFontSize,
+          color: '#2c3e50',
+          fontWeight: 600,
+          align: 'center',
+        },
+      },
+      position: 'inside',
+      distance: 0,
+    },
+    emphasis: {
+      itemStyle: {
+        shadowBlur: 10,
+        shadowColor: 'rgba(0, 0, 0, 0.3)',
+        borderColor: textColor,
+        borderWidth: 2,
+      },
+    },
+    itemStyle: {
+      borderColor: cellBorderColor,
+      borderWidth: cellBorderWidth,
+      borderRadius: cellBorderRadius,
+    },
+    progressive: 0,
+  };
+
+  // ──────────────────────────────────────────────
+  // Build Visual Map
+  // ──────────────────────────────────────────────
+  const vmPositionProps = getVisualMapPositionProps(visualMapPosition);
+  let visualMap: any;
+
+  if (isCategorical) {
+    visualMap = {
+      type: 'piecewise' as const,
+      categories,
+      inRange: { color: categoryColors },
+      show: showVisualMap,
+      orient: visualMapOrient,
+      textStyle: { color: textColor },
+      dimension: 1,
+      ...vmPositionProps,
+    };
+  } else {
+    const visualMapBase = {
+      min: resolvedMin,
+      max: resolvedMax,
+      calculable: true,
+      orient: visualMapOrient,
+      show: showVisualMap,
+      inRange: { color: colors },
+      textStyle: { color: textColor },
+      dimension: 1,
+      ...vmPositionProps,
     };
 
-    // ──────────────────────────────────────────────
-    // Build Visual Map
-    // ──────────────────────────────────────────────
-    const vmPositionProps = getVisualMapPositionProps(visualMapPosition);
-    let visualMap: any;
-
-    if (isCategorical) {
-        visualMap = {
+    visualMap =
+      visualMapType === VisualMapType.Piecewise
+        ? {
+            ...visualMapBase,
             type: 'piecewise' as const,
-            categories,
-            inRange: { color: categoryColors },
-            show: showVisualMap,
-            orient: visualMapOrient,
-            textStyle: { color: textColor },
-            dimension: 1,
-            ...vmPositionProps,
-        };
-    } else {
-        const visualMapBase = {
-            min: resolvedMin,
-            max: resolvedMax,
-            calculable: true,
-            orient: visualMapOrient,
-            show: showVisualMap,
-            inRange: { color: colors },
-            textStyle: { color: textColor },
-            dimension: 1,
-            ...vmPositionProps,
-        };
+            splitNumber: piecewiseNum,
+          }
+        : { ...visualMapBase, type: 'continuous' as const, realtime: false };
+  }
 
-        visualMap = visualMapType === VisualMapType.Piecewise
-            ? { ...visualMapBase, type: 'piecewise' as const, splitNumber: piecewiseNum }
-            : { ...visualMapBase, type: 'continuous' as const, realtime: false };
-    }
+  // ──────────────────────────────────────────────
+  // Build tooltip
+  // ──────────────────────────────────────────────
+  const tooltip = {
+    trigger: 'item' as const,
+    formatter: (params: any) => {
+      if (!params?.data || !Array.isArray(params.data)) return '';
+      const [dateStr, value, row] = params.data;
 
-    // ──────────────────────────────────────────────
-    // Build tooltip
-    // ──────────────────────────────────────────────
-    const tooltip = {
-        trigger: 'item' as const,
-        formatter: (params: any) => {
-            if (!params?.data || !Array.isArray(params.data)) return '';
-            const [dateStr, value, row] = params.data;
-            
-            const rows: [string, string][] = [];
-            // Add temporal column
-            rows.push([temporalColumn, dateStr]);
-            // Add main metric
-            const displayVal = typeof value === 'number'
-                ? (numberFormatter ? numberFormatter(value) : String(value))
-                : String(value);
-            rows.push([metricLabel, displayVal]);
+      const rows: [string, string][] = [];
+      // Add temporal column
+      rows.push([temporalColumn, dateStr]);
+      // Add main metric
+      const displayVal =
+        typeof value === 'number'
+          ? numberFormatter
+            ? numberFormatter(value)
+            : String(value)
+          : String(value);
+      rows.push([metricLabel, displayVal]);
 
-            // Add all other keys from original row (except temporalColumn and metricColName)
-            if (row) {
-                Object.keys(row).forEach(key => {
-                    if (key !== temporalColumn && key !== metricColName) {
-                        rows.push([key, String(row[key])]);
-                    }
-                });
-            }
-            return tooltipHtml(rows, dateStr);
-        },
-        confine: false,
-        appendToBody: true,
-        backgroundColor: tooltipBg,
-        borderColor: tooltipBorderColor,
-        borderWidth: 1,
-        padding: [10, 14],
-        textStyle: { fontSize: 13, color: tooltipTextColor },
-        extraCssText: 'box-shadow: 0 4px 14px rgba(0,0,0,0.12); border-radius: 8px;',
-    };
+      // Add all other keys from original row (except temporalColumn and metricColName)
+      if (row) {
+        Object.keys(row).forEach(key => {
+          if (key !== temporalColumn && key !== metricColName) {
+            rows.push([key, String(row[key])]);
+          }
+        });
+      }
+      return tooltipHtml(rows, dateStr);
+    },
+    confine: false,
+    appendToBody: true,
+    backgroundColor: tooltipBg,
+    borderColor: tooltipBorderColor,
+    borderWidth: 1,
+    padding: [10, 14],
+    textStyle: { fontSize: 13, color: tooltipTextColor },
+    extraCssText:
+      'box-shadow: 0 4px 14px rgba(0,0,0,0.12); border-radius: 8px;',
+  };
 
-    // ──────────────────────────────────────────────
-    // Calculate sizing — adapt to data range
-    // ──────────────────────────────────────────────
-    let requiredHeight = height;
-    let requiredWidth = width;
+  // ──────────────────────────────────────────────
+  // Calculate sizing — adapt to data range
+  // ──────────────────────────────────────────────
+  let requiredHeight = height;
+  let requiredWidth = width;
 
-    if (layoutMode === 'scrollable') {
-        requiredHeight = Math.max(height, calendarHeight + 130);
-        // Calendar width needs approximately 53 weeks * cellSize + left/right margins
-        const calendarComputedWidth = isVertical
-            ? (cellSize * 8) + 120
-            : (cellSize * 55) + 120;
-        requiredWidth = Math.max(width, calendarComputedWidth);
-    }
+  if (layoutMode === 'scrollable') {
+    requiredHeight = Math.max(height, calendarHeight + 130);
+    // Calendar width needs approximately 53 weeks * cellSize + left/right margins
+    const calendarComputedWidth = isVertical
+      ? cellSize * 8 + 120
+      : cellSize * 55 + 120;
+    requiredWidth = Math.max(width, calendarComputedWidth);
+  }
 
-    // ──────────────────────────────────────────────
-    // Assemble ECharts options
-    // ──────────────────────────────────────────────
-    const echartOptions: EChartsCoreOption = {
-        tooltip,
-        visualMap,
-        calendar,
-        series: [series],
-    };
+  // ──────────────────────────────────────────────
+  // Assemble ECharts options
+  // ──────────────────────────────────────────────
+  const echartOptions: EChartsCoreOption = {
+    tooltip,
+    visualMap,
+    calendar,
+    series: [series],
+  };
 
+  // ──────────────────────────────────────────────
+  // Build crossfilter props
+  // ──────────────────────────────────────────────
+  const refs: Refs = {};
+  const selectedValues = filterState?.selectedValues
+    ? (filterState.selectedValues as Record<number, string>)
+    : {};
 
-
-    // ──────────────────────────────────────────────
-    // Build crossfilter props
-    // ──────────────────────────────────────────────
-    const refs: Refs = {};
-    const selectedValues = filterState?.selectedValues
-        ? (filterState.selectedValues as Record<number, string>)
-        : {};
-
-    return {
-        echartOptions,
-        formData: fd,
-        height, // Lock outer component to strict Dashboard bounds
-        echartHeight: requiredHeight, // Allow inner Echart to independently expand
-        width,
-        echartWidth: requiredWidth,
-        setDataMask,
-        selectedValues,
-        labelMap,
-        groupby: temporalColumn ? [temporalColumn as any] : [],
-        emitCrossFilters: emitFilter && (emitCrossFilters ?? false),
-        filterState,
-        refs,
-        temporalColumn,
-        crossfilterMode,
-        onContextMenu: hooks.onContextMenu,
-        coltypeMapping: queriesData[0]?.coltypes
-            ? Object.fromEntries(
-                (queriesData[0].colnames || []).map((col: string, idx: number) => [
-                    col,
-                    queriesData[0].coltypes![idx],
-                ]),
-            )
-            : undefined,
-        setControlValue,
-    };
+  return {
+    echartOptions,
+    formData: fd,
+    height, // Lock outer component to strict Dashboard bounds
+    echartHeight: requiredHeight, // Allow inner Echart to independently expand
+    width,
+    echartWidth: requiredWidth,
+    setDataMask,
+    selectedValues,
+    labelMap,
+    groupby: temporalColumn ? [temporalColumn as any] : [],
+    emitCrossFilters: emitFilter && (emitCrossFilters ?? false),
+    filterState,
+    refs,
+    temporalColumn,
+    crossfilterMode,
+    onContextMenu: hooks.onContextMenu,
+    coltypeMapping: queriesData[0]?.coltypes
+      ? Object.fromEntries(
+          (queriesData[0].colnames || []).map((col: string, idx: number) => [
+            col,
+            queriesData[0].coltypes![idx],
+          ]),
+        )
+      : undefined,
+    setControlValue,
+  };
 }

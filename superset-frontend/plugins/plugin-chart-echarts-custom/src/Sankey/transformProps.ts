@@ -258,10 +258,7 @@ export default function transformProps(
           rows.push(['Stage', stageName]);
         }
         if (show_stage_percentage && stageTotal > 0) {
-          rows.push([
-            'Stage %',
-            percentFormatter.format(value / stageTotal),
-          ]);
+          rows.push(['Stage %', percentFormatter.format(value / stageTotal)]);
         }
         if (show_whole_percentage && overallTotal > 0) {
           rows.push([

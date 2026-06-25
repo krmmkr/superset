@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,21 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { buildQueryContext, QueryFormData } from '@superset-ui/core';
-import { SupersetPluginChartCustomControlsQueryFormData } from '../types';
 
-export default function buildQuery(formData: QueryFormData) {
-  const customControlsFormData =
-    formData as SupersetPluginChartCustomControlsQueryFormData;
-
-  return buildQueryContext(formData, baseQueryObject => [
-    {
-      ...baseQueryObject,
-      groupby: customControlsFormData.filterColumn
-        ? [customControlsFormData.filterColumn]
-        : [],
-      metrics: [],
-      series_limit: 1000,
-    },
-  ]);
-}
+declare module '*.png';
+declare module '*.jpg';

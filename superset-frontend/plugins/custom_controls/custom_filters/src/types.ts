@@ -17,51 +17,46 @@
  * under the License.
  */
 import {
-    QueryFormData,
-    TimeseriesDataRecord,
-    ChartProps,
+  QueryFormData,
+  TimeseriesDataRecord,
+  ChartProps,
 } from '@superset-ui/core';
 import { SupersetTheme } from '@apache-superset/core/theme';
 
-
 export interface SupersetPluginChartCustomControlsStylesProps {
-    height: number;
-    width: number;
+  height: number;
+  width: number;
 }
-
 
 export type ControlType = 'Dropdown' | 'Radio' | 'Checkbox' | 'TextBox';
 
-
 export interface SupersetPluginChartCustomControlsQueryFormData extends QueryFormData {
-    controlType: ControlType;
-    filterColumn?: any;
-    orientation?: 'vertical' | 'horizontal';
-    includeAllOption?: boolean;
-    multiSelect?: boolean;
-    defaultValue?: string;
-    hideTitle?: boolean;
-    boldTitle?: boolean;
+  controlType: ControlType;
+  filterColumn?: any;
+  orientation?: 'vertical' | 'horizontal';
+  includeAllOption?: boolean;
+  multiSelect?: boolean;
+  defaultValue?: string;
+  hideTitle?: boolean;
+  boldTitle?: boolean;
 }
-
 
 export interface ExtendedTheme extends SupersetTheme {}
 
-
 export interface SupersetPluginChartCustomControlsProps extends SupersetPluginChartCustomControlsStylesProps {
-    data: TimeseriesDataRecord[];
-    controlType: ControlType;
-    filterColumn?: any;
-    orientation?: 'vertical' | 'horizontal';
-    includeAllOption?: boolean;
-    multiSelect?: boolean;
-    defaultValue?: string;
-    hideTitle?: boolean;
-    boldTitle?: boolean;
-    hooks: ChartProps['hooks'];
-    filterState?: any;
-    theme?: ExtendedTheme;
+  data: TimeseriesDataRecord[];
+  controlType: ControlType;
+  filterColumn?: any;
+  orientation?: 'vertical' | 'horizontal';
+  includeAllOption?: boolean;
+  multiSelect?: boolean;
+  defaultValue?: string;
+  hideTitle?: boolean;
+  boldTitle?: boolean;
+  hooks: ChartProps['hooks'];
+  filterState?: any;
+  theme?: ExtendedTheme;
 }
 
-
-export type CustomControlsTransformedProps = SupersetPluginChartCustomControlsProps;
+export type CustomControlsTransformedProps =
+  SupersetPluginChartCustomControlsProps;

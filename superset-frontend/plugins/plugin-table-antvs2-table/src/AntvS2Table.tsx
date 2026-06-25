@@ -25,6 +25,7 @@ import {
   ColCell,
   RowCell,
   CornerCell,
+  MergedCell,
   S2Event,
   TextAlign,
 } from '@antv/s2';
@@ -57,13 +58,23 @@ function getAlignmentFromOptions(
 class CustomDataCell extends DataCell {
   getTextStyle() {
     const textStyle = super.getTextStyle();
+    const field = (this.meta?.field || this.meta?.valueField || '') as string;
+    const isMetric =
+      (this.spreadsheet?.options as any)?.metricCols?.includes(field) || false;
     return {
       ...textStyle,
-      textAlign: getAlignmentFromOptions(
-        this.spreadsheet,
-        this.meta.valueField,
-        true,
-      ),
+      textAlign: getAlignmentFromOptions(this.spreadsheet, field, isMetric),
+    };
+  }
+}
+
+class CustomMergedCell extends MergedCell {
+  getTextStyle() {
+    const textStyle = super.getTextStyle();
+    const field = (this.meta?.field || this.meta?.valueField || '') as string;
+    return {
+      ...textStyle,
+      textAlign: getAlignmentFromOptions(this.spreadsheet, field, false),
     };
   }
 }
@@ -176,9 +187,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   const [sortParams, setSortParams] = useState<any[]>([]);
 
   const fieldsKey = JSON.stringify({
-    rows: groupby,
     columns: props.s2DataConfig?.fields?.columns || [],
-    values: metricCols,
   });
 
   React.useEffect(() => {
@@ -189,18 +198,34 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     () => ({
       ...s2DataConfig,
       sortParams:
-        sortParams.length > 0 ? sortParams : s2DataConfig.sortParams || [],
+        sortParams.length > 0
+          ? sortParams
+          : s2DataConfig.sortParams || [],
     }),
     [s2DataConfig, sortParams],
   );
 
-  // ── Cross-filtering (data & row cell clicks only) ──
+  // ── Cross-filtering ──
   const handleDataClick = useCallback(
     (cellItem: any) => {
       if (!emitCrossFilters || !setDataMask) return;
 
-      const meta = cellItem?.viewMeta || cellItem?.meta;
-      if (!meta?.query) return;
+      const meta =
+        cellItem?.viewMeta ||
+        cellItem?.meta ||
+        (typeof cellItem?.getMeta === 'function' ? cellItem.getMeta() : null);
+      if (!meta) return;
+
+      const record =
+        meta.record ||
+        meta.spreadsheet?.dataSet?.getRowData?.(meta) ||
+        meta.spreadsheet?.dataSet?.displayData?.[meta.rowIndex] ||
+        meta.query ||
+        (meta.cells &&
+          (meta.cells[0]?.viewMeta?.record ||
+            meta.cells[0]?.meta?.record ||
+            meta.cells[0]?.record)) ||
+        {};
 
       const colsToEmit =
         crossfilterColumns.length > 0 ? crossfilterColumns : groupby;
@@ -209,8 +234,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       const filters: any[] = [];
 
       colsToEmit.forEach(col => {
-        if (meta.query[col] !== undefined) {
-          const val = meta.query[col];
+        if (record[col] !== undefined) {
+          const val = record[col];
           filterDict[col] = val;
           filters.push({ col, op: '==', val });
         }
@@ -271,7 +296,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   const isDefaultTheme = !formData.theme || formData.theme === 'default';
 
   const {
-    sheetType = 'pivot',
     adaptive,
     loading,
     showPagination,
@@ -395,7 +419,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       'cell',
     ];
 
-    // Auto-promote keys from root, root.options, themeCfg or themeCfg.theme to merged.theme
     themeKeys.forEach(key => {
       if (advancedS2OptionsObj && advancedS2OptionsObj[key]) {
         activeTheme[key] = merge(
@@ -453,7 +476,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   const optionsWithStyles = useMemo(() => {
     const baseOptions = { ...s2Options };
 
-    // Deep merge advanced options directly on top (excluding theme settings and top-level props)
     const {
       sheetType: ignoredSheetType,
       adaptive: ignoredAdaptive,
@@ -478,7 +500,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
     const finalOptions = merge({}, baseOptions, restOptions, userOptions);
 
-    // Promote layout/style keys from root of advancedS2OptionsObj or nested options to style block
     const styleKeys = [
       'colCell',
       'rowCell',
@@ -505,7 +526,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       }
     });
 
-    // Also support direct rowHeight / colHeight / cellHeight overrides from root or nested options
     if (advancedS2OptionsObj) {
       const colHeight = advancedS2OptionsObj.colHeight ?? userOptions.colHeight;
       if (colHeight !== undefined) {
@@ -528,7 +548,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       }
     }
 
-    // Apply word wrapping options natively in S2 2.x
     finalOptions.style = finalOptions.style || {};
 
     finalOptions.style.colCell = finalOptions.style.colCell || {};
@@ -546,15 +565,23 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     finalOptions.style.dataCell.maxLines = dataCellWordWrap ? Infinity : 1;
     finalOptions.style.dataCell.textOverflow = 'ellipsis';
 
-    // Attach custom alignment options to finalOptions so cell classes can read them
     (finalOptions as any).columnAlignmentsObj = columnAlignmentsObj;
     (finalOptions as any).defaultDimensionAlign = defaultDimensionAlign;
     (finalOptions as any).defaultMetricAlign = defaultMetricAlign;
     (finalOptions as any).metricCols = metricCols;
 
-    // Map custom cells
     finalOptions.dataCell = (viewMeta: any, spreadsheet: any, ...args: any[]) =>
       new CustomDataCell(
+        viewMeta,
+        spreadsheet || viewMeta?.spreadsheet,
+        ...args,
+      );
+    finalOptions.mergedCell = (
+      viewMeta: any,
+      spreadsheet: any,
+      ...args: any[]
+    ) =>
+      new CustomMergedCell(
         viewMeta,
         spreadsheet || viewMeta?.spreadsheet,
         ...args,
@@ -566,8 +593,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     finalOptions.cornerCell = (meta: any, spreadsheet: any, ...args: any[]) =>
       new CustomCornerCell(meta, spreadsheet || meta?.spreadsheet, ...args);
 
-    // Defensively remove style overrides for cell definitions, to prevent S2 from
-    // overwriting our custom cell constructor functions when merging style block to root.
     if (finalOptions.style) {
       if (typeof finalOptions.style.rowCell === 'function') {
         delete finalOptions.style.rowCell;
@@ -581,9 +606,11 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       if (typeof finalOptions.style.dataCell === 'function') {
         delete finalOptions.style.dataCell;
       }
+      if (typeof finalOptions.style.mergedCell === 'function') {
+        delete finalOptions.style.mergedCell;
+      }
     }
 
-    // Ensure tooltip has a render function for the operation menu in 2.x
     finalOptions.tooltip = finalOptions.tooltip || {};
     finalOptions.tooltip.operation = finalOptions.tooltip.operation || {};
     finalOptions.tooltip.operation.menu = {
@@ -601,6 +628,12 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       ...finalOptions.tooltip.operation.menu,
     };
 
+    if (sortParams && sortParams.length > 0) {
+      finalOptions.mergedCellsInfo = [];
+    } else {
+      finalOptions.mergedCellsInfo = s2Options.mergedCellsInfo || [];
+    }
+
     return finalOptions;
   }, [
     s2Options,
@@ -613,18 +646,15 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     colHeaderWordWrap,
     rowHeaderWordWrap,
     dataCellWordWrap,
+    sortParams,
   ]);
 
-  // Generate a key to force SheetComponent remount when config/theme changes.
-  // Width/height are intentionally excluded — S2 handles resize internally
-  // via options.height and the wrapper div style without needing a remount.
   const sheetKey = useMemo(
     () =>
       [
         isDark ? 'dark' : 'light',
         formData.theme || 'default',
         formData.advancedS2Options || formData.advanced_s2_options || '',
-        formData.tableMode || formData.table_mode || 'grid',
         formData.showSeriesNumber ?? formData.show_series_number ?? false,
         formData.layoutWidthType || formData.layout_width_type || 'adaptive',
         formData.showTooltip ?? formData.show_tooltip ?? true,
@@ -656,14 +686,13 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         formData.colHeaderWordWrap ?? formData.col_header_word_wrap ?? false,
         formData.rowHeaderWordWrap ?? formData.row_header_word_wrap ?? false,
         formData.dataCellWordWrap ?? formData.data_cell_word_wrap ?? false,
+        formData.enableRowspan ?? formData.enable_rowspan ?? false,
       ].join('_'),
     [
       isDark,
       formData.theme,
       formData.advancedS2Options,
       formData.advanced_s2_options,
-      formData.tableMode,
-      formData.table_mode,
       formData.showSeriesNumber,
       formData.show_series_number,
       formData.layoutWidthType,
@@ -694,6 +723,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       formData.row_header_word_wrap,
       formData.dataCellWordWrap,
       formData.data_cell_word_wrap,
+      formData.enableRowspan,
+      formData.enable_rowspan,
     ],
   );
 
@@ -704,7 +735,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     >
       {React.createElement(SheetComponent as any, {
         key: sheetKey,
-        sheetType,
+        sheetType: 'table',
         adaptive,
         loading,
         showPagination,
@@ -729,7 +760,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
             const cell = s2.getTargetCell(event?.target);
             const cellType = cell?.cellType;
 
-            // Only modify if it is a row cell or col cell, the event is a click, and has options
             if (
               (cellType === 'rowCell' || cellType === 'colCell') &&
               options &&
@@ -751,7 +781,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
                     : ['none']
                   : s2.getMenuDefaultSelectedKeys(meta?.id) || ['none'];
 
-                // Shared handler: applies sort for both dimension and metric fields
                 const applySortMethod = (method: string) => {
                   if (isDimension) {
                     const prevSortParams = (
