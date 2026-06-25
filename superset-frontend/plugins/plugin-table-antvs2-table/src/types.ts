@@ -99,6 +99,7 @@ export interface S2TableTransformedProps {
   groupby: string[];
   allFields: string[];
   metricCols: string[];
+  metricColsSet: Set<string>;
   advancedS2OptionsObj: any;
   defaultDimensionAlign?: 'left' | 'center' | 'right';
   defaultMetricAlign?: 'left' | 'center' | 'right';

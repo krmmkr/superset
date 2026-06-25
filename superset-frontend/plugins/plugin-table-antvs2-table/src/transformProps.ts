@@ -294,6 +294,7 @@ export default function transformProps(
   const metricCols = colnames.filter(
     c => metricNameSet.has(c) || metricNameLowerSet.has(c.toLowerCase()),
   );
+  const metricColsSet = new Set(metricCols);
 
   const allFields = [...groupby, ...metricCols];
 
@@ -469,6 +470,7 @@ export default function transformProps(
     groupby,
     allFields,
     metricCols,
+    metricColsSet,
     setDataMask,
     selectedValues,
     emitCrossFilters: emitFilter && (emitCrossFilters ?? false),

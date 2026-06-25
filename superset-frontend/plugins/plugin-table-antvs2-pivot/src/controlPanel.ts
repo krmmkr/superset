@@ -26,6 +26,7 @@ import { GenericDataType } from '@apache-superset/core/common';
 import {
   ControlPanelConfig,
   sharedControls,
+  ControlStateMapping,
 } from '@superset-ui/chart-controls';
 
 const config: ControlPanelConfig = {
@@ -74,7 +75,7 @@ const config: ControlPanelConfig = {
       ],
     },
     {
-      label: t('Table Configuration'),
+      label: t('Layout & Sizing'),
       expanded: true,
       controlSetRows: [
         [
@@ -118,6 +119,42 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'row_height',
+            config: {
+              type: 'TextControl',
+              label: t('Row Height (px)'),
+              description: t(
+                'Custom height for data cells and rows in pixels. Leave empty for default.',
+              ),
+              isInt: true,
+              validators: [legacyValidateInteger],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'col_height',
+            config: {
+              type: 'TextControl',
+              label: t('Column Header Height (px)'),
+              description: t(
+                'Custom height for column header cells in pixels. Leave empty for default.',
+              ),
+              isInt: true,
+              validators: [legacyValidateInteger],
+              renderTrigger: true,
+            },
+          },
+        ],
+      ],
+    },
+    {
+      label: t('Column Customizations'),
+      expanded: true,
+      controlSetRows: [
         [
           {
             name: 'dimension_config',
@@ -168,14 +205,15 @@ const config: ControlPanelConfig = {
               shouldMapStateToProps() {
                 return true;
               },
-              mapStateToProps({ controls }: any) {
+              mapStateToProps({ controls }: { controls: ControlStateMapping }) {
                 const groupby = ensureIsArray(controls.groupby?.value || []);
                 const columns = ensureIsArray(controls.columns?.value || []);
-                const colnames = [...groupby, ...columns].map(col =>
-                  typeof col === 'object'
-                    ? col.column_name || col.label
-                    : String(col),
-                );
+                const colnames = [...groupby, ...columns].map(col => {
+                  if (col && typeof col === 'object' && !Array.isArray(col)) {
+                    return (col as any).column_name || (col as any).label || '';
+                  }
+                  return String(col);
+                });
                 return {
                   columnsPropsObject: {
                     colnames,
@@ -272,7 +310,7 @@ const config: ControlPanelConfig = {
               shouldMapStateToProps() {
                 return true;
               },
-              mapStateToProps({ controls }: any) {
+              mapStateToProps({ controls }: { controls: ControlStateMapping }) {
                 const metrics = ensureIsArray(controls.metrics?.value || []);
                 const colnames = metrics.map((m: any) => getMetricLabel(m));
                 return {
@@ -285,6 +323,82 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'default_dimension_align',
+            config: {
+              type: 'SelectControl',
+              label: t('Default Dimension Alignment'),
+              default: 'left',
+              choices: [
+                ['left', t('Left')],
+                ['center', t('Center')],
+                ['right', t('Right')],
+              ],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'default_metric_align',
+            config: {
+              type: 'SelectControl',
+              label: t('Default Metric Alignment'),
+              default: 'right',
+              choices: [
+                ['left', t('Left')],
+                ['center', t('Center')],
+                ['right', t('Right')],
+              ],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'col_header_word_wrap',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Wrap Column Header Text'),
+              description: t('Wrap column header text when there is overflow.'),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'row_header_word_wrap',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Wrap Row Header Text'),
+              description: t(
+                'Wrap row header (dimension) text when there is overflow.',
+              ),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'data_cell_word_wrap',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Wrap Data Cell Text'),
+              description: t('Wrap data cell values when there is overflow.'),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+      ],
+    },
+    {
+      label: t('Table Interactive Behaviors'),
+      expanded: true,
+      controlSetRows: [
         [
           {
             name: 'show_series_number',
@@ -306,25 +420,6 @@ const config: ControlPanelConfig = {
               description: t('Show details tooltip when hovering over cells.'),
               default: true,
               renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'advanced_s2_options',
-            config: {
-              type: 'TextAreaControl',
-              label: t('Advanced S2 Options (JSON)'),
-              description: t(
-                'Deeply override any AntV S2 config (options, styles, multi-column interaction). ' +
-                  'Example: {"style": {"rowCfg": {"widthByField": {"Region": 120}}}}',
-              ),
-              default: '{}',
-              language: 'json',
-              renderTrigger: true,
-              minLines: 15,
-              maxLines: 40,
-              textAreaStyles: { width: '100%' },
             },
           },
         ],
@@ -415,7 +510,7 @@ const config: ControlPanelConfig = {
       ],
     },
     {
-      label: t('Appearance'),
+      label: t('Theme & Colors'),
       expanded: false,
       controlSetRows: [
         [
@@ -434,69 +529,6 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-        [
-          {
-            name: 'row_height',
-            config: {
-              type: 'TextControl',
-              label: t('Row Height (px)'),
-              description: t(
-                'Custom height for data cells and rows in pixels. Leave empty for default.',
-              ),
-              isInt: true,
-              validators: [legacyValidateInteger],
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'col_height',
-            config: {
-              type: 'TextControl',
-              label: t('Column Header Height (px)'),
-              description: t(
-                'Custom height for column header cells in pixels. Leave empty for default.',
-              ),
-              isInt: true,
-              validators: [legacyValidateInteger],
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'default_dimension_align',
-            config: {
-              type: 'SelectControl',
-              label: t('Default Dimension Alignment'),
-              default: 'left',
-              choices: [
-                ['left', t('Left')],
-                ['center', t('Center')],
-                ['right', t('Right')],
-              ],
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'default_metric_align',
-            config: {
-              type: 'SelectControl',
-              label: t('Default Metric Alignment'),
-              default: 'right',
-              choices: [
-                ['left', t('Left')],
-                ['center', t('Center')],
-                ['right', t('Right')],
-              ],
-              renderTrigger: true,
-            },
-          },
-        ],
-
         [
           {
             name: 'header_color',
@@ -534,47 +566,8 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-        [
-          {
-            name: 'col_header_word_wrap',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Wrap Column Header Text'),
-              description: t('Wrap column header text when there is overflow.'),
-              default: false,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'row_header_word_wrap',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Wrap Row Header Text'),
-              description: t(
-                'Wrap row header (dimension) text when there is overflow.',
-              ),
-              default: false,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'data_cell_word_wrap',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Wrap Data Cell Text'),
-              description: t('Wrap data cell values when there is overflow.'),
-              default: false,
-              renderTrigger: true,
-            },
-          },
-        ],
       ],
     },
-
     {
       label: t('Cross-filtering'),
       expanded: false,
@@ -605,6 +598,31 @@ const config: ControlPanelConfig = {
                   'Emitted as JSON dict for Jinja parsing.',
               ),
               validators: [],
+            },
+          },
+        ],
+      ],
+    },
+    {
+      label: t('Advanced Options (Developer)'),
+      expanded: false,
+      controlSetRows: [
+        [
+          {
+            name: 'advanced_s2_options',
+            config: {
+              type: 'TextAreaControl',
+              label: t('Advanced S2 Options (JSON)'),
+              description: t(
+                'Deeply override any AntV S2 config (options, styles, multi-column interaction). ' +
+                  'Example: {"style": {"rowCfg": {"widthByField": {"Region": 120}}}}',
+              ),
+              default: '{}',
+              language: 'json',
+              renderTrigger: true,
+              minLines: 15,
+              maxLines: 40,
+              textAreaStyles: { width: '100%' },
             },
           },
         ],

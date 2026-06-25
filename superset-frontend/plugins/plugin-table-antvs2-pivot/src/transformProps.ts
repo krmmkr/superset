@@ -283,8 +283,6 @@ export default function transformProps(
     }
   });
 
-  const excludeTotalsMetrics = Array.from(excludeTotalsSet);
-
   const defaultDimensionAlign =
     formData.defaultDimensionAlign ??
     formData.default_dimension_align ??
@@ -414,7 +412,7 @@ export default function transformProps(
   ) => {
     const metric = query['$$extra$$'];
     if (!metric) return 0;
-    if (excludeTotalsMetrics.includes(metric)) {
+    if (excludeTotalsSet.has(metric)) {
       return null;
     }
 

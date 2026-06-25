@@ -198,11 +198,15 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
 
   const [sortParams, setSortParams] = useState<any[]>([]);
 
-  const fieldsKey = JSON.stringify({
-    rows: groupby,
-    columns: props.s2DataConfig?.fields?.columns || [],
-    values: metricCols,
-  });
+  const fieldsKey = useMemo(
+    () =>
+      JSON.stringify({
+        rows: groupby,
+        columns: props.s2DataConfig?.fields?.columns || [],
+        values: metricCols,
+      }),
+    [groupby, props.s2DataConfig?.fields?.columns, metricCols],
+  );
 
   React.useEffect(() => {
     setSortParams([]);

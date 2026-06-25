@@ -187,3 +187,13 @@ test('should generate mergedCellsInfo when enableRowspan is true', () => {
   expect(stateMerge[0]).toEqual({ rowIndex: 0, colIndex: 1, showText: true });
   expect(stateMerge[1]).toEqual({ rowIndex: 1, colIndex: 1, showText: false });
 });
+
+test('should generate metricColsSet correctly', () => {
+  const chartProps = buildChartProps();
+  const result = transformProps(chartProps as any);
+
+  expect(result.metricColsSet).toBeDefined();
+  expect(result.metricColsSet.has('sales')).toBe(true);
+  expect(result.metricColsSet.has('region')).toBe(false);
+});
+

@@ -26,6 +26,7 @@ import { GenericDataType } from '@apache-superset/core/common';
 import {
   ControlPanelConfig,
   sharedControls,
+  ControlStateMapping,
 } from '@superset-ui/chart-controls';
 
 const config: ControlPanelConfig = {
@@ -66,7 +67,7 @@ const config: ControlPanelConfig = {
       ],
     },
     {
-      label: t('Table Configuration'),
+      label: t('Layout & Sizing'),
       expanded: true,
       controlSetRows: [
         [
@@ -91,6 +92,56 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'enable_rowspan',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Enable Rowspan / Merge Cells'),
+              description: t(
+                'Automatically merge adjacent row cells with identical values for dimension columns.',
+              ),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'row_height',
+            config: {
+              type: 'TextControl',
+              label: t('Row Height (px)'),
+              description: t(
+                'Custom height for data cells and rows in pixels. Leave empty for default.',
+              ),
+              isInt: true,
+              validators: [legacyValidateInteger],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'col_height',
+            config: {
+              type: 'TextControl',
+              label: t('Column Header Height (px)'),
+              description: t(
+                'Custom height for column header cells in pixels. Leave empty for default.',
+              ),
+              isInt: true,
+              validators: [legacyValidateInteger],
+              renderTrigger: true,
+            },
+          },
+        ],
+      ],
+    },
+    {
+      label: t('Column Customizations'),
+      expanded: true,
+      controlSetRows: [
         [
           {
             name: 'dimension_config',
@@ -128,13 +179,14 @@ const config: ControlPanelConfig = {
               shouldMapStateToProps() {
                 return true;
               },
-              mapStateToProps({ controls }: any) {
+              mapStateToProps({ controls }: { controls: ControlStateMapping }) {
                 const groupby = ensureIsArray(controls.groupby?.value || []);
-                const colnames = groupby.map(col =>
-                  typeof col === 'object'
-                    ? col.column_name || col.label
-                    : String(col),
-                );
+                const colnames = groupby.map(col => {
+                  if (col && typeof col === 'object' && !Array.isArray(col)) {
+                    return (col as any).column_name || (col as any).label || '';
+                  }
+                  return String(col);
+                });
                 return {
                   columnsPropsObject: {
                     colnames,
@@ -191,7 +243,7 @@ const config: ControlPanelConfig = {
               shouldMapStateToProps() {
                 return true;
               },
-              mapStateToProps({ controls }: any) {
+              mapStateToProps({ controls }: { controls: ControlStateMapping }) {
                 const metrics = ensureIsArray(controls.metrics?.value || []);
                 const colnames = metrics.map((m: any) => getMetricLabel(m));
                 return {
@@ -201,129 +253,6 @@ const config: ControlPanelConfig = {
                   },
                 };
               },
-            },
-          },
-        ],
-        [
-          {
-            name: 'show_series_number',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show Row Index (Series Number)'),
-              description: t('Show row index/sequence numbers on the left.'),
-              default: false,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'enable_rowspan',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Enable Rowspan / Merge Cells'),
-              description: t(
-                'Automatically merge adjacent row cells with identical values for dimension columns.',
-              ),
-              default: false,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'show_tooltip',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show Hover Tooltip'),
-              description: t('Show details tooltip when hovering over cells.'),
-              default: true,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'advanced_s2_options',
-            config: {
-              type: 'TextAreaControl',
-              label: t('Advanced S2 Options (JSON)'),
-              description: t(
-                'Deeply override any AntV S2 config (options, styles, multi-column interaction). ' +
-                  'Example: {"style": {"colCell": {"widthByField": {"Region": 120}}}}',
-              ),
-              default: '{}',
-              language: 'json',
-              renderTrigger: true,
-              minLines: 15,
-              maxLines: 40,
-              textAreaStyles: { width: '100%' },
-            },
-          },
-        ],
-        [
-          {
-            name: 'show_sort_controls',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Enable Native Sorting'),
-              description: t(
-                'Show interactive sort icons when hovering over column headers.',
-              ),
-              default: true,
-              renderTrigger: true,
-            },
-          },
-        ],
-      ],
-    },
-    {
-      label: t('Appearance'),
-      expanded: false,
-      controlSetRows: [
-        [
-          {
-            name: 'theme',
-            config: {
-              type: 'SelectControl',
-              label: t('Table Theme'),
-              default: 'default',
-              choices: [
-                ['default', t('Default')],
-                ['colorful', t('Colorful')],
-                ['gray', t('Gray')],
-              ],
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'row_height',
-            config: {
-              type: 'TextControl',
-              label: t('Row Height (px)'),
-              description: t(
-                'Custom height for data cells and rows in pixels. Leave empty for default.',
-              ),
-              isInt: true,
-              validators: [legacyValidateInteger],
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'col_height',
-            config: {
-              type: 'TextControl',
-              label: t('Column Header Height (px)'),
-              description: t(
-                'Custom height for column header cells in pixels. Leave empty for default.',
-              ),
-              isInt: true,
-              validators: [legacyValidateInteger],
-              renderTrigger: true,
             },
           },
         ],
@@ -355,43 +284,6 @@ const config: ControlPanelConfig = {
                 ['center', t('Center')],
                 ['right', t('Right')],
               ],
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'header_color',
-            config: {
-              type: 'ColorPickerControl',
-              label: t('Header Background Color'),
-              description: t(
-                'Custom background color for column and row headers.',
-              ),
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'border_color',
-            config: {
-              type: 'ColorPickerControl',
-              label: t('Border Color'),
-              description: t('Custom color for table cell borders.'),
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'row_banding_color',
-            config: {
-              type: 'ColorPickerControl',
-              label: t('Row Banding (Stripe) Color'),
-              description: t(
-                'Custom color for alternate rows. Set opacity to 0 (transparent) to disable row banding.',
-              ),
               renderTrigger: true,
             },
           },
@@ -437,6 +329,109 @@ const config: ControlPanelConfig = {
       ],
     },
     {
+      label: t('Table Interactive Behaviors'),
+      expanded: true,
+      controlSetRows: [
+        [
+          {
+            name: 'show_series_number',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Show Row Index (Series Number)'),
+              description: t('Show row index/sequence numbers on the left.'),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'show_tooltip',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Show Hover Tooltip'),
+              description: t('Show details tooltip when hovering over cells.'),
+              default: true,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'show_sort_controls',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Enable Native Sorting'),
+              description: t(
+                'Show interactive sort icons when hovering over column headers.',
+              ),
+              default: true,
+              renderTrigger: true,
+            },
+          },
+        ],
+      ],
+    },
+    {
+      label: t('Theme & Colors'),
+      expanded: false,
+      controlSetRows: [
+        [
+          {
+            name: 'theme',
+            config: {
+              type: 'SelectControl',
+              label: t('Table Theme'),
+              default: 'default',
+              choices: [
+                ['default', t('Default')],
+                ['colorful', t('Colorful')],
+                ['gray', t('Gray')],
+              ],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'header_color',
+            config: {
+              type: 'ColorPickerControl',
+              label: t('Header Background Color'),
+              description: t(
+                'Custom background color for column and row headers.',
+              ),
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'border_color',
+            config: {
+              type: 'ColorPickerControl',
+              label: t('Border Color'),
+              description: t('Custom color for table cell borders.'),
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'row_banding_color',
+            config: {
+              type: 'ColorPickerControl',
+              label: t('Row Banding (Stripe) Color'),
+              description: t(
+                'Custom color for alternate rows. Set opacity to 0 (transparent) to disable row banding.',
+              ),
+              renderTrigger: true,
+            },
+          },
+        ],
+      ],
+    },
+    {
       label: t('Cross-filtering'),
       expanded: false,
       controlSetRows: [
@@ -466,6 +461,31 @@ const config: ControlPanelConfig = {
                   'Emitted as JSON dict for Jinja parsing.',
               ),
               validators: [],
+            },
+          },
+        ],
+      ],
+    },
+    {
+      label: t('Advanced Options (Developer)'),
+      expanded: false,
+      controlSetRows: [
+        [
+          {
+            name: 'advanced_s2_options',
+            config: {
+              type: 'TextAreaControl',
+              label: t('Advanced S2 Options (JSON)'),
+              description: t(
+                'Deeply override any AntV S2 config (options, styles, multi-column interaction). ' +
+                  'Example: {"style": {"colCell": {"widthByField": {"Region": 120}}}}',
+              ),
+              default: '{}',
+              language: 'json',
+              renderTrigger: true,
+              minLines: 15,
+              maxLines: 40,
+              textAreaStyles: { width: '100%' },
             },
           },
         ],

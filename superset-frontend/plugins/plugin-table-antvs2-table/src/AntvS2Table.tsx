@@ -69,7 +69,7 @@ class CustomDataCell extends DataCell {
     const textStyle = super.getTextStyle();
     const field = (this.meta?.field || this.meta?.valueField || '') as string;
     const isMetric =
-      (this.spreadsheet?.options as any)?.metricCols?.includes(field) || false;
+      (this.spreadsheet?.options as any)?.metricColsSet?.has(field) || false;
     const isBold = getBoldTextFromOptions(this.spreadsheet, field);
     return {
       ...textStyle,
@@ -187,6 +187,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     crossfilterColumns,
     groupby,
     metricCols,
+    metricColsSet,
     advancedS2OptionsObj,
     defaultDimensionAlign = 'left',
     defaultMetricAlign = 'right',
@@ -206,9 +207,13 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
 
   const [sortParams, setSortParams] = useState<any[]>([]);
 
-  const fieldsKey = JSON.stringify({
-    columns: props.s2DataConfig?.fields?.columns || [],
-  });
+  const fieldsKey = useMemo(
+    () =>
+      JSON.stringify({
+        columns: props.s2DataConfig?.fields?.columns || [],
+      }),
+    [props.s2DataConfig?.fields?.columns],
+  );
 
   React.useEffect(() => {
     setSortParams([]);
@@ -590,6 +595,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     (finalOptions as any).defaultDimensionAlign = defaultDimensionAlign;
     (finalOptions as any).defaultMetricAlign = defaultMetricAlign;
     (finalOptions as any).metricCols = metricCols;
+    (finalOptions as any).metricColsSet = metricColsSet;
 
     finalOptions.dataCell = (viewMeta: any, spreadsheet: any, ...args: any[]) =>
       new CustomDataCell(
@@ -664,6 +670,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     columnAlignmentsObj,
     headerColor,
     metricCols,
+    metricColsSet,
     colHeaderWordWrap,
     rowHeaderWordWrap,
     dataCellWordWrap,
