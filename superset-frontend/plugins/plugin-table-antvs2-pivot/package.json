@@ -1,0 +1,35 @@
+{
+  "name": "superset-custom-s2-table-plugin",
+  "version": "0.1.0",
+  "description": "Superset Chart - Custom AntV S2 Table Plugin",
+  "sideEffects": false,
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "files": [
+    "esm",
+    "lib",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && tsc --project tsconfig.build.esm.json",
+    "dev": "tsc --project tsconfig.build.json --watch"
+  },
+  "author": "Superset",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@superset-ui/chart-controls": "*",
+    "@superset-ui/core": "*",
+    "react": "^16.13.1 || ^17.0.0 || ^18.0.0"
+  },
+  "dependencies": {
+    "@antv/s2": "^2.7.1",
+    "@antv/s2-react": "^2.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}
