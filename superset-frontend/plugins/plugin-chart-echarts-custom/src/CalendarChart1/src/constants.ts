@@ -1,3 +1,4 @@
+/* eslint-disable theme-colors/no-literal-colors */
 /**
  * Licensed under the Apache License, Version 2.0
  * Superset Calendar Heatmap Plugin - Constants
@@ -45,7 +46,7 @@ export enum MonthLabelFormat {
 export const DEFAULT_FORM_DATA = {
   // Calendar layout
   calendarOrient: CalendarOrient.Horizontal,
-  cellSize: 16,
+  cellSize: 34,
   showMonthSeparator: true,
   monthSeparatorColor: '#000000',
   monthSeparatorWidth: 2,
@@ -60,7 +61,7 @@ export const DEFAULT_FORM_DATA = {
   visualMapType: VisualMapType.Continuous,
   visualMapOrient: VisualMapOrient.Horizontal,
   visualMapPosition: VisualMapPosition.BottomLeft,
-  showVisualMap: true,
+  showVisualMap: false,
   piecewiseNum: 5,
   emptyCellColor: '#efefef',
 
@@ -70,10 +71,10 @@ export const DEFAULT_FORM_DATA = {
   cellBorderRadius: 1,
 
   // Cell labels
-  showCellLabel: false,
-  showCellDate: false,
-  labelFontSize: 11,
-  dayLabelFontSize: 9,
+  showCellLabel: true,
+  showCellDate: true,
+  labelFontSize: 10,
+  dayLabelFontSize: 11,
 
   // Tooltip
   dateFormat: '%Y-%m-%d',

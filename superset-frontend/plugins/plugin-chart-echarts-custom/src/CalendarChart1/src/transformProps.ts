@@ -1,13 +1,9 @@
-/**
- * Licensed under the Apache License, Version 2.0
- * Superset Calendar Heatmap Plugin - Transform Props
- *
- * Transforms Superset query results into ECharts calendar heatmap options.
- */
+/* eslint-disable theme-colors/no-literal-colors */
 import {
   getMetricLabel,
   getNumberFormatter,
   getSequentialSchemeRegistry,
+  getCategoricalSchemeRegistry,
   NumberFormats,
   DataRecord,
   tooltipHtml,
@@ -17,6 +13,8 @@ import type { EChartsCoreOption } from 'echarts/core';
 import {
   CalendarHeatmapChartProps,
   CalendarHeatmapTransformedProps,
+  CalendarDayData,
+  CalendarMonthData,
   Refs,
 } from './types';
 import {
@@ -30,7 +28,7 @@ import {
 
 // Day-of-week labels for different formats
 const DAY_LABELS: Record<string, string[]> = {
-  [DayLabelFormat.Short]: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
+  [DayLabelFormat.Short]: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
   [DayLabelFormat.Medium]: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   [DayLabelFormat.Full]: [
     'Sunday',
@@ -92,25 +90,139 @@ function getVisualMapPositionProps(position: string) {
 }
 
 /**
- * Resolve sequential color scheme into an array of hex colors
+ * Parse any color string (hex or rgb) into [r, g, b]
  */
-function getSequentialColors(colorScheme: string, steps: number): string[] {
-  const registry = getSequentialSchemeRegistry();
-  const scheme = registry.get(colorScheme);
-  if (scheme && scheme.colors) {
-    const colors = scheme.colors as string[];
-    if (colors.length >= steps) {
-      const result: string[] = [];
-      for (let i = 0; i < steps; i++) {
-        const idx = Math.round((i / (steps - 1)) * (colors.length - 1));
-        result.push(colors[idx]);
-      }
-      return result;
+function parseToRgb(colorStr: string): [number, number, number] {
+  if (!colorStr) return [59, 130, 246];
+  if (colorStr.startsWith('#')) {
+    let hex = colorStr.slice(1);
+    if (hex.length === 3) {
+      hex = hex
+        .split('')
+        .map(c => c + c)
+        .join('');
     }
-    return [...colors];
+    const r = parseInt(hex.substring(0, 2), 16) || 0;
+    const g = parseInt(hex.substring(2, 4), 16) || 0;
+    const b = parseInt(hex.substring(4, 6), 16) || 0;
+    return [r, g, b];
   }
-  // Explicit Fallback if scheme is missing
-  return ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127'];
+  if (colorStr.startsWith('rgb')) {
+    const parts = colorStr.match(/\d+/g);
+    if (parts && parts.length >= 3) {
+      return [Number(parts[0]), Number(parts[1]), Number(parts[2])];
+    }
+  }
+  return [59, 130, 246];
+}
+
+/**
+ * Interpolate smoothly between two colors
+ */
+function interpolateColor(
+  color1: string,
+  color2: string,
+  factor: number,
+): string {
+  const [r1, g1, b1] = parseToRgb(color1);
+  const [r2, g2, b2] = parseToRgb(color2);
+
+  const r = Math.round(r1 + factor * (r2 - r1));
+  const g = Math.round(g1 + factor * (g2 - g1));
+  const b = Math.round(b1 + factor * (b2 - b1));
+
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+/**
+ * Compute the color for a given normalized intensity (0..1)
+ */
+function getColorForIntensity(
+  intensity: number,
+  colorStops: string[],
+  isPiecewise: boolean,
+): string {
+  if (!colorStops || colorStops.length === 0) return '#3b82f6';
+  if (colorStops.length === 1) return colorStops[0];
+
+  const clamped = Math.max(0, Math.min(1, intensity));
+
+  if (isPiecewise) {
+    const idx = Math.min(
+      colorStops.length - 1,
+      Math.floor(clamped * colorStops.length),
+    );
+    return colorStops[idx];
+  }
+
+  // Continuous gradient interpolation across multi-stop colorStops
+  const scaled = clamped * (colorStops.length - 1);
+  const index = Math.floor(scaled);
+  const nextIndex = Math.min(index + 1, colorStops.length - 1);
+  const factor = scaled - index;
+
+  return interpolateColor(colorStops[index], colorStops[nextIndex], factor);
+}
+
+/**
+ * Calculate high-contrast text color based on tile background brightness
+ */
+function getContrastTextColor(bg: string): string {
+  const [r, g, b] = parseToRgb(bg);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#0f172a' : '#ffffff';
+}
+
+/**
+ * Resolve sequential or categorical color scheme into an array of hex colors
+ */
+function getSequentialColors(colorScheme?: string, steps = 7): string[] {
+  let baseColors: string[] = [];
+
+  if (colorScheme) {
+    const seqRegistry = getSequentialSchemeRegistry();
+    const seqScheme = seqRegistry.get(colorScheme);
+    if (seqScheme?.colors && seqScheme.colors.length > 0) {
+      baseColors = seqScheme.colors as string[];
+    } else {
+      try {
+        const catRegistry = getCategoricalSchemeRegistry();
+        const catScheme = catRegistry.get(colorScheme);
+        if (catScheme?.colors && catScheme.colors.length > 0) {
+          baseColors = catScheme.colors as string[];
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (baseColors.length === 0) {
+    const defaultSeq = getSequentialSchemeRegistry().get();
+    if (defaultSeq?.colors && defaultSeq.colors.length > 0) {
+      baseColors = defaultSeq.colors as string[];
+    } else {
+      baseColors = [
+        '#1e3a8a',
+        '#1d4ed8',
+        '#2563eb',
+        '#3b82f6',
+        '#60a5fa',
+        '#93c5fd',
+      ];
+    }
+  }
+
+  if (baseColors.length === 1 || steps <= 1) {
+    return Array(Math.max(1, steps)).fill(baseColors[0]);
+  }
+
+  const result: string[] = [];
+  for (let i = 0; i < steps; i += 1) {
+    const factor = i / (steps - 1);
+    result.push(getColorForIntensity(factor, baseColors, false));
+  }
+  return result;
 }
 
 /**
@@ -270,9 +382,10 @@ export default function transformProps(
   };
 
   // Helper to try both keys
-  const getVal = (keyCamel: string, keySnake: string, def: any) => fd[keyCamel] ?? fd[keySnake] ?? def;
+  const getVal = (keyCamel: string, keySnake: string, def: any) =>
+    fd[keyCamel] ?? fd[keySnake] ?? def;
 
-  const {sliceId} = fd;
+  const { sliceId } = fd;
   const granularitySqla = getVal(
     'granularitySqla',
     'granularity_sqla',
@@ -731,7 +844,7 @@ export default function transformProps(
     label: {
       show: showLabel,
       formatter: (params: any) => {
-        if (!params || !params.data || !Array.isArray(params.data)) return '';
+        if (!params?.data || !Array.isArray(params.data)) return '';
         const dateStr = params.data[0] as string;
         const value = params.data[1];
 
@@ -931,6 +1044,123 @@ export default function transformProps(
   }
 
   // ──────────────────────────────────────────────
+  // Build React Calendar Heatmap month/day matrix
+  // ──────────────────────────────────────────────
+  const startMonthDate = parseLocalDate(minDateStr);
+  const endMonthDate = parseLocalDate(maxDateStr);
+
+  const startYear = startMonthDate.getFullYear();
+  const startMonthIdx = startMonthDate.getMonth();
+  const endYear = endMonthDate.getFullYear();
+  const endMonthIdx = endMonthDate.getMonth();
+
+  const dataMap = new Map<
+    string,
+    { value: number | string; row: DataRecord }
+  >();
+  calendarData.forEach(([dStr, val, r]) => {
+    dataMap.set(dStr, { value: val, row: r });
+  });
+
+  const months: CalendarMonthData[] = [];
+  let curYear = startYear;
+  let curMonthIdx = startMonthIdx;
+
+  while (
+    curYear < endYear ||
+    (curYear === endYear && curMonthIdx <= endMonthIdx)
+  ) {
+    const monthDate = new Date(curYear, curMonthIdx, 1);
+    const baseMonth =
+      monthLabelFormat === MonthLabelFormat.Full
+        ? MONTH_LABELS[MonthLabelFormat.Full][curMonthIdx]
+        : MONTH_LABELS[MonthLabelFormat.Short][curMonthIdx];
+    const monthName = `${baseMonth} ${curYear}`;
+
+    const firstDayOfWeek = monthDate.getDay(); // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+    const totalDays = new Date(curYear, curMonthIdx + 1, 0).getDate();
+
+    const days: (CalendarDayData | null)[] = [];
+    // Add empty slots before day 1
+    for (let i = 0; i < firstDayOfWeek; i += 1) {
+      days.push(null);
+    }
+
+    for (let day = 1; day <= totalDays; day += 1) {
+      const mStr = String(curMonthIdx + 1).padStart(2, '0');
+      const dStr = String(day).padStart(2, '0');
+      const dateStr = `${curYear}-${mStr}-${dStr}`;
+
+      const entry = dataMap.get(dateStr);
+      const val = entry !== undefined ? entry.value : null;
+      const raw = entry?.row;
+
+      let numVal: number | null = null;
+      let formattedValue = '';
+      let intensity = 0;
+
+      if (val !== null && val !== undefined) {
+        numVal = Number(val);
+        if (!isNaN(numVal)) {
+          formattedValue = numberFormatter(numVal);
+          if (resolvedMax > resolvedMin) {
+            intensity = Math.max(
+              0,
+              Math.min(1, (numVal - resolvedMin) / (resolvedMax - resolvedMin)),
+            );
+          } else {
+            intensity = 0.5;
+          }
+        } else {
+          formattedValue = String(val);
+          intensity = 0.5;
+        }
+      }
+
+      // Dynamic color scheme resolution (Continuous gradient or Piecewise steps)
+      let color = darkMode ? '#1a1d26' : '#f1f5f9'; // Dark slate placeholder for empty
+      let textColor = darkMode ? '#64748b' : '#94a3b8';
+
+      if (val !== null && val !== undefined) {
+        if (isCategorical) {
+          color = colorFn(String(val), sliceId);
+        } else {
+          color = getColorForIntensity(
+            intensity,
+            colors,
+            visualMapType === VisualMapType.Piecewise,
+          );
+        }
+        textColor = getContrastTextColor(color);
+      }
+
+      days.push({
+        dateStr,
+        dayOfMonth: day,
+        value: val,
+        formattedValue,
+        intensity,
+        color,
+        textColor,
+        rawRecord: raw,
+      });
+    }
+
+    months.push({
+      year: curYear,
+      month: curMonthIdx,
+      monthName,
+      days,
+    });
+
+    curMonthIdx += 1;
+    if (curMonthIdx > 11) {
+      curMonthIdx = 0;
+      curYear += 1;
+    }
+  }
+
+  // ──────────────────────────────────────────────
   // Assemble ECharts options
   // ──────────────────────────────────────────────
   const echartOptions: EChartsCoreOption = {
@@ -974,5 +1204,56 @@ export default function transformProps(
         )
       : undefined,
     setControlValue,
+    // React Calendar Heatmap props
+    months,
+    metricLabel,
+    cellSize,
+    calendarOrient,
+    layoutMode: getVal('layoutMode', 'layout_mode', 'scrollable'),
+    showDayLabel,
+    dayLabels: DAY_LABELS[dayLabelFormat] || DAY_LABELS[DayLabelFormat.Short],
+    showMonthLabel,
+    showCellLabel: getBool(
+      getVal(
+        'showCellLabel',
+        'show_cell_label',
+        DEFAULT_FORM_DATA.showCellLabel,
+      ),
+      true,
+    ),
+    showCellDate: getBool(
+      getVal('showCellDate', 'show_cell_date', DEFAULT_FORM_DATA.showCellDate),
+      true,
+    ),
+    labelFontSize: Number(
+      getVal(
+        'labelFontSize',
+        'label_font_size',
+        DEFAULT_FORM_DATA.labelFontSize,
+      ),
+    ),
+    dayLabelFontSize: Number(
+      getVal(
+        'dayLabelFontSize',
+        'day_label_font_size',
+        DEFAULT_FORM_DATA.dayLabelFontSize,
+      ),
+    ),
+    showVisualMap: getBool(
+      getVal(
+        'showVisualMap',
+        'show_visual_map',
+        DEFAULT_FORM_DATA.showVisualMap,
+      ),
+      false,
+    ),
+    visualMapColors: colors,
+    visualMapMin: resolvedMin,
+    visualMapMax: resolvedMax,
+    visualMapType,
+    visualMapOrient,
+    visualMapPosition,
+    formattedMin: numberFormatter(resolvedMin),
+    formattedMax: numberFormatter(resolvedMax),
   };
 }

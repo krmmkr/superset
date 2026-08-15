@@ -1,3 +1,4 @@
+/* eslint-disable camelcase, theme-colors/no-literal-colors */
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -99,10 +100,22 @@ export default function transformProps(
     formData.show_overall_total !== undefined
       ? formData.show_overall_total
       : showOverallTotal;
+  const link_color_mode =
+    formData.link_color_mode ?? formData.linkColorMode ?? 'gradient';
+  const enable_3d_effect =
+    formData.enable_3d_effect ?? formData.enable3dEffect ?? true;
+  const node_width = Number(formData.node_width ?? formData.nodeWidth ?? 16);
+  const node_gap = Number(formData.node_gap ?? formData.nodeGap ?? 16);
+  const node_border_radius = Number(
+    formData.node_border_radius ?? formData.nodeBorderRadius ?? 6,
+  );
+  const link_opacity = Number(
+    formData.link_opacity ?? formData.linkOpacity ?? 0.75,
+  );
 
   const { data } = queriesData[0];
   const colorFn = CategoricalColorNamespace.getScale(colorScheme);
-  const metricLabel = getMetricLabel(metric);
+  const metricLabel = metric ? getMetricLabel(metric) : 'Value';
   const valueFormatter = getNumberFormatter(NumberFormats.FLOAT_2_POINT);
   const percentFormatter = getPercentFormatter(NumberFormats.PERCENT_2_POINT);
 
@@ -213,10 +226,28 @@ export default function transformProps(
       name,
       itemStyle: {
         color: colorFn(String(name).replace(/ \(stage \d+\)$/, ''), sliceId),
+        borderRadius: enable_3d_effect
+          ? [
+              node_border_radius,
+              node_border_radius,
+              node_border_radius,
+              node_border_radius,
+            ]
+          : 0,
+        borderColor: enable_3d_effect
+          ? 'rgba(255, 255, 255, 0.25)'
+          : 'transparent',
+        borderWidth: enable_3d_effect ? 1 : 0,
+        shadowBlur: enable_3d_effect ? 10 : 0,
+        shadowColor: enable_3d_effect ? 'rgba(0, 0, 0, 0.45)' : 'transparent',
+        shadowOffsetX: enable_3d_effect ? 2 : 0,
+        shadowOffsetY: enable_3d_effect ? 2 : 0,
       },
       label: {
         color: theme.colorText,
         textShadow: theme.colorBgBase,
+        fontSize: 12,
+        fontWeight: 500,
         formatter: () => displayName,
       },
     };
@@ -280,10 +311,41 @@ export default function transformProps(
   const echartOptions: EChartsOption = {
     series: [
       {
-        animation: false,
+        animation: true,
         data: seriesData,
+        nodeWidth: node_width,
+        nodeGap: node_gap,
+        nodeAlign: 'justify',
+        layoutIterations: 32,
+        draggable: true,
+        emphasis: {
+          focus: 'adjacency',
+          lineStyle: {
+            opacity: 0.95,
+          },
+        },
         lineStyle: {
-          color: 'source',
+          color: link_color_mode,
+          curveness: 0.5,
+          opacity: link_opacity,
+        },
+        itemStyle: {
+          borderRadius: enable_3d_effect
+            ? [
+                node_border_radius,
+                node_border_radius,
+                node_border_radius,
+                node_border_radius,
+              ]
+            : 0,
+          borderColor: enable_3d_effect
+            ? 'rgba(255, 255, 255, 0.25)'
+            : 'transparent',
+          borderWidth: enable_3d_effect ? 1 : 0,
+          shadowBlur: enable_3d_effect ? 10 : 0,
+          shadowColor: enable_3d_effect ? 'rgba(0, 0, 0, 0.45)' : 'transparent',
+          shadowOffsetX: enable_3d_effect ? 2 : 0,
+          shadowOffsetY: enable_3d_effect ? 2 : 0,
         },
         links,
         type: 'sankey',

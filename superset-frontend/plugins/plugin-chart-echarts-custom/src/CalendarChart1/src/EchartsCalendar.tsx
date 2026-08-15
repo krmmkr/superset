@@ -1,168 +1,89 @@
 /**
  * Licensed under the Apache License, Version 2.0
- * Superset Calendar Heatmap Plugin - ECharts Calendar React Component
+ * Superset Calendar Heatmap Plugin - Modern React Calendar Component
  *
- * Renders the ECharts calendar heatmap and handles click events
- * to emit date-based crossfilters via setDataMask.
+ * Renders sleek 7-column calendar month grids with customizable dual-line day+metric tiles,
+ * dynamic color scheme gradients, layout orientations, and interactive date cross-filtering.
  */
-import {
-  useRef,
-  useEffect,
-  useCallback,
-  useState,
-  useLayoutEffect,
-} from 'react';
-import { init, use } from 'echarts/core';
-import { HeatmapChart } from 'echarts/charts';
-import { CalendarComponent } from 'echarts/components';
-import {
-  TooltipComponent,
-  VisualMapComponent,
-  VisualMapContinuousComponent,
-  VisualMapPiecewiseComponent,
-} from 'echarts/components';
-import { CanvasRenderer } from 'echarts/renderers';
-import { LabelLayout } from 'echarts/features';
-import type { EChartsType } from 'echarts/core';
+/* eslint-disable theme-colors/no-literal-colors */
+import { useState, useCallback, useRef } from 'react';
 import type { DataMask } from '@superset-ui/core';
-import { CalendarHeatmapTransformedProps } from './types';
-
-// Register required ECharts components — including LabelLayout for labels
-use([
-  CanvasRenderer,
-  HeatmapChart,
-  CalendarComponent,
-  TooltipComponent,
-  VisualMapComponent,
-  VisualMapContinuousComponent,
-  VisualMapPiecewiseComponent,
-  LabelLayout,
-]);
-
-// Simple counter to track renders
-let renderCount = 0;
+import { CalendarHeatmapTransformedProps, CalendarDayData } from './types';
+import {
+  CalendarOrient,
+  VisualMapType,
+  VisualMapOrient,
+  VisualMapPosition,
+} from './constants';
 
 export default function EchartsCalendar(
   props: CalendarHeatmapTransformedProps,
 ) {
   const {
+    months = [],
     width,
     height,
-    echartWidth,
-    echartHeight,
-    echartOptions,
     setDataMask,
     selectedValues,
     emitCrossFilters,
     temporalColumn,
     crossfilterMode,
+    metricLabel,
     refs,
+    cellSize = 34,
+    calendarOrient = CalendarOrient.Horizontal,
+    layoutMode = 'scrollable',
+    showDayLabel = true,
+    dayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+    showMonthLabel = true,
+    showCellLabel = true,
+    showCellDate = true,
+    labelFontSize = 10,
+    dayLabelFontSize = 11,
+    showVisualMap = false,
+    visualMapColors = [],
+    visualMapType = VisualMapType.Continuous,
+    visualMapOrient = VisualMapOrient.Horizontal,
+    visualMapPosition = VisualMapPosition.BottomLeft,
+    formattedMin = '0',
+    formattedMax = '100',
   } = props;
 
-  const divRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<EChartsType>();
-  const [didMount, setDidMount] = useState(false);
-  // Track options changes with a serialized hash for debugging
-
-  // Expose refs if needed by parent
+  const containerRef = useRef<HTMLDivElement>(null);
   if (refs) {
-    refs.divRef = divRef as any;
+    refs.divRef = containerRef as any;
   }
 
-  // ──────────────────────────────────────────────
-  // Resize handler
-  // ──────────────────────────────────────────────
-  const handleSizeChange = useCallback(
-    ({ width: w, height: h }: { width: number; height: number }) => {
-      if (chartRef.current) {
-        chartRef.current.resize({ width: w, height: h });
-      }
-    },
-    [],
+  const [hoveredDay, setHoveredDay] = useState<CalendarDayData | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(
+    null,
   );
 
-  // ──────────────────────────────────────────────
-  // Initialize chart
-  // ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!divRef.current) return;
-    if (!chartRef.current) {
-      chartRef.current = init(divRef.current);
-      console.log('[CalendarHeatmap] ECharts instance created');
-    }
-    handleSizeChange({ width: echartWidth, height: echartHeight });
-    setDidMount(true);
-  }, []); // init once
-
-  // Dispose on unmount
-  useEffect(
-    () => () => {
-      chartRef.current?.dispose();
-      chartRef.current = undefined;
-    },
-    [],
-  );
-
-  // ──────────────────────────────────────────────
-  // Apply options when they change
-  // This is the CRITICAL effect — it must fire whenever
-  // echartOptions changes (new reference from transformProps)
-  // ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!didMount || !chartRef.current) return;
-
-    renderCount += 1;
-    console.log(
-      `[CalendarHeatmap] Applying setOption (render #${renderCount})`,
-    );
-
-    try {
-      // Use notMerge=true to completely replace options
-      chartRef.current.setOption(echartOptions, {
-        notMerge: true,
-        lazyUpdate: false,
-      });
-      console.log('[CalendarHeatmap] setOption succeeded');
-    } catch (e) {
-      console.error('[CalendarHeatmap] setOption failed:', e);
-    }
-  }, [didMount, echartOptions]);
-
-  // ──────────────────────────────────────────────
-  // Resize on dimension changes
-  // ──────────────────────────────────────────────
-  useLayoutEffect(() => {
-    handleSizeChange({ width: echartWidth, height: echartHeight });
-  }, [echartWidth, echartHeight, handleSizeChange]);
+  const selectedDates = Object.values(selectedValues || {});
 
   // ──────────────────────────────────────────────
   // Cross-filter click handler
   // ──────────────────────────────────────────────
-  const handleClick = useCallback(
-    (params: any) => {
+  const handleDayClick = useCallback(
+    (day: CalendarDayData) => {
       if (!emitCrossFilters || !setDataMask) return;
 
-      const dataItem = params?.data;
-      if (!dataItem || !Array.isArray(dataItem)) return;
-
-      const dateStr = dataItem[0];
-
-      const currentlySelected = Object.values(selectedValues || {});
-      const isSelected = currentlySelected.includes(dateStr);
+      const { dateStr } = day;
+      const isSelected = selectedDates.includes(dateStr);
 
       if (isSelected) {
+        // Clear filter
         const dataMask: DataMask = {
           extraFormData: { time_range: undefined, filters: [] } as any,
           filterState: { value: null, selectedValues: null },
         };
         setDataMask(dataMask);
       } else {
+        // Apply filter
         const isCategorical = crossfilterMode === 'string';
         const extraFormData: any = {};
 
         if (isCategorical) {
-          // String Mode: Do NOT emit a time_range at all.
-          // Just emit a standard column filter so Jinja templates can capture the raw string!
           extraFormData.time_range = undefined;
           extraFormData.filters = [
             {
@@ -172,7 +93,6 @@ export default function EchartsCalendar(
             },
           ];
         } else {
-          // Temporal Mode: Native Superset override
           extraFormData.time_range = `${dateStr} : ${dateStr}T23:59:59`;
           extraFormData.filters = [
             {
@@ -196,69 +116,327 @@ export default function EchartsCalendar(
     [
       emitCrossFilters,
       setDataMask,
-      selectedValues,
-      temporalColumn,
+      selectedDates,
       crossfilterMode,
+      temporalColumn,
     ],
   );
 
-  // ──────────────────────────────────────────────
-  // Register event handlers
-  // ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!didMount || !chartRef.current) return;
-    chartRef.current.off('click');
-    chartRef.current.on('click', handleClick);
-  }, [didMount, handleClick]);
+  const isVertical = calendarOrient === CalendarOrient.Vertical;
+  const tileHeight =
+    showCellLabel && showCellDate ? Math.round(cellSize * 1.22) : cellSize;
 
-  // ──────────────────────────────────────────────
-  // Highlighting
-  // ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!chartRef.current || !didMount) return;
-
-    const selected = Object.values(selectedValues || {});
-    if (selected.length === 0) {
-      chartRef.current.dispatchAction({ type: 'downplay' });
-    } else {
-      chartRef.current.dispatchAction({ type: 'downplay' });
-      // Find data indices for highlighting
-      const option = chartRef.current.getOption() as any;
-      const seriesArr = Array.isArray(option?.series)
-        ? option.series
-        : [option?.series].filter(Boolean);
-      seriesArr.forEach((_series: any, seriesIdx: number) => {
-        const sData = _series?.data || [];
-        const matchingIndices: number[] = [];
-        sData.forEach((item: any, dataIdx: number) => {
-          const ds = Array.isArray(item) ? item[0] : null;
-          if (ds && selected.includes(ds)) {
-            matchingIndices.push(dataIdx);
-          }
-        });
-        if (matchingIndices.length > 0) {
-          chartRef.current!.dispatchAction({
-            type: 'highlight',
-            seriesIndex: seriesIdx,
-            dataIndex: matchingIndices,
-          });
-        }
-      });
+  // Visual Map Legend Component
+  const renderVisualMapLegend = () => {
+    if (!showVisualMap || !visualMapColors || visualMapColors.length === 0) {
+      return null;
     }
-  }, [selectedValues, didMount]);
+
+    const isLegendVertical = visualMapOrient === VisualMapOrient.Vertical;
+    const isPiecewise = visualMapType === VisualMapType.Piecewise;
+
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: isLegendVertical ? 'column' : 'row',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 12px',
+          backgroundColor: 'rgba(255, 255, 255, 0.03)',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          fontSize: '11px',
+          color: '#9ca3af',
+          width: 'fit-content',
+        }}
+      >
+        <span>{formattedMin}</span>
+        {isPiecewise ? (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: isLegendVertical ? 'column-reverse' : 'row',
+              gap: '2px',
+            }}
+          >
+            {visualMapColors.map((c, i) => (
+              <div
+                key={`${c}-${i}`}
+                style={{
+                  width: isLegendVertical ? '14px' : '18px',
+                  height: isLegendVertical ? '14px' : '10px',
+                  backgroundColor: c,
+                  borderRadius: '2px',
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div
+            style={{
+              width: isLegendVertical ? '10px' : '120px',
+              height: isLegendVertical ? '100px' : '10px',
+              borderRadius: '4px',
+              background: isLegendVertical
+                ? `linear-gradient(to top, ${visualMapColors.join(', ')})`
+                : `linear-gradient(to right, ${visualMapColors.join(', ')})`,
+            }}
+          />
+        )}
+        <span>{formattedMax}</span>
+      </div>
+    );
+  };
+
+  const isLegendTop =
+    visualMapPosition === VisualMapPosition.TopLeft ||
+    visualMapPosition === VisualMapPosition.TopRight;
+  const isLegendRight =
+    visualMapPosition === VisualMapPosition.TopRight ||
+    visualMapPosition === VisualMapPosition.BottomRight;
 
   return (
     <div
-      style={{ width: `${width}px`, height: `${height}px`, overflow: 'auto' }}
+      ref={containerRef}
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        overflow: 'auto',
+        backgroundColor: 'transparent',
+        padding: '16px 20px',
+        boxSizing: 'border-box',
+        fontFamily:
+          "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        color: '#f3f4f6',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+      }}
     >
+      {/* Top Legend if selected */}
+      {showVisualMap && isLegendTop && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: isLegendRight ? 'flex-end' : 'flex-start',
+            marginBottom: '4px',
+          }}
+        >
+          {renderVisualMapLegend()}
+        </div>
+      )}
+
+      {/* Month Grids Container */}
       <div
-        ref={divRef}
         style={{
-          width: `${echartWidth}px`,
-          height: `${echartHeight}px`,
-          position: 'relative',
+          display: 'flex',
+          flexDirection: isVertical ? 'column' : 'row',
+          flexWrap: layoutMode === 'fit' ? 'nowrap' : 'wrap',
+          gap: `${Math.max(16, Math.round(cellSize * 0.7))}px`,
+          justifyContent: 'flex-start',
+          alignItems: isVertical ? 'center' : 'flex-start',
         }}
-      />
+      >
+        {months.map(m => (
+          <div
+            key={`${m.year}-${m.month}`}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              minWidth: `${7 * cellSize + 28}px`,
+            }}
+          >
+            {/* Month & Year Title */}
+            {showMonthLabel && (
+              <div
+                style={{
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#f3f4f6',
+                  textAlign: 'center',
+                  marginBottom: '10px',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {m.monthName}
+              </div>
+            )}
+
+            {/* Weekday Row */}
+            {showDayLabel && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(7, ${cellSize}px)`,
+                  gap: '4px',
+                  marginBottom: '6px',
+                  justifyContent: 'center',
+                }}
+              >
+                {dayLabels.map((w, i) => (
+                  <div
+                    key={`${w}-${i}`}
+                    style={{
+                      fontSize: `${Math.max(9, Math.round(cellSize * 0.32))}px`,
+                      fontWeight: 500,
+                      color: '#9ca3af',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {w}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 7-Column Day Matrix */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(7, ${cellSize}px)`,
+                gap: '4px',
+                justifyContent: 'center',
+              }}
+            >
+              {m.days.map((day, dIdx) => {
+                if (!day) {
+                  return (
+                    <div
+                      key={`empty-${dIdx}`}
+                      style={{
+                        width: `${cellSize}px`,
+                        height: `${tileHeight}px`,
+                        visibility: 'hidden',
+                      }}
+                    />
+                  );
+                }
+
+                const isSelected = selectedDates.includes(day.dateStr);
+
+                return (
+                  <div
+                    key={day.dateStr}
+                    onClick={() => handleDayClick(day)}
+                    onMouseEnter={e => {
+                      setHoveredDay(day);
+                      setTooltipPos({ x: e.clientX, y: e.clientY });
+                    }}
+                    onMouseMove={e => {
+                      setTooltipPos({ x: e.clientX, y: e.clientY });
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredDay(null);
+                      setTooltipPos(null);
+                    }}
+                    style={{
+                      width: `${cellSize}px`,
+                      height: `${tileHeight}px`,
+                      borderRadius: `${Math.max(4, Math.round(cellSize * 0.16))}px`,
+                      backgroundColor: day.color,
+                      border: isSelected
+                        ? '2px solid #38bdf8'
+                        : '1px solid rgba(255, 255, 255, 0.05)',
+                      boxShadow: isSelected
+                        ? '0 0 10px rgba(56, 189, 248, 0.5)'
+                        : 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition:
+                        'transform 0.15s ease, filter 0.15s ease, border-color 0.15s ease',
+                      transform: isSelected ? 'scale(1.06)' : 'scale(1)',
+                      userSelect: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {/* Day of Month */}
+                    {showCellDate && (
+                      <span
+                        style={{
+                          fontSize: `${dayLabelFontSize}px`,
+                          fontWeight: 500,
+                          color: day.textColor || '#ffffff',
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        {day.dayOfMonth}
+                      </span>
+                    )}
+
+                    {/* Metric Value */}
+                    {showCellLabel && (
+                      <span
+                        style={{
+                          fontSize: `${labelFontSize}px`,
+                          fontWeight: 600,
+                          color: day.textColor || '#ffffff',
+                          opacity: day.value != null ? 0.95 : 0.4,
+                          lineHeight: 1.1,
+                          marginTop: showCellDate ? '2px' : '0px',
+                          maxWidth: '100%',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {day.value != null ? day.formattedValue : ''}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom Legend if selected */}
+      {showVisualMap && !isLegendTop && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: isLegendRight ? 'flex-end' : 'flex-start',
+            marginTop: '8px',
+          }}
+        >
+          {renderVisualMapLegend()}
+        </div>
+      )}
+
+      {/* Floating Tooltip */}
+      {hoveredDay && tooltipPos && (
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x + 12,
+            top: tooltipPos.y + 12,
+            backgroundColor: '#1f222a',
+            border: '1px solid #2f333d',
+            borderRadius: '8px',
+            padding: '8px 12px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            fontSize: '12px',
+          }}
+        >
+          <div
+            style={{ fontWeight: 600, color: '#f3f4f6', marginBottom: '2px' }}
+          >
+            {hoveredDay.dateStr}
+          </div>
+          <div style={{ color: '#9ca3af' }}>
+            {metricLabel || 'Value'}:{' '}
+            <span style={{ color: '#38bdf8', fontWeight: 600 }}>
+              {hoveredDay.value != null ? hoveredDay.formattedValue : '0'}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

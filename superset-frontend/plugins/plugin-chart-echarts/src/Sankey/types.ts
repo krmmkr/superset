@@ -28,6 +28,18 @@ export type SankeyFormData = QueryFormData & {
   metric: QueryFormMetric;
   source: QueryFormColumn;
   target: QueryFormColumn;
+  link_color_mode?: 'gradient' | 'source' | 'target';
+  linkColorMode?: 'gradient' | 'source' | 'target';
+  enable_3d_effect?: boolean;
+  enable3dEffect?: boolean;
+  node_width?: number;
+  nodeWidth?: number;
+  node_gap?: number;
+  nodeGap?: number;
+  node_border_radius?: number;
+  nodeBorderRadius?: number;
+  link_opacity?: number;
+  linkOpacity?: number;
 };
 
 export interface SankeyChartProps extends BaseChartProps<SankeyFormData> {

@@ -8,7 +8,8 @@ import transformProps from '../../src/CalendarChart1/src/transformProps';
 import { CalendarHeatmapChartProps } from '../../src/CalendarChart1/src/types';
 
 describe('Echarts Calendar Heatmap transformProps', () => {
-  const getChartProps = (formOverrides = {}, data: any[] = []) => new ChartProps({
+  const getChartProps = (formOverrides = {}, data: any[] = []) =>
+    new ChartProps({
       formData: {
         colorScheme: 'bnbColors',
         datasource: '3__table',
@@ -61,6 +62,15 @@ describe('Echarts Calendar Heatmap transformProps', () => {
     });
     expect(tooltipHtml).toContain('2026-03-01');
     expect(tooltipHtml).toContain('100');
+
+    // Verify React calendar months structure
+    expect(result.months).toBeDefined();
+    expect(result.months.length).toBeGreaterThanOrEqual(1);
+    expect(result.months[0].monthName).toContain('2026');
+    const day1 = result.months[0].days.find(d => d?.dateStr === '2026-03-01');
+    expect(day1).toBeDefined();
+    expect(day1?.value).toBe(100);
+    expect(day1?.dayOfMonth).toBe(1);
   });
 
   test('should handle categorical (text) data correctly', () => {
@@ -92,5 +102,44 @@ describe('Echarts Calendar Heatmap transformProps', () => {
     });
     expect(tooltipHtml).toContain('2026-03-01');
     expect(tooltipHtml).toContain('Success');
+  });
+
+  test('should propagate customization controls properly', () => {
+    const chartProps = getChartProps(
+      {
+        cell_size: 42,
+        calendar_orient: 'vertical',
+        layout_mode: 'scrollable',
+        show_day_label: false,
+        show_month_label: true,
+        show_cell_label: true,
+        show_cell_date: false,
+        label_font_size: 14,
+        day_label_font_size: 12,
+        show_visual_map: true,
+        visual_map_type: 'piecewise',
+        piecewise_num: 4,
+        visual_map_min: 50,
+        visual_map_max: 500,
+      },
+      [
+        { ds: '2026-03-01', count: 100 },
+        { ds: '2026-03-02', count: 400 },
+      ],
+    );
+
+    const result = transformProps(chartProps);
+    expect(result.cellSize).toBe(42);
+    expect(result.calendarOrient).toBe('vertical');
+    expect(result.layoutMode).toBe('scrollable');
+    expect(result.showDayLabel).toBe(false);
+    expect(result.showCellDate).toBe(false);
+    expect(result.showCellLabel).toBe(true);
+    expect(result.labelFontSize).toBe(14);
+    expect(result.dayLabelFontSize).toBe(12);
+    expect(result.showVisualMap).toBe(true);
+    expect(result.visualMapMin).toBe(50);
+    expect(result.visualMapMax).toBe(500);
+    expect(result.visualMapColors.length).toBe(4);
   });
 });

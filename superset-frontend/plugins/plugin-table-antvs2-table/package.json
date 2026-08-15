@@ -11,8 +11,8 @@
     "src"
   ],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && tsc --project tsconfig.build.esm.json",
-    "dev": "tsc --project tsconfig.build.json --watch"
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch"
   },
   "author": "Superset",
   "license": "Apache-2.0",

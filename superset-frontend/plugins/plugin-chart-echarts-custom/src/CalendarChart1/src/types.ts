@@ -4,6 +4,7 @@
  */
 import {
   ChartProps,
+  DataRecord,
   QueryFormColumn,
   SetDataMaskHook,
   ChartDataResponseResult,
@@ -84,6 +85,26 @@ export type Refs = {
   divRef?: React.RefObject<HTMLDivElement>;
 };
 
+// Data for an individual day tile in the React calendar grid
+export interface CalendarDayData {
+  dateStr: string; // 'YYYY-MM-DD'
+  dayOfMonth: number;
+  value: number | string | null;
+  formattedValue: string;
+  intensity: number; // 0 to 1
+  color: string; // Background color for tile
+  textColor: string;
+  rawRecord?: DataRecord;
+}
+
+// Data for a month calendar block
+export interface CalendarMonthData {
+  year: number;
+  month: number; // 0-11
+  monthName: string; // 'Jun 2026'
+  days: (CalendarDayData | null)[]; // 7-column array with null for leading/trailing empty cells
+}
+
 // Transformed props passed to the React component
 export interface CalendarHeatmapTransformedProps {
   echartOptions: EChartsCoreOption;
@@ -108,4 +129,27 @@ export interface CalendarHeatmapTransformedProps {
   ) => void;
   coltypeMapping?: Record<string, number>;
   setControlValue?: HandlerFunction;
+
+  // React Calendar fields
+  months: CalendarMonthData[];
+  metricLabel: string;
+  cellSize: number;
+  calendarOrient: string;
+  layoutMode: string;
+  showDayLabel: boolean;
+  dayLabels: string[];
+  showMonthLabel: boolean;
+  showCellLabel: boolean;
+  showCellDate: boolean;
+  labelFontSize: number;
+  dayLabelFontSize: number;
+  showVisualMap: boolean;
+  visualMapColors: string[];
+  visualMapMin: number;
+  visualMapMax: number;
+  visualMapType: string;
+  visualMapOrient: string;
+  visualMapPosition: string;
+  formattedMin: string;
+  formattedMax: string;
 }

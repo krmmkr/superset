@@ -1,7 +1,4 @@
-/**
- * Licensed under the Apache License, Version 2.0
- * Superset Calendar Heatmap Plugin - Control Panel
- */
+/* eslint-disable import/no-extraneous-dependencies */
 import { t } from '@apache-superset/core/translation';
 import {
   ControlPanelConfig,
@@ -406,46 +403,6 @@ const config: ControlPanelConfig = {
               ),
               default: '',
               isFloat: true,
-              renderTrigger: true,
-            },
-          },
-        ],
-      ],
-    },
-
-    // ──────────────────────────────────────────────
-    // CELL STYLING
-    // ──────────────────────────────────────────────
-    {
-      label: t('Cell Styling'),
-      expanded: false,
-      controlSetRows: [
-        [
-          {
-            name: 'cell_border_width',
-            config: {
-              type: 'SliderControl',
-              label: t('Cell Border Width'),
-              description: t('Border width for each day cell.'),
-              default: DEFAULT_FORM_DATA.cellBorderWidth,
-              min: 0,
-              max: 5,
-              step: 0.5,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'cell_border_radius',
-            config: {
-              type: 'SliderControl',
-              label: t('Cell Border Radius'),
-              description: t('Corner rounding for each day cell.'),
-              default: DEFAULT_FORM_DATA.cellBorderRadius,
-              min: 0,
-              max: 15,
-              step: 1,
               renderTrigger: true,
             },
           },
