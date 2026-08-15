@@ -60,6 +60,10 @@ export default function transformProps(
     node_border_radius = nodeBorderRadius,
     linkOpacity = 0.75,
     link_opacity = linkOpacity,
+    blurOpacity = 0.15,
+    blur_opacity = blurOpacity,
+    focusMode = 'adjacency',
+    focus_mode = focusMode,
   } = formData;
   const { data } = queriesData[0];
   const colorFn = CategoricalColorNamespace.getScale(colorScheme);
@@ -153,6 +157,18 @@ export default function transformProps(
     return tooltipHtml(rows, name);
   };
 
+  let maxRightLabelLen = 0;
+  set.forEach(name => {
+    if ((outgoingFlows.get(name) || 0) === 0) {
+      maxRightLabelLen = Math.max(maxRightLabelLen, name.length);
+    }
+  });
+
+  const dynamicRightMargin = Math.max(
+    55,
+    Math.min(260, Math.ceil(maxRightLabelLen * 7.5 + 24)),
+  );
+
   const echartOptions: EChartsOption = {
     series: {
       animation: true,
@@ -162,10 +178,27 @@ export default function transformProps(
       nodeAlign: 'justify',
       layoutIterations: 32,
       draggable: true,
+      left: 14,
+      right: dynamicRightMargin,
+      top: 15,
+      bottom: 15,
       emphasis: {
-        focus: 'adjacency',
+        focus: focus_mode,
+        itemStyle: {
+          shadowBlur: 16,
+          shadowColor: 'rgba(0, 0, 0, 0.7)',
+          opacity: 1,
+        },
         lineStyle: {
           opacity: 0.95,
+        },
+      },
+      blur: {
+        itemStyle: {
+          opacity: blur_opacity,
+        },
+        lineStyle: {
+          opacity: Math.max(0.04, blur_opacity * 0.75),
         },
       },
       lineStyle: {

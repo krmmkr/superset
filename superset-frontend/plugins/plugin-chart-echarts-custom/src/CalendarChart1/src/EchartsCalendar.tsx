@@ -1,3 +1,4 @@
+/* eslint-disable theme-colors/no-literal-colors, import/no-extraneous-dependencies */
 /**
  * Licensed under the Apache License, Version 2.0
  * Superset Calendar Heatmap Plugin - Modern React Calendar Component
@@ -5,8 +6,8 @@
  * Renders sleek 7-column calendar month grids with customizable dual-line day+metric tiles,
  * dynamic color scheme gradients, layout orientations, and interactive date cross-filtering.
  */
-/* eslint-disable theme-colors/no-literal-colors */
 import { useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { DataMask } from '@superset-ui/core';
 import { CalendarHeatmapTransformedProps, CalendarDayData } from './types';
 import {
@@ -47,6 +48,10 @@ export default function EchartsCalendar(
     visualMapPosition = VisualMapPosition.BottomLeft,
     formattedMin = '0',
     formattedMax = '100',
+    textColor = '#f3f4f6',
+    secondaryTextColor = '#9ca3af',
+    borderColor = 'rgba(255, 255, 255, 0.08)',
+    emptyCellColor = 'rgba(128, 128, 128, 0.08)',
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -208,7 +213,7 @@ export default function EchartsCalendar(
         boxSizing: 'border-box',
         fontFamily:
           "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-        color: '#f3f4f6',
+        color: textColor,
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
@@ -251,11 +256,11 @@ export default function EchartsCalendar(
             {showMonthLabel && (
               <div
                 style={{
-                  fontSize: '15px',
+                  fontSize: '12px',
                   fontWeight: 600,
-                  color: '#f3f4f6',
+                  color: textColor,
                   textAlign: 'center',
-                  marginBottom: '10px',
+                  marginBottom: '8px',
                   letterSpacing: '-0.01em',
                 }}
               >
@@ -280,7 +285,7 @@ export default function EchartsCalendar(
                     style={{
                       fontSize: `${Math.max(9, Math.round(cellSize * 0.32))}px`,
                       fontWeight: 500,
-                      color: '#9ca3af',
+                      color: secondaryTextColor,
                       textAlign: 'center',
                     }}
                   >
@@ -334,10 +339,10 @@ export default function EchartsCalendar(
                       width: `${cellSize}px`,
                       height: `${tileHeight}px`,
                       borderRadius: `${Math.max(4, Math.round(cellSize * 0.16))}px`,
-                      backgroundColor: day.color,
+                      backgroundColor: day.color || emptyCellColor,
                       border: isSelected
                         ? '2px solid #38bdf8'
-                        : '1px solid rgba(255, 255, 255, 0.05)',
+                        : `1px solid ${borderColor}`,
                       boxShadow: isSelected
                         ? '0 0 10px rgba(56, 189, 248, 0.5)'
                         : 'none',
@@ -407,36 +412,80 @@ export default function EchartsCalendar(
         </div>
       )}
 
-      {/* Floating Tooltip */}
-      {hoveredDay && tooltipPos && (
-        <div
-          style={{
-            position: 'fixed',
-            left: tooltipPos.x + 12,
-            top: tooltipPos.y + 12,
-            backgroundColor: '#1f222a',
-            border: '1px solid #2f333d',
-            borderRadius: '8px',
-            padding: '8px 12px',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
-            zIndex: 9999,
-            pointerEvents: 'none',
-            fontSize: '12px',
-          }}
-        >
+      {/* Floating Tooltip mounted to document.body to prevent dashboard tile transform offset */}
+      {hoveredDay &&
+        tooltipPos &&
+        createPortal(
           <div
-            style={{ fontWeight: 600, color: '#f3f4f6', marginBottom: '2px' }}
+            style={{
+              position: 'fixed',
+              left: tooltipPos.x + 14,
+              top: tooltipPos.y + 14,
+              backgroundColor: '#1f222a',
+              border: `1px solid ${borderColor}`,
+              borderRadius: '8px',
+              padding: '8px 12px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+              zIndex: 99999,
+              pointerEvents: 'none',
+              fontSize: '12px',
+              minWidth: '130px',
+            }}
           >
-            {hoveredDay.dateStr}
-          </div>
-          <div style={{ color: '#9ca3af' }}>
-            {metricLabel || 'Value'}:{' '}
-            <span style={{ color: '#38bdf8', fontWeight: 600 }}>
-              {hoveredDay.value != null ? hoveredDay.formattedValue : '0'}
-            </span>
-          </div>
-        </div>
-      )}
+            <div
+              style={{
+                fontWeight: 600,
+                color: '#f3f4f6',
+                marginBottom: '4px',
+              }}
+            >
+              {hoveredDay.dateStr}
+            </div>
+            <div
+              style={{
+                color: '#9ca3af',
+                display: 'flex',
+                gap: '8px',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span>{metricLabel || 'Value'}:</span>
+              <span style={{ color: '#38bdf8', fontWeight: 600 }}>
+                {hoveredDay.value != null ? hoveredDay.formattedValue : '0'}
+              </span>
+            </div>
+            {hoveredDay.extraMetrics && hoveredDay.extraMetrics.length > 0 && (
+              <div
+                style={{
+                  marginTop: '4px',
+                  paddingTop: '4px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                }}
+              >
+                {hoveredDay.extraMetrics.map(item => (
+                  <div
+                    key={item.label}
+                    style={{
+                      color: '#9ca3af',
+                      display: 'flex',
+                      gap: '8px',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>{item.label}:</span>
+                    <span style={{ color: '#f3f4f6', fontWeight: 500 }}>
+                      {item.formattedValue}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

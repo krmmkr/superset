@@ -71,6 +71,10 @@ export interface CalendarHeatmapFormData extends QueryFormData {
   // Crossfilter
   emitFilter: boolean;
   crossfilterMode: string;
+
+  // Tooltip Extra Columns / Metrics
+  tooltip_metrics?: any;
+  tooltipMetrics?: any;
 }
 
 // Chart props as received from Superset
@@ -85,6 +89,13 @@ export type Refs = {
   divRef?: React.RefObject<HTMLDivElement>;
 };
 
+// Extra metric/column data shown in hover tooltip
+export interface CalendarExtraMetric {
+  label: string;
+  value: any;
+  formattedValue: string;
+}
+
 // Data for an individual day tile in the React calendar grid
 export interface CalendarDayData {
   dateStr: string; // 'YYYY-MM-DD'
@@ -95,6 +106,7 @@ export interface CalendarDayData {
   color: string; // Background color for tile
   textColor: string;
   rawRecord?: DataRecord;
+  extraMetrics?: CalendarExtraMetric[];
 }
 
 // Data for a month calendar block
@@ -152,4 +164,8 @@ export interface CalendarHeatmapTransformedProps {
   visualMapPosition: string;
   formattedMin: string;
   formattedMax: string;
+  textColor?: string;
+  secondaryTextColor?: string;
+  borderColor?: string;
+  emptyCellColor?: string;
 }

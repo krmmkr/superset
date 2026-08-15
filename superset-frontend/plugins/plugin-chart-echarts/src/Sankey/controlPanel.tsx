@@ -72,6 +72,41 @@ const config: ControlPanelConfig = {
         ['color_scheme'],
         [
           {
+            name: 'layout_mode',
+            config: {
+              type: 'SelectControl',
+              label: t('Layout Mode'),
+              default: 'fit',
+              choices: [
+                ['fit', t('Fit to Width')],
+                ['scrollable', t('Scrollable (Maintain Min Width)')],
+              ],
+              renderTrigger: true,
+              description: t(
+                'Fit to Width scales the diagram into the card. Scrollable enables horizontal scrolling when the diagram exceeds the minimum width.',
+              ),
+            },
+          },
+        ],
+        [
+          {
+            name: 'min_width',
+            config: {
+              type: 'SliderControl',
+              label: t('Minimum Diagram Width (px)'),
+              default: 600,
+              min: 300,
+              max: 2000,
+              step: 50,
+              renderTrigger: true,
+              description: t(
+                'Minimum width in pixels before horizontal scrollbar appears in scrollable mode.',
+              ),
+            },
+          },
+        ],
+        [
+          {
             name: 'link_color_mode',
             config: {
               type: 'SelectControl',
@@ -160,6 +195,42 @@ const config: ControlPanelConfig = {
               step: 0.05,
               renderTrigger: true,
               description: t('Opacity of the flow ribbons.'),
+            },
+          },
+        ],
+        [
+          {
+            name: 'blur_opacity',
+            config: {
+              type: 'SliderControl',
+              label: t('Hover Inactive Elements Opacity'),
+              default: 0.15,
+              min: 0.0,
+              max: 0.8,
+              step: 0.05,
+              renderTrigger: true,
+              description: t(
+                'Controls the opacity of non-focused nodes and ribbons when hovering over a specific bar or flow.',
+              ),
+            },
+          },
+        ],
+        [
+          {
+            name: 'focus_mode',
+            config: {
+              type: 'SelectControl',
+              label: t('Hover Focus Mode'),
+              default: 'adjacency',
+              choices: [
+                ['adjacency', t('Direct Connections (Adjacency)')],
+                ['trajectory', t('Full Flow Path (Trajectory)')],
+                ['series', t('All Elements in Series')],
+              ],
+              renderTrigger: true,
+              description: t(
+                'Choose whether hovering highlights only direct adjacent connections or the entire multi-stage path.',
+              ),
             },
           },
         ],

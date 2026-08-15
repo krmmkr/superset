@@ -15,6 +15,7 @@ import {
   CalendarHeatmapTransformedProps,
   CalendarDayData,
   CalendarMonthData,
+  CalendarExtraMetric,
   Refs,
 } from './types';
 import {
@@ -1134,6 +1135,30 @@ export default function transformProps(
         textColor = getContrastTextColor(color);
       }
 
+      const extraMetrics: CalendarExtraMetric[] = [];
+      if (raw) {
+        Object.keys(raw).forEach(k => {
+          if (
+            k !== temporalColumn &&
+            k !== metricLabel &&
+            k !== metricColName &&
+            raw[k] !== undefined &&
+            raw[k] !== null
+          ) {
+            const rawVal = raw[k];
+            const formattedVal =
+              typeof rawVal === 'number'
+                ? numberFormatter(rawVal)
+                : String(rawVal);
+            extraMetrics.push({
+              label: k,
+              value: rawVal,
+              formattedValue: formattedVal,
+            });
+          }
+        });
+      }
+
       days.push({
         dateStr,
         dayOfMonth: day,
@@ -1143,6 +1168,7 @@ export default function transformProps(
         color,
         textColor,
         rawRecord: raw,
+        extraMetrics,
       });
     }
 
@@ -1255,5 +1281,9 @@ export default function transformProps(
     visualMapPosition,
     formattedMin: numberFormatter(resolvedMin),
     formattedMax: numberFormatter(resolvedMax),
+    textColor: theme?.colorText || '#f3f4f6',
+    secondaryTextColor: theme?.colorTextSecondary || '#9ca3af',
+    borderColor: theme?.colorBorderSecondary || 'rgba(255, 255, 255, 0.08)',
+    emptyCellColor: theme?.colorFillQuaternary || 'rgba(128, 128, 128, 0.08)',
   };
 }

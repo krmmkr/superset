@@ -142,4 +142,34 @@ describe('Echarts Calendar Heatmap transformProps', () => {
     expect(result.visualMapMax).toBe(500);
     expect(result.visualMapColors.length).toBe(4);
   });
+
+  test('should extract extra tooltip metrics from row data', () => {
+    const chartProps = getChartProps(
+      {
+        tooltip_metrics: ['min_val', 'status_list'],
+      },
+      [
+        {
+          ds: '2026-03-01',
+          count: 150,
+          min_val: 10,
+          status_list: 'Active, Pending',
+        },
+      ],
+    );
+
+    const result = transformProps(chartProps);
+    const day = result.months[0].days.find(d => d?.dateStr === '2026-03-01');
+    expect(day).toBeDefined();
+    expect(day?.extraMetrics).toBeDefined();
+    expect(day?.extraMetrics?.length).toBe(2);
+
+    const minMetric = day?.extraMetrics?.find(m => m.label === 'min_val');
+    expect(minMetric?.value).toBe(10);
+
+    const statusMetric = day?.extraMetrics?.find(
+      m => m.label === 'status_list',
+    );
+    expect(statusMetric?.value).toBe('Active, Pending');
+  });
 });

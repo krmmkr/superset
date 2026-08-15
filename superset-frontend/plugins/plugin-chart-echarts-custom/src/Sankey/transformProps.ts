@@ -112,6 +112,14 @@ export default function transformProps(
   const link_opacity = Number(
     formData.link_opacity ?? formData.linkOpacity ?? 0.75,
   );
+  const blur_opacity = Number(
+    formData.blur_opacity ??
+      formData.blurOpacity ??
+      formData.inactive_opacity ??
+      formData.inactiveOpacity ??
+      0.15,
+  );
+  const focus_mode = formData.focus_mode ?? formData.focusMode ?? 'adjacency';
 
   const { data } = queriesData[0];
   const colorFn = CategoricalColorNamespace.getScale(colorScheme);
@@ -191,10 +199,18 @@ export default function transformProps(
     nodeValues.set(nodeName, Math.max(totalIncoming, totalOutgoing));
   });
 
+  let maxRightLabelLen = 0;
+  const lastStageSuffix = `(stage ${columns.length - 1})`;
+
   const seriesData: NonNullable<SankeySeriesOption['data']> = Array.from(
     set,
   ).map(name => {
     let displayName = String(name).replace(/ \(stage \d+\)$/, '');
+    const isRightmostStage =
+      columns.length > 0
+        ? String(name).endsWith(lastStageSuffix)
+        : (outgoingFlows.get(name) || 0) === 0;
+
     if (show_label_percentage) {
       const match = String(name).match(/ \(stage (\d+)\)$/);
       if (match) {
@@ -222,6 +238,11 @@ export default function transformProps(
         }
       }
     }
+
+    if (isRightmostStage) {
+      maxRightLabelLen = Math.max(maxRightLabelLen, displayName.length);
+    }
+
     return {
       name,
       itemStyle: {
@@ -252,6 +273,12 @@ export default function transformProps(
       },
     };
   });
+
+  // Calculate dynamic right margin based on rightmost labels to prevent clipping
+  const dynamicRightMargin = Math.max(
+    55,
+    Math.min(260, Math.ceil(maxRightLabelLen * 7.5 + 24)),
+  );
 
   const tooltipFormatter = (params: CallbackDataParams) => {
     const { name, data } = params;
@@ -318,10 +345,27 @@ export default function transformProps(
         nodeAlign: 'justify',
         layoutIterations: 32,
         draggable: true,
+        left: 14,
+        right: dynamicRightMargin,
+        top: 15,
+        bottom: 15,
         emphasis: {
-          focus: 'adjacency',
+          focus: focus_mode,
+          itemStyle: {
+            shadowBlur: 16,
+            shadowColor: 'rgba(0, 0, 0, 0.7)',
+            opacity: 1,
+          },
           lineStyle: {
             opacity: 0.95,
+          },
+        },
+        blur: {
+          itemStyle: {
+            opacity: blur_opacity,
+          },
+          lineStyle: {
+            opacity: Math.max(0.04, blur_opacity * 0.75),
           },
         },
         lineStyle: {

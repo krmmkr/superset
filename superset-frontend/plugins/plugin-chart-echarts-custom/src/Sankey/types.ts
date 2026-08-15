@@ -57,6 +57,16 @@ export type SankeyFormData = QueryFormData & {
   nodeBorderRadius?: number;
   link_opacity?: number;
   linkOpacity?: number;
+  layout_mode?: 'fit' | 'scrollable';
+  layoutMode?: 'fit' | 'scrollable';
+  min_width?: number;
+  minWidth?: number;
+  blur_opacity?: number;
+  blurOpacity?: number;
+  inactive_opacity?: number;
+  inactiveOpacity?: number;
+  focus_mode?: 'adjacency' | 'trajectory' | 'series';
+  focusMode?: 'adjacency' | 'trajectory' | 'series';
 };
 
 export interface SankeyChartProps extends BaseChartProps<SankeyFormData> {

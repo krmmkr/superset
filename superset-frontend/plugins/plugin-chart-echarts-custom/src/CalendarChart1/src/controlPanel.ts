@@ -29,6 +29,19 @@ const config: ControlPanelConfig = {
         ['time_range'],
         ['time_grain_sqla'],
         ['metrics'],
+        [
+          {
+            name: 'tooltip_metrics',
+            config: {
+              ...sharedControls.metrics,
+              label: t('Tooltip Extra Columns / Metrics'),
+              description: t(
+                'Add extra aggregated columns or SQL expressions (e.g., listagg(status, ", "), min(val), max(val), count(distinct id)) to show in the date cell hover tooltip.',
+              ),
+              default: [],
+            },
+          },
+        ],
         ['adhoc_filters'],
         ['row_limit'],
       ],
@@ -102,37 +115,6 @@ const config: ControlPanelConfig = {
               max: 50,
               step: 1,
               renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'show_month_separator',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show Month Separators'),
-              description: t('Draw lines between months.'),
-              default: DEFAULT_FORM_DATA.showMonthSeparator,
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'month_separator_width',
-            config: {
-              type: 'SliderControl',
-              label: t('Month Separator Width'),
-              description: t(
-                'Width of the month separator lines. High values natively push all cells apart in ECharts.',
-              ),
-              default: DEFAULT_FORM_DATA.monthSeparatorWidth,
-              min: 1,
-              max: 5,
-              step: 1,
-              renderTrigger: true,
-              visibility: ({ controls }: any) =>
-                controls?.show_month_separator?.value === true,
             },
           },
         ],

@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 /**
  * Licensed under the Apache License, Version 2.0
  * Superset Calendar Heatmap Plugin - Build Query
@@ -9,7 +10,29 @@ import {
 } from '@superset-ui/core';
 
 export default function buildQuery(formData: QueryFormData) {
-  const { metrics = [] } = formData as any;
+  const {
+    metrics = [],
+    tooltip_metrics: tooltipMetricsSnake = [],
+    tooltipMetrics = [],
+  } = formData as any;
+  const rawMetricsList = [
+    ...(Array.isArray(metrics) ? metrics : [metrics]),
+    ...(Array.isArray(tooltipMetricsSnake)
+      ? tooltipMetricsSnake
+      : [tooltipMetricsSnake]),
+    ...(Array.isArray(tooltipMetrics) ? tooltipMetrics : [tooltipMetrics]),
+  ].filter(Boolean);
+
+  const seenLabels = new Set<string>();
+  const allMetrics = rawMetricsList.filter(m => {
+    const label =
+      typeof m === 'object' && m !== null
+        ? m.label || m.column_name || JSON.stringify(m)
+        : String(m);
+    if (seenLabels.has(label)) return false;
+    seenLabels.add(label);
+    return true;
+  });
 
   let parsedGranularity = formData.granularity_sqla;
   let isCustomSql = false;
@@ -45,18 +68,18 @@ export default function buildQuery(formData: QueryFormData) {
   };
 
   return buildQueryContext(updatedFormData, baseQueryObject => [
-      {
-        ...baseQueryObject,
-        metrics: metrics.length ? metrics : [],
-        // Modern Echarts Approach: If Custom SQL, treat it as a generic grouping column
-        columns: isCustomSql
-          ? [
-              parsedGranularity as QueryFormColumn,
-              ...(baseQueryObject.columns || []),
-            ]
-          : baseQueryObject.columns,
-        // Opt out of legacy `is_timeseries` checks if Custom SQL, so `helpers.py` doesn't enforce physical columns
-        is_timeseries: !isCustomSql,
-      },
-    ]);
+    {
+      ...baseQueryObject,
+      metrics: allMetrics.length ? allMetrics : [],
+      // Modern Echarts Approach: If Custom SQL, treat it as a generic grouping column
+      columns: isCustomSql
+        ? [
+            parsedGranularity as QueryFormColumn,
+            ...(baseQueryObject.columns || []),
+          ]
+        : baseQueryObject.columns,
+      // Opt out of legacy `is_timeseries` checks if Custom SQL, so `helpers.py` doesn't enforce physical columns
+      is_timeseries: !isCustomSql,
+    },
+  ]);
 }

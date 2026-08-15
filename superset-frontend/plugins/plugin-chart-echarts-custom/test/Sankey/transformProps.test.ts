@@ -46,6 +46,10 @@ describe('Echarts Sankey transformProps', () => {
     expect(series.itemStyle.shadowBlur).toBe(10);
     expect(series.nodeWidth).toBe(16);
     expect(series.nodeGap).toBe(16);
+    expect(series.left).toBe(14);
+    expect(series.right).toBeGreaterThanOrEqual(55);
+    expect(series.emphasis.focus).toBe('adjacency');
+    expect(series.blur.itemStyle.opacity).toBe(0.15);
 
     // Check node items
     expect(series.data.length).toBeGreaterThanOrEqual(3);
@@ -72,6 +76,8 @@ describe('Echarts Sankey transformProps', () => {
       node_gap: 20,
       node_border_radius: 10,
       link_opacity: 0.9,
+      blur_opacity: 0.05,
+      focus_mode: 'trajectory',
       enable_3d_effect: true,
     });
     const result = transformProps(customProps);
@@ -80,6 +86,8 @@ describe('Echarts Sankey transformProps', () => {
     expect(series.nodeWidth).toBe(24);
     expect(series.nodeGap).toBe(20);
     expect(series.lineStyle.opacity).toBe(0.9);
+    expect(series.emphasis.focus).toBe('trajectory');
+    expect(series.blur.itemStyle.opacity).toBe(0.05);
     expect(series.itemStyle.borderRadius).toEqual([10, 10, 10, 10]);
   });
 });
