@@ -39,6 +39,8 @@ const config: ControlPanelConfig = {
                 'Add extra aggregated columns or SQL expressions (e.g., listagg(status, ", "), min(val), max(val), count(distinct id)) to show in the date cell hover tooltip.',
               ),
               default: [],
+              validators: [],
+              clearable: true,
             },
           },
         ],
