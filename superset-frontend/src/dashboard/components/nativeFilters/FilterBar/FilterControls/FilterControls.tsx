@@ -556,12 +556,7 @@ const FilterControls: FC<FilterControlsProps> = ({
       };
     });
 
-    return [
-      ...chartCustomizations,
-      ...dividerItems,
-      ...crossFilters,
-      ...nativeFiltersInScope,
-    ];
+    return [...nativeFiltersInScope, ...dividerItems, ...chartCustomizations];
   }, [
     filtersInScope,
     renderer,
@@ -576,79 +571,116 @@ const FilterControls: FC<FilterControlsProps> = ({
 
   const renderHorizontalContent = useCallback(
     () => (
-      <div
-        css={(theme: SupersetTheme) => css`
-          padding: 0 ${theme.sizeUnit * 4}px;
-          min-width: 0;
-          flex: 1;
-        `}
-      >
-        <DropdownContainer
-          items={items}
-          dropdownTriggerIcon={
-            <Icons.FilterOutlined
-              css={css`
-                && {
-                  margin-right: -4px;
-                  display: flex;
-                }
-              `}
-            />
-          }
-          dropdownTriggerText={t('More filters')}
-          dropdownTriggerCount={activeOverflowedFiltersInScope.length}
-          dropdownTriggerTooltip={
-            activeOverflowedFiltersInScope.length === 0
-              ? t('No applied filters')
-              : t(
-                  'Applied filters: %s',
-                  activeOverflowedFiltersInScope
-                    .map(filter => filter.name)
-                    .join(', '),
-                )
-          }
-          dropdownContent={
-            overflowedFiltersInScope.length ||
-            overflowedCrossFilters.length ||
-            (filtersOutOfScope.length && showCollapsePanel) ||
-            (customizationsOutOfScope.length && showCustomizationCollapsePanel)
-              ? () => (
-                  <>
-                    <FiltersDropdownContent
-                      overflowedCrossFilters={overflowedCrossFilters}
-                      filtersInScope={overflowedFiltersInScope}
-                      filtersOutOfScope={filtersOutOfScope}
-                      renderer={renderer}
-                      rendererCrossFilter={rendererCrossFilter}
-                      showCollapsePanel={showCollapsePanel}
-                      forceRenderOutOfScope={hasRequiredFirst}
-                    />
-                    {showCustomizationCollapsePanel && (
-                      <CustomizationsOutOfScopeCollapsible
-                        customizationsOutOfScope={customizationsOutOfScope}
-                        renderer={customizationRenderer}
-                        forceRender={false}
-                      />
-                    )}
-                  </>
-                )
-              : undefined
-          }
-          forceRender={hasRequiredFirst}
-          ref={popoverRef}
-          onOverflowingStateChange={({ overflowed: nextOverflowedIds }) => {
-            if (
-              nextOverflowedIds.length !== overflowedIds.length ||
-              overflowedIds.reduce(
-                (a, b, i) => a || b !== nextOverflowedIds[i],
-                false,
-              )
-            ) {
-              setOverflowedIds(nextOverflowedIds);
+      <>
+        <div
+          css={(theme: SupersetTheme) => css`
+            padding: 0 ${theme.sizeUnit * 4}px;
+            min-width: 0;
+            flex: 1;
+          `}
+        >
+          <DropdownContainer
+            items={items}
+            dropdownTriggerIcon={
+              <Icons.FilterOutlined
+                css={css`
+                  && {
+                    margin-right: -4px;
+                    display: flex;
+                  }
+                `}
+              />
             }
-          }}
-        />
-      </div>
+            dropdownTriggerText={t('More filters')}
+            dropdownTriggerCount={activeOverflowedFiltersInScope.length}
+            dropdownTriggerTooltip={
+              activeOverflowedFiltersInScope.length === 0
+                ? t('No applied filters')
+                : t(
+                    'Applied filters: %s',
+                    activeOverflowedFiltersInScope
+                      .map(filter => filter.name)
+                      .join(', '),
+                  )
+            }
+            dropdownContent={
+              overflowedFiltersInScope.length ||
+              (filtersOutOfScope.length && showCollapsePanel) ||
+              (customizationsOutOfScope.length &&
+                showCustomizationCollapsePanel)
+                ? () => (
+                    <>
+                      <FiltersDropdownContent
+                        overflowedCrossFilters={[]}
+                        filtersInScope={overflowedFiltersInScope}
+                        filtersOutOfScope={filtersOutOfScope}
+                        renderer={renderer}
+                        rendererCrossFilter={rendererCrossFilter}
+                        showCollapsePanel={showCollapsePanel}
+                        forceRenderOutOfScope={hasRequiredFirst}
+                      />
+                      {showCustomizationCollapsePanel && (
+                        <CustomizationsOutOfScopeCollapsible
+                          customizationsOutOfScope={customizationsOutOfScope}
+                          renderer={customizationRenderer}
+                          forceRender={false}
+                        />
+                      )}
+                    </>
+                  )
+                : undefined
+            }
+            forceRender={hasRequiredFirst}
+            ref={popoverRef}
+            onOverflowingStateChange={({ overflowed: nextOverflowedIds }) => {
+              if (
+                nextOverflowedIds.length !== overflowedIds.length ||
+                overflowedIds.reduce(
+                  (a, b, i) => a || b !== nextOverflowedIds[i],
+                  false,
+                )
+              ) {
+                setOverflowedIds(nextOverflowedIds);
+              }
+            }}
+          />
+        </div>
+        {selectedCrossFilters.length > 0 && (
+          <div
+            css={(theme: SupersetTheme) => css`
+              padding: 0 ${theme.sizeUnit}px;
+              flex-shrink: 0;
+            `}
+          >
+            <DropdownContainer
+              items={[]}
+              dropdownTriggerIcon={
+                <Icons.FilterOutlined
+                  css={css`
+                    && {
+                      margin-right: -4px;
+                      display: flex;
+                    }
+                  `}
+                />
+              }
+              dropdownTriggerText={t('Cross filters')}
+              dropdownTriggerCount={selectedCrossFilters.length}
+              dropdownContent={() => (
+                <FiltersDropdownContent
+                  overflowedCrossFilters={selectedCrossFilters}
+                  filtersInScope={[]}
+                  filtersOutOfScope={[]}
+                  renderer={() => null}
+                  rendererCrossFilter={rendererCrossFilter}
+                  showCollapsePanel={false}
+                  forceRenderOutOfScope={false}
+                />
+              )}
+            />
+          </div>
+        )}
+      </>
     ),
     [
       items,

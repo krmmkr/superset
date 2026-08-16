@@ -130,6 +130,37 @@ export const hydrateDashboard =
         : getEmptyLayout()
     ) as Record<string, LayoutItem | DashboardEntity>;
 
+    // Auto-scale legacy 12-column layouts to 24-column grid
+    const layoutItems = Object.values(layout).filter(
+      item => typeof item === 'object' && item !== null,
+    ) as LayoutItem[];
+    const isExplicit24 = (layout as any).GRID_COLUMN_COUNT === 24;
+    const hasComponentOver12 = layoutItems.some(
+      item =>
+        item.meta &&
+        typeof item.meta.width === 'number' &&
+        item.meta.width > 12,
+    );
+    const hasComponentWithWidth = layoutItems.some(
+      item =>
+        item.meta &&
+        typeof item.meta.width === 'number' &&
+        item.meta.width > 0,
+    );
+
+    if (!isExplicit24 && !hasComponentOver12 && hasComponentWithWidth) {
+      layoutItems.forEach(item => {
+        if (
+          item.meta &&
+          typeof item.meta.width === 'number' &&
+          item.meta.width > 0
+        ) {
+          item.meta.width = Math.min(GRID_COLUMN_COUNT, item.meta.width * 2);
+        }
+      });
+      (layout as any).GRID_COLUMN_COUNT = 24;
+    }
+
     // create a lookup to sync layout names with slice names
     const chartIdToLayoutId: Record<number, string> = {};
     Object.values(layout).forEach(layoutComponent => {
