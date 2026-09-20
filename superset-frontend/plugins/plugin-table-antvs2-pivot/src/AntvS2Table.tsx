@@ -523,6 +523,51 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
     const finalOptions = merge({}, baseOptions, restOptions, userOptions);
 
+    // Merge conditions: cleanly combine baseOptions.conditions (from UI) with any conditions defined in advanced options
+    const advConditions = merge(
+      {},
+      restOptions.conditions || {},
+      userOptions.conditions || {},
+    );
+    if (Object.keys(advConditions).length > 0) {
+      finalOptions.conditions = {
+        background: [
+          ...(baseOptions.conditions?.background || []),
+          ...(advConditions.background || []),
+        ],
+        text: [
+          ...(baseOptions.conditions?.text || []),
+          ...(advConditions.text || []),
+        ],
+        ...(advConditions.icon
+          ? {
+              icon: [
+                ...(baseOptions.conditions?.icon || []),
+                ...advConditions.icon,
+              ],
+            }
+          : {}),
+        ...(advConditions.interval
+          ? {
+              interval: [
+                ...(baseOptions.conditions?.interval || []),
+                ...advConditions.interval,
+              ],
+            }
+          : {}),
+      };
+    }
+
+    // Merge customSVGIcons: preserve built-in SVGs and custom SVGs from UI and advanced options
+    const advCustomSVGIcons =
+      restOptions.customSVGIcons || userOptions.customSVGIcons || [];
+    if (advCustomSVGIcons.length > 0) {
+      finalOptions.customSVGIcons = [
+        ...(baseOptions.customSVGIcons || []),
+        ...advCustomSVGIcons,
+      ];
+    }
+
     // Promote layout/style keys from root of advancedS2OptionsObj or nested options to style block
     const styleKeys = [
       'colCell',
@@ -706,6 +751,11 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         formData.metricsLayout ?? formData.metrics_layout ?? 'columns',
         formData.totalsPosition ?? formData.totals_position ?? 'bottom_right',
         formData.nullPlaceholder ?? formData.null_placeholder ?? '-',
+        JSON.stringify(
+          formData.enhancedConditionalFormatting ||
+            formData.enhanced_conditional_formatting ||
+            [],
+        ),
       ].join('_'),
     [
       isDark,
@@ -752,6 +802,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       formData.totals_position,
       formData.nullPlaceholder,
       formData.null_placeholder,
+      formData.enhancedConditionalFormatting,
+      formData.enhanced_conditional_formatting,
     ],
   );
 

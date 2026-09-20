@@ -28,6 +28,7 @@ import {
   sharedControls,
   ControlStateMapping,
 } from '@superset-ui/chart-controls';
+import EnhancedConditionalFormattingControl from './components/EnhancedConditionalFormattingControl';
 
 const config: ControlPanelConfig = {
   controlPanelSections: [
@@ -582,6 +583,65 @@ const config: ControlPanelConfig = {
                 ['top_left', t('Top / Left')],
               ],
               renderTrigger: true,
+            },
+          },
+        ],
+      ],
+    },
+    {
+      label: t('Conditional Formatting'),
+      expanded: true,
+      controlSetRows: [
+        [
+          {
+            name: 'enhanced_conditional_formatting',
+            config: {
+              type: EnhancedConditionalFormattingControl,
+              label: t('Conditional Formatting Rules'),
+              description: t(
+                'Apply custom color highlights, dynamic cross-column comparisons (e.g. Col A > Col B), or color scales/heatmaps.',
+              ),
+              renderTrigger: true,
+              default: [],
+              shouldMapStateToProps() {
+                return true;
+              },
+              mapStateToProps({ controls }: { controls: ControlStateMapping }) {
+                const groupby = ensureIsArray(controls.groupby?.value || []);
+                const columns = ensureIsArray(controls.columns?.value || []);
+                const metrics = ensureIsArray(controls.metrics?.value || []);
+
+                const dimNames = [...groupby, ...columns]
+                  .map(col => {
+                    if (col && typeof col === 'object' && !Array.isArray(col)) {
+                      return (col as any).column_name || (col as any).label || '';
+                    }
+                    return String(col);
+                  })
+                  .filter(Boolean);
+                const metricNames = metrics
+                  .map((m: any) => getMetricLabel(m))
+                  .filter(Boolean);
+
+                const dimSet = new Set(dimNames);
+                const metricSet = new Set(metricNames);
+
+                const dimOptions = [...dimSet].map(name => ({
+                  label: `${name} (${t('Dimension')})`,
+                  value: name,
+                  isDimension: true,
+                }));
+
+                const metricOptions = [...metricSet].map(name => ({
+                  label: `${name} (${t('Metric')})`,
+                  value: name,
+                  isDimension: false,
+                }));
+
+                return {
+                  columnOptions: [...metricOptions, ...dimOptions],
+                };
+              },
             },
           },
         ],

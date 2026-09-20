@@ -370,3 +370,327 @@ test('should preserve null values in s2Data instead of coercing to 0', () => {
   );
   expect(profitMeta.formatter(null)).toBe('N/A');
 });
+
+test('should generate static threshold conditions for background and text', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: '1',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '>',
+        compareTarget: 'static',
+        targetValue: 150,
+        color: '#ff0000',
+        applyTo: 'background',
+      },
+      {
+        id: '2',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '<=',
+        compareTarget: 'static',
+        targetValue: 150,
+        color: '#0000ff',
+        applyTo: 'text',
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const bgCond = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'sales',
+  );
+  expect(bgCond).toBeDefined();
+  expect(bgCond.mapping(200)).toEqual({ fill: '#ff0000' });
+  expect(bgCond.mapping(100)).toBeNull();
+
+  const textCond = result.s2Options.conditions.text.find(
+    (c: any) => c.field === 'sales',
+  );
+  expect(textCond).toBeDefined();
+  expect(textCond.mapping(150)).toEqual({ fill: '#0000ff' });
+  expect(textCond.mapping(100)).toEqual({ fill: '#0000ff' });
+  expect(textCond.mapping(200)).toBeNull();
+});
+
+test('should generate cross-column dynamic threshold conditions', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'cross-1',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '>',
+        compareTarget: 'column',
+        targetColumn: 'profit',
+        color: '#00ff00',
+        applyTo: 'background',
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const bgCond = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'sales',
+  );
+  expect(bgCond).toBeDefined();
+
+  // sales = 200, profit = 100 -> matched
+  expect(bgCond.mapping(200, { profit: 100 })).toEqual({ fill: '#00ff00' });
+  // sales = 100, profit = 200 -> not matched
+  expect(bgCond.mapping(100, { profit: 200 })).toBeNull();
+  // missing target column in row data -> null
+  expect(bgCond.mapping(100, {})).toBeNull();
+});
+
+test('should generate color scale heatmap conditions with min/max interpolation', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'scale-1',
+        column: 'sales',
+        ruleType: 'colorScale',
+        minColor: '#ffffff',
+        maxColor: '#000000',
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const bgCond = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'sales',
+  );
+  expect(bgCond).toBeDefined();
+
+  // In test data, sales are 100 and 200.
+  // min = 100 -> ratio 0 -> rgb(255, 255, 255)
+  expect(bgCond.mapping(100)).toEqual({ fill: 'rgb(255, 255, 255)' });
+  // max = 200 -> ratio 1 -> rgb(0, 0, 0)
+  expect(bgCond.mapping(200)).toEqual({ fill: 'rgb(0, 0, 0)' });
+  // midpoint = 150 -> ratio 0.5 -> intermediate rgb
+  const midResult = bgCond.mapping(150);
+  expect(midResult).toBeDefined();
+  expect(midResult.fill).toMatch(/^rgb\(\d+,\s*\d+,\s*\d+\)$/i);
+  expect(midResult.fill).not.toBe('rgb(255, 255, 255)');
+  expect(midResult.fill).not.toBe('rgb(0, 0, 0)');
+});
+
+test('should support opacity / transparency in threshold rules', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'opacity-1',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '>',
+        compareTarget: 'static',
+        targetValue: 150,
+        color: '#ff0000',
+        opacity: 0.4,
+        applyTo: 'background',
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const bgCond = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'sales',
+  );
+  expect(bgCond).toBeDefined();
+  expect(bgCond.mapping(200)).toEqual({ fill: 'rgba(255, 0, 0, 0.4)' });
+  expect(bgCond.mapping(100)).toBeNull();
+});
+
+test('should support dimension rules with string operators (=, !=, contains, starts_with)', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'dim-exact',
+        column: 'region',
+        ruleType: 'threshold',
+        operator: '=',
+        compareTarget: 'static',
+        targetValueText: 'East',
+        color: '#1890ff',
+        opacity: 0.5,
+        applyTo: 'background',
+      },
+      {
+        id: 'dim-contains',
+        column: 'category',
+        ruleType: 'threshold',
+        operator: 'contains',
+        compareTarget: 'static',
+        targetValueText: 'Office',
+        color: '#52c41a',
+        applyTo: 'text',
+      },
+      {
+        id: 'dim-starts',
+        column: 'region',
+        ruleType: 'threshold',
+        operator: 'starts_with',
+        compareTarget: 'static',
+        targetValueText: 'We',
+        color: '#faad14',
+        applyTo: 'background',
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const regionCond = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'region',
+  );
+  expect(regionCond).toBeDefined();
+  expect(regionCond.mapping('East')).toEqual({ fill: 'rgba(24, 144, 255, 0.5)' });
+  expect(regionCond.mapping('West')).toBeNull();
+
+  const catCond = result.s2Options.conditions.text.find(
+    (c: any) => c.field === 'category',
+  );
+  expect(catCond).toBeDefined();
+  expect(catCond.mapping('Office Supplies')).toEqual({ fill: '#52c41a' });
+  expect(catCond.mapping('Furniture')).toBeNull();
+
+  // Test starts_with rule
+  const startsCond = result.s2Options.conditions.background.filter(
+    (c: any) => c.field === 'region',
+  )[1];
+  expect(startsCond).toBeDefined();
+  expect(startsCond.mapping('West')).toEqual({ fill: '#faad14' });
+  expect(startsCond.mapping('East')).toBeNull();
+});
+
+test('should support color scale with min and max opacity gradients', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'scale-opacity',
+        column: 'sales',
+        ruleType: 'colorScale',
+        minColor: '#ffffff',
+        maxColor: '#000000',
+        minOpacity: 0.2,
+        maxOpacity: 0.8,
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const bgCond = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'sales',
+  );
+  expect(bgCond).toBeDefined();
+
+  // min (100) -> ratio 0 -> rgba(255, 255, 255, 0.2)
+  expect(bgCond.mapping(100)).toEqual({ fill: 'rgba(255, 255, 255, 0.2)' });
+  // max (200) -> ratio 1 -> rgba(0, 0, 0, 0.8)
+  expect(bgCond.mapping(200)).toEqual({ fill: 'rgba(0, 0, 0, 0.8)' });
+  // midpoint (150) -> ratio 0.5 -> alpha around 0.5
+  const midResult = bgCond.mapping(150);
+  expect(midResult).toBeDefined();
+  expect(midResult.fill).toMatch(/^rgba\(\d+,\s*\d+,\s*\d+,\s*0\.5\)$/);
+});
+
+test('should support icon conditions for threshold rules with vector icons and position', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'icon-up',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '>',
+        compareTarget: 'static',
+        targetValue: 150,
+        color: '#52c41a',
+        applyTo: 'icon',
+        iconName: 'trend-up',
+        iconPosition: 'left',
+      },
+      {
+        id: 'icon-down',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '<',
+        compareTarget: 'static',
+        targetValue: 150,
+        color: '#ff4d4f',
+        applyTo: 'icon',
+        iconName: 'trend-down',
+        iconPosition: 'right',
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const iconConditions = result.s2Options.conditions.icon;
+  expect(iconConditions).toBeDefined();
+  expect(iconConditions.length).toBe(2);
+
+  // Up icon (position: left)
+  const upCond = iconConditions[0];
+  expect(upCond.field).toBe('sales');
+  expect(upCond.position).toBe('left');
+  expect(upCond.mapping(200)).toEqual({ fill: '#52c41a', icon: 'trend-up' });
+  expect(upCond.mapping(100)).toBeNull();
+
+  // Down icon (position: right)
+  const downCond = iconConditions[1];
+  expect(downCond.field).toBe('sales');
+  expect(downCond.position).toBe('right');
+  expect(downCond.mapping(100)).toEqual({ fill: '#ff4d4f', icon: 'trend-down' });
+  expect(downCond.mapping(200)).toBeNull();
+
+  // Verify customSVGIcons are registered in s2Options
+  expect(result.s2Options.customSVGIcons).toBeDefined();
+  const iconNames = result.s2Options.customSVGIcons.map((item: any) => item.name);
+  expect(iconNames).toContain('trend-up');
+  expect(iconNames).toContain('trend-down');
+});
+
+test('should support custom prefix in icon conditions', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'custom-prefix-rule',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '>',
+        compareTarget: 'static',
+        targetValue: 100,
+        color: '#1890ff',
+        applyTo: 'icon',
+        iconName: 'custom',
+        customPrefix: '$',
+        iconPosition: 'left',
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const iconConditions = result.s2Options.conditions.icon;
+  expect(iconConditions).toBeDefined();
+  expect(iconConditions.length).toBe(1);
+
+  const prefixCond = iconConditions[0];
+  expect(prefixCond.field).toBe('sales');
+  expect(prefixCond.position).toBe('left');
+
+  const matchResult = prefixCond.mapping(150);
+  expect(matchResult).toBeDefined();
+  expect(matchResult.fill).toBe('#1890ff');
+  expect(matchResult.icon).toBe('custom_custom-prefix-rule');
+
+  // Verify custom SVG was registered
+  const customSvg = result.s2Options.customSVGIcons.find(
+    (item: any) => item.name === 'custom_custom-prefix-rule',
+  );
+  expect(customSvg).toBeDefined();
+  expect(customSvg.src).toContain('<text');
+  expect(customSvg.src).toContain('$</text>');
+});
+
+
+

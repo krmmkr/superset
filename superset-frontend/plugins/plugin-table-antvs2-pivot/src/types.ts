@@ -28,6 +28,37 @@ import {
   HandlerFunction,
 } from '@superset-ui/core';
 
+export type EnhancedConditionalFormattingRule = {
+  id: string;
+  column: string;
+  ruleType: 'threshold' | 'colorScale';
+  operator?:
+    | '>'
+    | '<'
+    | '>='
+    | '<='
+    | '='
+    | '!='
+    | 'between'
+    | 'contains'
+    | 'starts_with';
+  compareTarget?: 'static' | 'column';
+  targetValue?: number;
+  targetValueRight?: number;
+  targetValueText?: string;
+  targetColumn?: string;
+  color?: string;
+  opacity?: number;
+  applyTo?: 'background' | 'text' | 'icon';
+  iconName?: string;
+  iconPosition?: 'left' | 'right';
+  customPrefix?: string;
+  minColor?: string;
+  maxColor?: string;
+  minOpacity?: number;
+  maxOpacity?: number;
+};
+
 export interface S2TableFormData extends QueryFormData {
   groupby: QueryFormColumn[];
   columns: QueryFormColumn[];
@@ -63,6 +94,8 @@ export interface S2TableFormData extends QueryFormData {
   nullPlaceholder?: string;
   enable_export?: boolean;
   enableExport?: boolean;
+  enhanced_conditional_formatting?: EnhancedConditionalFormattingRule[];
+  enhancedConditionalFormatting?: EnhancedConditionalFormattingRule[];
   defaultDimensionAlign?: 'left' | 'center' | 'right';
   defaultMetricAlign?: 'left' | 'center' | 'right';
   headerColor?: { r: number; g: number; b: number; a: number };
@@ -157,4 +190,5 @@ export interface S2TableTransformedProps {
   totalsPosition?: 'bottom_right' | 'top_left';
   nullPlaceholder?: string;
   enableExport?: boolean;
+  enhancedConditionalFormatting?: EnhancedConditionalFormattingRule[];
 }
