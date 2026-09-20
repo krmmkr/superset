@@ -53,6 +53,8 @@ export interface S2TableFormData extends QueryFormData {
   showTooltip?: boolean;
   rowHeight?: string;
   colHeight?: string;
+  hideMeasureColumn?: boolean;
+  hide_measure_column?: boolean;
   defaultDimensionAlign?: 'left' | 'center' | 'right';
   defaultMetricAlign?: 'left' | 'center' | 'right';
   headerColor?: { r: number; g: number; b: number; a: number };
@@ -142,4 +144,5 @@ export interface S2TableTransformedProps {
   colHeaderWordWrap?: boolean;
   rowHeaderWordWrap?: boolean;
   dataCellWordWrap?: boolean;
+  hideMeasureColumn?: boolean;
 }

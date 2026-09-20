@@ -73,11 +73,11 @@ test('should transform default chart props correctly', () => {
   expect(result.s2DataConfig.fields.columns).toEqual(['category']);
   expect(result.s2DataConfig.fields.values).toEqual(['sales']);
 
-  expect(result.s2Options.showSeriesNumber).toBe(false);
+  expect(result.s2Options.seriesNumber.enable).toBe(false);
   expect(result.s2Options.style.layoutWidthType).toBe('adaptive');
   expect(result.s2Options.tooltip.enable).toBe(true);
-  expect(result.s2Options.style.rowCfg).toBeUndefined();
-  expect(result.s2Options.style.colCfg.height).toBeUndefined();
+  expect(result.s2Options.style.rowCell.height).toBeUndefined();
+  expect(result.s2Options.style.colCell.height).toBeUndefined();
 });
 
 test('should handle showSeriesNumber, layoutWidthType, and showTooltip', () => {
@@ -88,7 +88,7 @@ test('should handle showSeriesNumber, layoutWidthType, and showTooltip', () => {
   });
   const result = transformProps(chartProps as any);
 
-  expect(result.s2Options.showSeriesNumber).toBe(true);
+  expect(result.s2Options.seriesNumber.enable).toBe(true);
   expect(result.s2Options.style.layoutWidthType).toBe('compact');
   expect(result.s2Options.tooltip.enable).toBe(false);
 });
@@ -100,9 +100,9 @@ test('should map valid custom rowHeight and colHeight to style configs', () => {
   });
   const result = transformProps(chartProps as any);
 
-  expect(result.s2Options.style.rowCfg.height).toBe(35);
-  expect(result.s2Options.style.cellCfg.height).toBe(35);
-  expect(result.s2Options.style.colCfg.height).toBe(45);
+  expect(result.s2Options.style.rowCell.height).toBe(35);
+  expect(result.s2Options.style.dataCell.height).toBe(35);
+  expect(result.s2Options.style.colCell.height).toBe(45);
 });
 
 test('should ignore invalid rowHeight and colHeight inputs', () => {
@@ -112,9 +112,9 @@ test('should ignore invalid rowHeight and colHeight inputs', () => {
   });
   const result = transformProps(chartProps as any);
 
-  expect(result.s2Options.style.rowCfg).toBeUndefined();
-  expect(result.s2Options.style.cellCfg).toBeUndefined();
-  expect(result.s2Options.style.colCfg.height).toBeUndefined();
+  expect(result.s2Options.style.rowCell.height).toBeUndefined();
+  expect(result.s2Options.style.dataCell.height).toBeUndefined();
+  expect(result.s2Options.style.colCell.height).toBeUndefined();
 });
 
 test('should map separate alignment configurations correctly', () => {
@@ -189,7 +189,7 @@ test('should exclude totals for metrics specified in excludeTotalsMetrics', () =
   });
   const result = transformProps(chartProps as any);
 
-  const { calcFunc } = result.s2Options.totals.row.calcTotals;
+  const { calcFunc } = result.s2Options.totals.row.calcGrandTotals;
   expect(calcFunc).toBeDefined();
 
   const salesVal = calcFunc({ $$extra$$: 'sales' }, [
@@ -262,7 +262,7 @@ test('should exclude totals for metrics configured with excludeTotals in metric_
   });
   const result = transformProps(chartProps as any);
 
-  const { calcFunc } = result.s2Options.totals.row.calcTotals;
+  const { calcFunc } = result.s2Options.totals.row.calcGrandTotals;
   expect(calcFunc).toBeDefined();
 
   const salesVal = calcFunc({ $$extra$$: 'sales' }, [
@@ -302,4 +302,20 @@ test('should exclude dimensions from row/col subTotalsDimensions when showSubtot
 
   expect(result.s2Options.totals.row.subTotalsDimensions).toEqual(['region']);
   expect(result.s2Options.totals.col.subTotalsDimensions).toEqual([]);
+});
+
+test('should map hide_measure_column correctly to s2Options.style.colCell', () => {
+  const chartPropsDefault = buildChartProps();
+  const resultDefault = transformProps(chartPropsDefault as any);
+  expect(resultDefault.hideMeasureColumn).toBe(false);
+  expect(resultDefault.s2Options.style.colCell.hideValue).toBe(false);
+  expect(resultDefault.s2Options.style.colCell.hideMeasureColumn).toBe(false);
+
+  const chartPropsHidden = buildChartProps({
+    hide_measure_column: true,
+  });
+  const resultHidden = transformProps(chartPropsHidden as any);
+  expect(resultHidden.hideMeasureColumn).toBe(true);
+  expect(resultHidden.s2Options.style.colCell.hideValue).toBe(true);
+  expect(resultHidden.s2Options.style.colCell.hideMeasureColumn).toBe(true);
 });

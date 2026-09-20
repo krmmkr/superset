@@ -684,6 +684,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         formData.colHeaderWordWrap ?? formData.col_header_word_wrap ?? false,
         formData.rowHeaderWordWrap ?? formData.row_header_word_wrap ?? false,
         formData.dataCellWordWrap ?? formData.data_cell_word_wrap ?? false,
+        formData.hideMeasureColumn ?? formData.hide_measure_column ?? false,
       ].join('_'),
     [
       isDark,
@@ -722,6 +723,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       formData.row_header_word_wrap,
       formData.dataCellWordWrap,
       formData.data_cell_word_wrap,
+      formData.hideMeasureColumn,
+      formData.hide_measure_column,
     ],
   );
 

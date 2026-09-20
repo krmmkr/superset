@@ -149,6 +149,20 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'hide_measure_column',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Hide Metric Columns / Headers'),
+              description: t(
+                'Hide the metric (measure) column header. Useful when pivoting on columns with a single metric to remove redundant metric headers.',
+              ),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
       ],
     },
     {

@@ -214,6 +214,16 @@ export default function transformProps(
       ? Number(colHeightRaw)
       : undefined;
 
+  const hideMeasureColumn = Boolean(
+    formData.hideMeasureColumn ??
+      formData.hide_measure_column ??
+      formData.hideMetricColumn ??
+      formData.hide_metric_column ??
+      formData.hideMetricsColumns ??
+      formData.hide_metrics_columns ??
+      false,
+  );
+
   const colHeaderWordWrap =
     formData.colHeaderWordWrap ?? formData.col_header_word_wrap ?? false;
   const rowHeaderWordWrap =
@@ -455,7 +465,8 @@ export default function transformProps(
       layoutWidthType: s2LayoutWidthType,
       colCell: {
         widthByField,
-        hideMeasureColumn: false,
+        hideValue: hideMeasureColumn,
+        hideMeasureColumn,
         ...(colHeight !== undefined ? { height: colHeight } : {}),
       },
       rowCell: {
@@ -559,5 +570,6 @@ export default function transformProps(
     colHeaderWordWrap,
     rowHeaderWordWrap,
     dataCellWordWrap,
+    hideMeasureColumn,
   };
 }
