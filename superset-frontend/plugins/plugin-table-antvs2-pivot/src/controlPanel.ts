@@ -163,6 +163,38 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'metrics_layout',
+            config: {
+              type: 'SelectControl',
+              label: t('Apply Metrics On'),
+              description: t(
+                'Choose whether metrics are displayed in columns (default) or along rows (useful for financial / P&L statements).',
+              ),
+              default: 'columns',
+              choices: [
+                ['columns', t('Columns (Default)')],
+                ['rows', t('Rows (Financial / P&L)')],
+              ],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'null_placeholder',
+            config: {
+              type: 'TextControl',
+              label: t('Missing Value Placeholder'),
+              description: t(
+                'Custom text displayed when a cell has no data / null value (e.g. "-" or "N/A").',
+              ),
+              default: '-',
+              renderTrigger: true,
+            },
+          },
+        ],
       ],
     },
     {
@@ -451,6 +483,20 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'enable_export',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Enable CSV Export'),
+              description: t(
+                'Show a CSV export button on the chart to download the formatted pivot table.',
+              ),
+              default: true,
+              renderTrigger: true,
+            },
+          },
+        ],
       ],
     },
     {
@@ -517,6 +563,24 @@ const config: ControlPanelConfig = {
                   'Requires 2+ Column dimensions.',
               ),
               default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'totals_position',
+            config: {
+              type: 'SelectControl',
+              label: t('Grand Totals & Subtotals Position'),
+              description: t(
+                'Position of total and subtotal rows/columns in the table.',
+              ),
+              default: 'bottom_right',
+              choices: [
+                ['bottom_right', t('Bottom / Right (Standard)')],
+                ['top_left', t('Top / Left')],
+              ],
               renderTrigger: true,
             },
           },

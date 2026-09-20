@@ -27,6 +27,8 @@ import {
   CornerCell,
   S2Event,
   TextAlign,
+  asyncGetAllPlainData,
+  download,
 } from '@antv/s2';
 import '@antv/s2-react/dist/s2-react.min.css';
 import { DataMask } from '@superset-ui/core';
@@ -192,11 +194,27 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     colHeaderWordWrap,
     rowHeaderWordWrap,
     dataCellWordWrap,
+    enableExport = true,
   } = props;
 
   const divRef = useRef<HTMLDivElement>(null);
+  const s2InstanceRef = useRef<any>(null);
 
   const [sortParams, setSortParams] = useState<any[]>([]);
+
+  const handleExportCsv = useCallback(async () => {
+    if (!s2InstanceRef.current) return;
+    try {
+      const csvData = await asyncGetAllPlainData({
+        sheetInstance: s2InstanceRef.current,
+        split: ',',
+        formatOptions: true,
+      });
+      download(csvData, 'pivot_table.csv');
+    } catch (e) {
+      console.error('Failed to export S2 pivot data', e);
+    }
+  }, []);
 
   const fieldsKey = useMemo(
     () =>
@@ -685,6 +703,9 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         formData.rowHeaderWordWrap ?? formData.row_header_word_wrap ?? false,
         formData.dataCellWordWrap ?? formData.data_cell_word_wrap ?? false,
         formData.hideMeasureColumn ?? formData.hide_measure_column ?? false,
+        formData.metricsLayout ?? formData.metrics_layout ?? 'columns',
+        formData.totalsPosition ?? formData.totals_position ?? 'bottom_right',
+        formData.nullPlaceholder ?? formData.null_placeholder ?? '-',
       ].join('_'),
     [
       isDark,
@@ -725,14 +746,56 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       formData.data_cell_word_wrap,
       formData.hideMeasureColumn,
       formData.hide_measure_column,
+      formData.metricsLayout,
+      formData.metrics_layout,
+      formData.totalsPosition,
+      formData.totals_position,
+      formData.nullPlaceholder,
+      formData.null_placeholder,
     ],
   );
 
   return (
     <div
       ref={divRef}
-      style={{ width: `${width}px`, height: `${height}px`, overflow: 'hidden' }}
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        overflow: 'hidden',
+        position: 'relative',
+      }}
     >
+      {enableExport && (
+        <button
+          onClick={handleExportCsv}
+          title="Export CSV"
+          style={{
+            position: 'absolute',
+            top: 4,
+            right: 8,
+            zIndex: 10,
+            padding: '3px 8px',
+            fontSize: '11px',
+            fontWeight: 500,
+            borderRadius: '4px',
+            border: `1px solid ${resolvedBorderColor}`,
+            backgroundColor: headerBgColor,
+            color: textColor,
+            cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            opacity: 0.85,
+            transition: 'opacity 0.2s',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.opacity = '1';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.opacity = '0.85';
+          }}
+        >
+          Export CSV
+        </button>
+      )}
       {React.createElement(SheetComponent as any, {
         key: sheetKey,
         sheetType,
@@ -743,6 +806,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         options: { ...optionsWithStyles, height },
         themeCfg: customThemeCfg,
         onMounted: (s2: any) => {
+          s2InstanceRef.current = s2;
           (window as any).s2 = s2;
           s2.on(S2Event.RANGE_SORT, (newSortParams: any) => {
             if (Array.isArray(newSortParams)) {

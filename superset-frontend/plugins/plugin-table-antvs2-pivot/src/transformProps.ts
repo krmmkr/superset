@@ -224,6 +224,20 @@ export default function transformProps(
       false,
   );
 
+  const metricsLayout =
+    formData.metricsLayout ?? formData.metrics_layout ?? 'columns';
+  const valueInCols = metricsLayout === 'columns';
+
+  const totalsPosition =
+    formData.totalsPosition ?? formData.totals_position ?? 'bottom_right';
+  const reverseTotalsLayout = totalsPosition === 'top_left';
+
+  const nullPlaceholder =
+    formData.nullPlaceholder ?? formData.null_placeholder ?? '-';
+
+  const enableExport =
+    formData.enableExport ?? formData.enable_export ?? true;
+
   const colHeaderWordWrap =
     formData.colHeaderWordWrap ?? formData.col_header_word_wrap ?? false;
   const rowHeaderWordWrap =
@@ -352,12 +366,17 @@ export default function transformProps(
   const colnames: string[] = (queryData as any).colnames || [];
 
   // Use Sets for O(1) metric name lookups instead of repeated Array.includes
+  const groupbySet = new Set(groupby);
+  const columnsSet = new Set(columns);
   const metricNameSet = new Set(rawMetricNames);
   const metricNameLowerSet = new Set(
     rawMetricNames.map((n: string) => n.toLowerCase()),
   );
   const metricCols = colnames.filter(
-    c => metricNameSet.has(c) || metricNameLowerSet.has(c.toLowerCase()),
+    c =>
+      !groupbySet.has(c) &&
+      !columnsSet.has(c) &&
+      (metricNameSet.has(c) || metricNameLowerSet.has(c.toLowerCase())),
   );
 
   const allFields = [...groupby, ...columns, ...metricCols];
@@ -375,15 +394,21 @@ export default function transformProps(
 
   // ── S2 Data Config ───────────────────────────
   const s2Data = data.map(row => {
-    const out: Record<string, string | number> = {};
+    const out: Record<string, string | number | null> = {};
     for (const col of groupby) {
-      out[col] = String(row[col]);
+      out[col] =
+        row[col] === null || row[col] === undefined ? '' : String(row[col]);
     }
     for (const col of columns) {
-      out[col] = String(row[col]);
+      out[col] =
+        row[col] === null || row[col] === undefined ? '' : String(row[col]);
     }
     for (const col of metricCols) {
-      out[col] = Number(row[col]) || 0;
+      const val = row[col];
+      out[col] =
+        val === null || val === undefined || val === ''
+          ? null
+          : Number(val);
     }
     return out;
   });
@@ -393,6 +418,7 @@ export default function transformProps(
       rows: groupby,
       columns,
       values: metricCols,
+      valueInCols,
     },
     meta: allFields.map(f => {
       const isMetric = metricCols.includes(f);
@@ -404,7 +430,9 @@ export default function transformProps(
           field: f,
           name: displayName,
           formatter: (val: any) =>
-            val === null || val === undefined ? '' : formatter(val),
+            val === null || val === undefined
+              ? nullPlaceholder
+              : formatter(val),
         };
       }
       return {
@@ -500,12 +528,15 @@ export default function transformProps(
         hiddenColumns: true,
       },
     } as any,
+    placeholder: {
+      cell: nullPlaceholder,
+    },
     totals: {
       row: {
         showGrandTotals: showRowTotals,
         showSubTotals: showRowSubtotals && groupby.length > 1,
-        reverseGrandTotalsLayout: true,
-        reverseSubTotalsLayout: true,
+        reverseGrandTotalsLayout: reverseTotalsLayout,
+        reverseSubTotalsLayout: reverseTotalsLayout,
         calcGrandTotals: calcTotalsObj,
         calcSubTotals: calcTotalsObj,
         subTotalsDimensions: (groupby.length > 1
@@ -518,6 +549,8 @@ export default function transformProps(
       col: {
         showGrandTotals: showColTotals,
         showSubTotals: showColSubtotals && columns.length > 1,
+        reverseGrandTotalsLayout: reverseTotalsLayout,
+        reverseSubTotalsLayout: reverseTotalsLayout,
         calcGrandTotals: calcTotalsObj,
         calcSubTotals: calcTotalsObj,
         subTotalsDimensions: (columns.length > 1
@@ -571,5 +604,9 @@ export default function transformProps(
     rowHeaderWordWrap,
     dataCellWordWrap,
     hideMeasureColumn,
+    metricsLayout,
+    totalsPosition,
+    nullPlaceholder,
+    enableExport,
   };
 }

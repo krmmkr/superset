@@ -205,17 +205,18 @@ test('should exclude totals for metrics specified in excludeTotalsMetrics', () =
   expect(profitVal).toBeNull();
 });
 
-test('should return empty string in formatter if value is null or undefined', () => {
+test('should return null placeholder in formatter if value is null or undefined', () => {
   const chartProps = buildChartProps({
     metrics: ['sales'],
+    null_placeholder: '-',
   });
   const result = transformProps(chartProps as any);
   const salesMeta = result.s2DataConfig.meta.find(
     (m: any) => m.field === 'sales',
   );
 
-  expect(salesMeta.formatter(null)).toBe('');
-  expect(salesMeta.formatter(undefined)).toBe('');
+  expect(salesMeta.formatter(null)).toBe('-');
+  expect(salesMeta.formatter(undefined)).toBe('-');
 });
 
 test('should map columnWidths when layoutWidthType is custom', () => {
@@ -318,4 +319,54 @@ test('should map hide_measure_column correctly to s2Options.style.colCell', () =
   expect(resultHidden.hideMeasureColumn).toBe(true);
   expect(resultHidden.s2Options.style.colCell.hideValue).toBe(true);
   expect(resultHidden.s2Options.style.colCell.hideMeasureColumn).toBe(true);
+});
+
+test('should map metrics_layout correctly to s2DataConfig.fields.valueInCols', () => {
+  const chartPropsCols = buildChartProps({ metrics_layout: 'columns' });
+  const resultCols = transformProps(chartPropsCols as any);
+  expect(resultCols.s2DataConfig.fields.valueInCols).toBe(true);
+
+  const chartPropsRows = buildChartProps({ metrics_layout: 'rows' });
+  const resultRows = transformProps(chartPropsRows as any);
+  expect(resultRows.s2DataConfig.fields.valueInCols).toBe(false);
+});
+
+test('should map totals_position correctly to reverseGrandTotalsLayout and reverseSubTotalsLayout', () => {
+  const chartPropsDefault = buildChartProps({ totals_position: 'bottom_right' });
+  const resultDefault = transformProps(chartPropsDefault as any);
+  expect(resultDefault.s2Options.totals.row.reverseGrandTotalsLayout).toBe(false);
+  expect(resultDefault.s2Options.totals.row.reverseSubTotalsLayout).toBe(false);
+  expect(resultDefault.s2Options.totals.col.reverseGrandTotalsLayout).toBe(false);
+  expect(resultDefault.s2Options.totals.col.reverseSubTotalsLayout).toBe(false);
+
+  const chartPropsTopLeft = buildChartProps({ totals_position: 'top_left' });
+  const resultTopLeft = transformProps(chartPropsTopLeft as any);
+  expect(resultTopLeft.s2Options.totals.row.reverseGrandTotalsLayout).toBe(true);
+  expect(resultTopLeft.s2Options.totals.row.reverseSubTotalsLayout).toBe(true);
+  expect(resultTopLeft.s2Options.totals.col.reverseGrandTotalsLayout).toBe(true);
+  expect(resultTopLeft.s2Options.totals.col.reverseSubTotalsLayout).toBe(true);
+});
+
+test('should preserve null values in s2Data instead of coercing to 0', () => {
+  const chartProps = buildChartProps({
+    metrics: ['sales', 'profit'],
+    null_placeholder: 'N/A',
+  });
+  chartProps.queriesData[0].data = [
+    { region: 'East', category: 'Furniture', sales: 100, profit: null },
+    { region: 'West', category: null, sales: null, profit: 0 },
+  ];
+  chartProps.queriesData[0].colnames = ['region', 'category', 'sales', 'profit'];
+  chartProps.queriesData[0].coltypes = [1, 1, 0, 0];
+
+  const result = transformProps(chartProps as any);
+  expect(result.s2DataConfig.data[0].profit).toBeNull();
+  expect(result.s2DataConfig.data[1].sales).toBeNull();
+  expect(result.s2DataConfig.data[1].profit).toBe(0);
+  expect(result.s2DataConfig.data[1].category).toBe('');
+
+  const profitMeta = result.s2DataConfig.meta.find(
+    (m: any) => m.field === 'profit',
+  );
+  expect(profitMeta.formatter(null)).toBe('N/A');
 });
