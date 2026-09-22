@@ -57,6 +57,42 @@ export const GlobalStyles = () => {
           font-family: ${theme.fontFamily};
         }
 
+        /* Sleek Modern Global Scrollbars */
+        * {
+          scrollbar-width: thin;
+          scrollbar-color: ${isDark
+              ? 'rgba(255, 255, 255, 0.18)'
+              : 'rgba(0, 0, 0, 0.18)'}
+            transparent;
+        }
+
+        ::-webkit-scrollbar {
+          width: 7px;
+          height: 7px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: ${isDark
+            ? 'rgba(255, 255, 255, 0.16)'
+            : 'rgba(0, 0, 0, 0.16)'};
+          border-radius: 6px;
+          transition: background 0.2s ease-in-out;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: ${isDark
+            ? 'rgba(255, 255, 255, 0.28)'
+            : 'rgba(0, 0, 0, 0.28)'};
+        }
+
+        ::-webkit-scrollbar-corner {
+          background: transparent;
+        }
+
         a {
           color: ${theme.colorLink};
         }

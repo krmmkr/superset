@@ -84,15 +84,22 @@ const getScreenshotNodeSelector = (chartId: string | number) =>
 const VerticalDotsTrigger = () => {
   const theme = useTheme();
   return (
-    <Icons.EllipsisOutlined
+    <Icons.InfoCircleOutlined
       css={css`
-        transform: rotate(90deg);
+        opacity: 0.4;
+        transition:
+          opacity 0.2s ease,
+          color 0.2s ease,
+          transform 0.2s ease;
         &:hover {
           cursor: pointer;
+          opacity: 1;
+          color: ${theme.colorPrimary};
+          transform: scale(1.08);
         }
       `}
-      iconSize="xl"
-      iconColor={theme.colorTextLabel}
+      iconSize="l"
+      iconColor={theme.colorTextSecondary}
       className="dot"
     />
   );
