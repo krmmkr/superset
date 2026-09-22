@@ -16,14 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { buildQueryContext, QueryFormData } from '@superset-ui/core';
+import {
+  buildQueryContext,
+  QueryFormData,
+  QueryObject,
+} from '@superset-ui/core';
 
 export default function buildQuery(formData: QueryFormData) {
   const { groupby, columns } = formData;
 
   const baseColumns = [...(groupby || []), ...(columns || [])];
 
-  return buildQueryContext(formData, (baseQueryObject: any) => [
+  return buildQueryContext(formData, (baseQueryObject: QueryObject) => [
     {
       ...baseQueryObject,
       groupby: baseColumns,

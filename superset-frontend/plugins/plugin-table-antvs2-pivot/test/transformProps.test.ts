@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+/* eslint-disable jest-dom/prefer-to-have-style */
 
 import { ChartProps, QueryFormData } from '@superset-ui/core';
 import transformProps from '../src/transformProps';
@@ -42,25 +43,26 @@ const baseFormData = {
   datasource: '1__table',
 };
 
-const buildChartProps = (formDataOverrides: Partial<QueryFormData> = {}) => new ChartProps({
-  formData: { ...baseFormData, ...formDataOverrides },
-  width: 800,
-  height: 600,
-  queriesData: [
-    {
-      data: [
-        { region: 'East', category: 'Furniture', sales: 100 },
-        { region: 'West', category: 'Office Supplies', sales: 200 },
-      ],
-      colnames: ['region', 'category', 'sales'],
-      coltypes: [1, 1, 0],
-    },
-  ],
-  hooks: { setDataMask },
-  filterState: { selectedFilters: {} },
-  datasource: { verboseMap: {}, columnFormats: {} },
-  theme: {} as any,
-});
+const buildChartProps = (formDataOverrides: Partial<QueryFormData> = {}) =>
+  new ChartProps({
+    formData: { ...baseFormData, ...formDataOverrides },
+    width: 800,
+    height: 600,
+    queriesData: [
+      {
+        data: [
+          { region: 'East', category: 'Furniture', sales: 100 },
+          { region: 'West', category: 'Office Supplies', sales: 200 },
+        ],
+        colnames: ['region', 'category', 'sales'],
+        coltypes: [1, 1, 0],
+      },
+    ],
+    hooks: { setDataMask },
+    filterState: { selectedFilters: {} },
+    datasource: { verboseMap: {}, columnFormats: {} },
+    theme: {} as any,
+  });
 
 test('should transform default chart props correctly', () => {
   const chartProps = buildChartProps();
@@ -332,18 +334,28 @@ test('should map metrics_layout correctly to s2DataConfig.fields.valueInCols', (
 });
 
 test('should map totals_position correctly to reverseGrandTotalsLayout and reverseSubTotalsLayout', () => {
-  const chartPropsDefault = buildChartProps({ totals_position: 'bottom_right' });
+  const chartPropsDefault = buildChartProps({
+    totals_position: 'bottom_right',
+  });
   const resultDefault = transformProps(chartPropsDefault as any);
-  expect(resultDefault.s2Options.totals.row.reverseGrandTotalsLayout).toBe(false);
+  expect(resultDefault.s2Options.totals.row.reverseGrandTotalsLayout).toBe(
+    false,
+  );
   expect(resultDefault.s2Options.totals.row.reverseSubTotalsLayout).toBe(false);
-  expect(resultDefault.s2Options.totals.col.reverseGrandTotalsLayout).toBe(false);
+  expect(resultDefault.s2Options.totals.col.reverseGrandTotalsLayout).toBe(
+    false,
+  );
   expect(resultDefault.s2Options.totals.col.reverseSubTotalsLayout).toBe(false);
 
   const chartPropsTopLeft = buildChartProps({ totals_position: 'top_left' });
   const resultTopLeft = transformProps(chartPropsTopLeft as any);
-  expect(resultTopLeft.s2Options.totals.row.reverseGrandTotalsLayout).toBe(true);
+  expect(resultTopLeft.s2Options.totals.row.reverseGrandTotalsLayout).toBe(
+    true,
+  );
   expect(resultTopLeft.s2Options.totals.row.reverseSubTotalsLayout).toBe(true);
-  expect(resultTopLeft.s2Options.totals.col.reverseGrandTotalsLayout).toBe(true);
+  expect(resultTopLeft.s2Options.totals.col.reverseGrandTotalsLayout).toBe(
+    true,
+  );
   expect(resultTopLeft.s2Options.totals.col.reverseSubTotalsLayout).toBe(true);
 });
 
@@ -356,7 +368,12 @@ test('should preserve null values in s2Data instead of coercing to 0', () => {
     { region: 'East', category: 'Furniture', sales: 100, profit: null },
     { region: 'West', category: null, sales: null, profit: 0 },
   ];
-  chartProps.queriesData[0].colnames = ['region', 'category', 'sales', 'profit'];
+  chartProps.queriesData[0].colnames = [
+    'region',
+    'category',
+    'sales',
+    'profit',
+  ];
   chartProps.queriesData[0].coltypes = [1, 1, 0, 0];
 
   const result = transformProps(chartProps as any);
@@ -544,7 +561,9 @@ test('should support dimension rules with string operators (=, !=, contains, sta
     (c: any) => c.field === 'region',
   );
   expect(regionCond).toBeDefined();
-  expect(regionCond.mapping('East')).toEqual({ fill: 'rgba(24, 144, 255, 0.5)' });
+  expect(regionCond.mapping('East')).toEqual({
+    fill: 'rgba(24, 144, 255, 0.5)',
+  });
   expect(regionCond.mapping('West')).toBeNull();
 
   const catCond = result.s2Options.conditions.text.find(
@@ -640,12 +659,17 @@ test('should support icon conditions for threshold rules with vector icons and p
   const downCond = iconConditions[1];
   expect(downCond.field).toBe('sales');
   expect(downCond.position).toBe('right');
-  expect(downCond.mapping(100)).toEqual({ fill: '#ff4d4f', icon: 'trend-down' });
+  expect(downCond.mapping(100)).toEqual({
+    fill: '#ff4d4f',
+    icon: 'trend-down',
+  });
   expect(downCond.mapping(200)).toBeNull();
 
   // Verify customSVGIcons are registered in s2Options
   expect(result.s2Options.customSVGIcons).toBeDefined();
-  const iconNames = result.s2Options.customSVGIcons.map((item: any) => item.name);
+  const iconNames = result.s2Options.customSVGIcons.map(
+    (item: any) => item.name,
+  );
   expect(iconNames).toContain('trend-up');
   expect(iconNames).toContain('trend-down');
 });
@@ -692,5 +716,58 @@ test('should support custom prefix in icon conditions', () => {
   expect(customSvg.src).toContain('$</text>');
 });
 
+test('should handle edge cases in isRuleMatched: null values, negative numbers, and non-numeric inputs', () => {
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'negative-test',
+        column: 'profit',
+        ruleType: 'threshold',
+        operator: '<',
+        compareTarget: 'static',
+        targetValue: 0,
+        color: '#ff4d4f',
+        applyTo: 'background',
+      },
+      {
+        id: 'between-negative',
+        column: 'profit',
+        ruleType: 'threshold',
+        operator: 'between',
+        compareTarget: 'static',
+        targetValue: -50,
+        targetValueRight: 50,
+        color: '#faad14',
+        applyTo: 'text',
+      },
+    ],
+  });
 
+  const result = transformProps(chartProps as any);
+  const bgCond = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'profit',
+  );
+  const textCond = result.s2Options.conditions.text.find(
+    (c: any) => c.field === 'profit',
+  );
 
+  expect(bgCond).toBeDefined();
+  expect(textCond).toBeDefined();
+
+  // Null or undefined value returns null
+  expect(bgCond.mapping(null)).toBeNull();
+  expect(bgCond.mapping(undefined)).toBeNull();
+
+  // Non-numeric string on numeric rule returns null
+  expect(bgCond.mapping('invalid-number')).toBeNull();
+
+  // Negative value matching
+  expect(bgCond.mapping(-20)).toEqual({ fill: '#ff4d4f' });
+  expect(bgCond.mapping(10)).toBeNull();
+
+  // Between negative range (-50 < val < 50)
+  expect(textCond.mapping(0)).toEqual({ fill: '#faad14' });
+  expect(textCond.mapping(-30)).toEqual({ fill: '#faad14' });
+  expect(textCond.mapping(-60)).toBeNull();
+  expect(textCond.mapping(60)).toBeNull();
+});

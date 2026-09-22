@@ -21,6 +21,8 @@ import {
   legacyValidateInteger,
   ensureIsArray,
   getMetricLabel,
+  QueryFormColumn,
+  QueryFormMetric,
 } from '@superset-ui/core';
 import { GenericDataType } from '@apache-superset/core/common';
 import {
@@ -228,7 +230,9 @@ const config: ControlPanelConfig = {
                       config: {
                         controlType: 'Checkbox',
                         label: t('Bold text'),
-                        description: t('Whether to make the text in this column bolder'),
+                        description: t(
+                          'Whether to make the text in this column bolder',
+                        ),
                         defaultValue: false,
                         debounceDelay: 200,
                       },
@@ -255,12 +259,18 @@ const config: ControlPanelConfig = {
               mapStateToProps({ controls }: { controls: ControlStateMapping }) {
                 const groupby = ensureIsArray(controls.groupby?.value || []);
                 const columns = ensureIsArray(controls.columns?.value || []);
-                const colnames = [...groupby, ...columns].map(col => {
-                  if (col && typeof col === 'object' && !Array.isArray(col)) {
-                    return (col as any).column_name || (col as any).label || '';
-                  }
-                  return String(col);
-                });
+                const colnames = [...groupby, ...columns].map(
+                  (col: QueryFormColumn) => {
+                    if (col && typeof col === 'object' && !Array.isArray(col)) {
+                      const colObj = col as {
+                        column_name?: string;
+                        label?: string;
+                      };
+                      return colObj.column_name || colObj.label || '';
+                    }
+                    return String(col);
+                  },
+                );
                 return {
                   columnsPropsObject: {
                     colnames,
@@ -300,7 +310,9 @@ const config: ControlPanelConfig = {
                           config: {
                             controlType: 'Checkbox',
                             label: t('Bold text'),
-                            description: t('Whether to make the text in this column bolder'),
+                            description: t(
+                              'Whether to make the text in this column bolder',
+                            ),
                             defaultValue: false,
                             debounceDelay: 200,
                           },
@@ -359,7 +371,9 @@ const config: ControlPanelConfig = {
               },
               mapStateToProps({ controls }: { controls: ControlStateMapping }) {
                 const metrics = ensureIsArray(controls.metrics?.value || []);
-                const colnames = metrics.map((m: any) => getMetricLabel(m));
+                const colnames = metrics.map((m: QueryFormMetric) =>
+                  getMetricLabel(m),
+                );
                 return {
                   columnsPropsObject: {
                     colnames,
@@ -612,15 +626,19 @@ const config: ControlPanelConfig = {
                 const metrics = ensureIsArray(controls.metrics?.value || []);
 
                 const dimNames = [...groupby, ...columns]
-                  .map(col => {
+                  .map((col: QueryFormColumn) => {
                     if (col && typeof col === 'object' && !Array.isArray(col)) {
-                      return (col as any).column_name || (col as any).label || '';
+                      const colObj = col as {
+                        column_name?: string;
+                        label?: string;
+                      };
+                      return colObj.column_name || colObj.label || '';
                     }
                     return String(col);
                   })
                   .filter(Boolean);
                 const metricNames = metrics
-                  .map((m: any) => getMetricLabel(m))
+                  .map((m: QueryFormMetric) => getMetricLabel(m))
                   .filter(Boolean);
 
                 const dimSet = new Set(dimNames);

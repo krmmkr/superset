@@ -16,7 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useRef, useCallback, useState, useMemo } from 'react';
+import {
+  useRef,
+  useCallback,
+  useState,
+  useMemo,
+  useEffect,
+  createElement,
+  Fragment,
+} from 'react';
 import { SheetComponent } from '@antv/s2-react';
 import {
   setLang,
@@ -60,10 +68,7 @@ function getAlignmentFromOptions(
  * Shared helper: reads per-column bold preference from the custom options
  * attached to the spreadsheet instance.
  */
-function getBoldTextFromOptions(
-  spreadsheet: any,
-  field: string,
-): boolean {
+function getBoldTextFromOptions(spreadsheet: any, field: string): boolean {
   const opts = spreadsheet?.options;
   const boldTextObj = opts?.columnBoldTextObj || {};
   return !!boldTextObj[field];
@@ -76,11 +81,7 @@ class CustomDataCell extends DataCell {
     const isBold = getBoldTextFromOptions(this.spreadsheet, field);
     return {
       ...textStyle,
-      textAlign: getAlignmentFromOptions(
-        this.spreadsheet,
-        field,
-        true,
-      ),
+      textAlign: getAlignmentFromOptions(this.spreadsheet, field, true),
       fontWeight: isBold ? 'bold' : textStyle.fontWeight,
     };
   }
@@ -94,11 +95,7 @@ class CustomColCell extends ColCell {
     const isBold = getBoldTextFromOptions(this.spreadsheet, field);
     return {
       ...textStyle,
-      textAlign: getAlignmentFromOptions(
-        this.spreadsheet,
-        field,
-        isMetric,
-      ),
+      textAlign: getAlignmentFromOptions(this.spreadsheet, field, isMetric),
       fontWeight: isBold ? 'bold' : textStyle.fontWeight,
     };
   }
@@ -112,11 +109,7 @@ class CustomRowCell extends RowCell {
     const isBold = getBoldTextFromOptions(this.spreadsheet, field);
     return {
       ...textStyle,
-      textAlign: getAlignmentFromOptions(
-        this.spreadsheet,
-        field,
-        isMetric,
-      ),
+      textAlign: getAlignmentFromOptions(this.spreadsheet, field, isMetric),
       fontWeight: isBold ? 'bold' : textStyle.fontWeight,
     };
   }
@@ -211,8 +204,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         formatOptions: true,
       });
       download(csvData, 'pivot_table.csv');
-    } catch (e) {
-      console.error('Failed to export S2 pivot data', e);
+    } catch {
+      // Export error handled silently
     }
   }, []);
 
@@ -226,9 +219,17 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     [groupby, props.s2DataConfig?.fields?.columns, metricCols],
   );
 
-  React.useEffect(() => {
+  const [prevFieldsKey, setPrevFieldsKey] = useState(fieldsKey);
+  if (fieldsKey !== prevFieldsKey) {
+    setPrevFieldsKey(fieldsKey);
     setSortParams([]);
-  }, [fieldsKey]);
+  }
+
+  useEffect(() => {
+    return () => {
+      s2InstanceRef.current = null;
+    };
+  }, []);
 
   const mergedDataCfg = useMemo(
     () => ({
@@ -285,9 +286,11 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   const isDark = isDarkMode;
   const headerBgColor =
     headerColor || theme?.colorBgLayout || theme?.colorFillAlter || '#fafafa';
-  const resolvedBorderColor = borderColor || (isDark
-    ? theme?.colorBorderSecondary || theme?.colorBorder || '#303030'
-    : theme?.colorBorderSecondary || theme?.colorBorder || '#f0f0f0');
+  const resolvedBorderColor =
+    borderColor ||
+    (isDark
+      ? theme?.colorBorderSecondary || theme?.colorBorder || '#303030'
+      : theme?.colorBorderSecondary || theme?.colorBorder || '#f0f0f0');
   const hoverBgColor = isDark
     ? theme?.colorFillContentHover || 'rgba(255, 255, 255, 0.08)'
     : theme?.colorBgTextHover || theme?.colorFillAlter || '#f5f5f5';
@@ -420,8 +423,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         : {},
     };
 
-    const userOptions =
-      (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
+    const userOptions = advancedS2OptionsObj?.options || {};
     const finalAdvThemeCfg = advThemeCfg || userOptions.themeCfg || {};
     const merged = merge({}, baseThemeCfg, finalAdvThemeCfg);
 
@@ -442,14 +444,14 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
 
     // Auto-promote keys from root, root.options, themeCfg or themeCfg.theme to merged.theme
     themeKeys.forEach(key => {
-      if (advancedS2OptionsObj && advancedS2OptionsObj[key]) {
+      if (advancedS2OptionsObj?.[key]) {
         activeTheme[key] = merge(
           {},
           activeTheme[key] || {},
           advancedS2OptionsObj[key],
         );
       }
-      if (userOptions && userOptions[key]) {
+      if (userOptions?.[key]) {
         activeTheme[key] = merge({}, activeTheme[key] || {}, userOptions[key]);
       }
       if (finalAdvThemeCfg[key]) {
@@ -499,28 +501,34 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     const baseOptions = { ...s2Options };
 
     // Deep merge advanced options directly on top (excluding theme settings and top-level props)
-    const {
-      sheetType: ignoredSheetType,
-      adaptive: ignoredAdaptive,
-      loading: ignoredLoading,
-      showPagination: ignoredShowPagination,
-      themeCfg: ignoredThemeCfg,
-      theme: ignoredTheme,
-      palette: ignoredPalette,
-      background: ignoredBackground,
-      splitLine: ignoredSplitLine,
-      dataCell: ignoredDataCell,
-      rowCell: ignoredRowCell,
-      colCell: ignoredColCell,
-      cornerCell: ignoredCornerCell,
-      scrollBar: ignoredScrollBar,
-      cell: ignoredCell,
-      options: ignoredOptions,
-      ...restOptions
-    } = advancedS2OptionsObj || {};
+    const themeProps = new Set([
+      'sheetType',
+      'adaptive',
+      'loading',
+      'showPagination',
+      'themeCfg',
+      'theme',
+      'palette',
+      'background',
+      'splitLine',
+      'dataCell',
+      'rowCell',
+      'colCell',
+      'cornerCell',
+      'scrollBar',
+      'cell',
+      'options',
+    ]);
+    const restOptions: Record<string, unknown> = {};
+    if (advancedS2OptionsObj) {
+      Object.entries(advancedS2OptionsObj).forEach(([k, v]) => {
+        if (!themeProps.has(k)) {
+          restOptions[k] = v;
+        }
+      });
+    }
 
-    const userOptions =
-      (advancedS2OptionsObj && advancedS2OptionsObj.options) || {};
+    const userOptions = advancedS2OptionsObj?.options || {};
     const finalOptions = merge({}, baseOptions, restOptions, userOptions);
 
     // Merge conditions: cleanly combine baseOptions.conditions (from UI) with any conditions defined in advanced options
@@ -577,7 +585,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       'seriesNumber',
     ];
     styleKeys.forEach(key => {
-      if (advancedS2OptionsObj && advancedS2OptionsObj[key]) {
+      if (advancedS2OptionsObj?.[key]) {
         finalOptions.style = finalOptions.style || {};
         finalOptions.style[key] = merge(
           {},
@@ -585,7 +593,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
           advancedS2OptionsObj[key],
         );
       }
-      if (userOptions && userOptions[key]) {
+      if (userOptions?.[key]) {
         finalOptions.style = finalOptions.style || {};
         finalOptions.style[key] = merge(
           {},
@@ -679,14 +687,14 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     finalOptions.tooltip.operation = finalOptions.tooltip.operation || {};
     finalOptions.tooltip.operation.menu = {
       render: (props: any) =>
-        React.createElement(
-          React.Fragment,
+        createElement(
+          Fragment,
           null,
-          React.createElement('style', null, TOOLTIP_MENU_STYLE),
-          React.createElement(
+          createElement('style', null, TOOLTIP_MENU_STYLE),
+          createElement(
             'div',
             { className: 's2-tooltip-custom-menu' },
-            React.createElement(Menu, { ...props, mode: 'vertical' }),
+            createElement(Menu, { ...props, mode: 'vertical' }),
           ),
         ),
       ...finalOptions.tooltip.operation.menu,
@@ -848,7 +856,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
           Export CSV
         </button>
       )}
-      {React.createElement(SheetComponent as any, {
+      {createElement(SheetComponent as any, {
         key: sheetKey,
         sheetType,
         adaptive,
@@ -859,7 +867,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         themeCfg: customThemeCfg,
         onMounted: (s2: any) => {
           s2InstanceRef.current = s2;
-          (window as any).s2 = s2;
           s2.on(S2Event.RANGE_SORT, (newSortParams: any) => {
             if (Array.isArray(newSortParams)) {
               setSortParams(newSortParams);

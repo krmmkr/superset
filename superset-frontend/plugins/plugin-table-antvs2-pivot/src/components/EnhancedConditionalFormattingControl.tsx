@@ -101,7 +101,9 @@ export default function EnhancedConditionalFormattingControl({
   const [targetColumn, setTargetColumn] = useState<string>(
     columnOptions[0]?.value || '',
   );
-  const [ruleType, setRuleType] = useState<'threshold' | 'colorScale'>('threshold');
+  const [ruleType, setRuleType] = useState<'threshold' | 'colorScale'>(
+    'threshold',
+  );
   const [operator, setOperator] = useState<
     | '>'
     | '<'
@@ -113,7 +115,9 @@ export default function EnhancedConditionalFormattingControl({
     | 'contains'
     | 'starts_with'
   >('>');
-  const [compareTarget, setCompareTarget] = useState<'static' | 'column'>('static');
+  const [compareTarget, setCompareTarget] = useState<'static' | 'column'>(
+    'static',
+  );
   const [targetValue, setTargetValue] = useState<number>(0);
   const [targetValueRight, setTargetValueRight] = useState<number>(100);
   const [targetValueText, setTargetValueText] = useState<string>('');
@@ -122,7 +126,9 @@ export default function EnhancedConditionalFormattingControl({
   );
   const [color, setColor] = useState<string>('#52c41a');
   const [opacity, setOpacity] = useState<number>(1);
-  const [applyTo, setApplyTo] = useState<'background' | 'text' | 'icon'>('background');
+  const [applyTo, setApplyTo] = useState<'background' | 'text' | 'icon'>(
+    'background',
+  );
   const [iconName, setIconName] = useState<string>('arrow-up');
   const [iconPosition, setIconPosition] = useState<'left' | 'right'>('left');
   const [customPrefix, setCustomPrefix] = useState<string>('');
@@ -142,6 +148,11 @@ export default function EnhancedConditionalFormattingControl({
       setOperator('=');
     } else {
       setOperator('>');
+    }
+    if (targetColumnCompare === newCol) {
+      const alternate =
+        columnOptions.find(o => o.value !== newCol)?.value || '';
+      setTargetColumnCompare(alternate);
     }
   };
 
@@ -180,7 +191,9 @@ export default function EnhancedConditionalFormattingControl({
       setTargetValue(rule.targetValue ?? 0);
       setTargetValueRight(rule.targetValueRight ?? 100);
       setTargetValueText(rule.targetValueText ?? '');
-      setTargetColumnCompare(rule.targetColumn || columnOptions[0]?.value || '');
+      setTargetColumnCompare(
+        rule.targetColumn || columnOptions[0]?.value || '',
+      );
       setColor(rule.color || '#52c41a');
       setOpacity(rule.opacity ?? 1);
       setApplyTo(rule.applyTo || 'background');
@@ -203,7 +216,9 @@ export default function EnhancedConditionalFormattingControl({
 
   const handleSaveRule = () => {
     const newRule: EnhancedConditionalFormattingRule = {
-      id: editingRuleId || `rule_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id:
+        editingRuleId ||
+        `rule_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       column: targetColumn,
       ruleType,
       ...(ruleType === 'threshold'
@@ -276,9 +291,18 @@ export default function EnhancedConditionalFormattingControl({
   return (
     <div style={{ width: '100%' }}>
       {/* Rule List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          marginBottom: '10px',
+        }}
+      >
         {value.length === 0 && (
-          <div style={{ fontSize: '12px', color: '#8c8c8c', fontStyle: 'italic' }}>
+          <div
+            style={{ fontSize: '12px', color: '#8c8c8c', fontStyle: 'italic' }}
+          >
             {t('No conditional formatting rules configured.')}
           </div>
         )}
@@ -300,7 +324,14 @@ export default function EnhancedConditionalFormattingControl({
                 fontSize: '12px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  overflow: 'hidden',
+                }}
+              >
                 {/* Color / Icon swatch preview */}
                 {rule.ruleType === 'threshold' ? (
                   rule.applyTo === 'icon' ? (
@@ -344,23 +375,27 @@ export default function EnhancedConditionalFormattingControl({
                     }}
                   />
                 )}
-                <span style={{ fontWeight: 500, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                <span
+                  style={{
+                    fontWeight: 500,
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {rule.column}
                 </span>
                 <span style={{ color: '#595959', fontSize: '11px' }}>
-                  {rule.ruleType === 'threshold' ? (
-                    rule.compareTarget === 'column' ? (
-                      `${rule.operator} ${rule.targetColumn} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
-                    ) : rule.operator === 'between' ? (
-                      `${rule.targetValue} - ${rule.targetValueRight} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
-                    ) : rule.targetValueText !== undefined && rule.targetValueText !== '' ? (
-                      `${rule.operator} "${rule.targetValueText}" (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
-                    ) : (
-                      `${rule.operator} ${rule.targetValue} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
-                    )
-                  ) : (
-                    `Color Scale (${Math.round((rule.minOpacity ?? 0.3) * 100)}% - ${Math.round((rule.maxOpacity ?? 1) * 100)}%)`
-                  )}
+                  {rule.ruleType === 'threshold'
+                    ? rule.compareTarget === 'column'
+                      ? `${rule.operator} ${rule.targetColumn} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
+                      : rule.operator === 'between'
+                        ? `${rule.targetValue} - ${rule.targetValueRight} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
+                        : rule.targetValueText !== undefined &&
+                            rule.targetValueText !== ''
+                          ? `${rule.operator} "${rule.targetValueText}" (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
+                          : `${rule.operator} ${rule.targetValue} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
+                    : `Color Scale (${Math.round((rule.minOpacity ?? 0.3) * 100)}% - ${Math.round((rule.maxOpacity ?? 1) * 100)}%)`}
                 </span>
               </div>
 
@@ -409,17 +444,33 @@ export default function EnhancedConditionalFormattingControl({
       </Button>
 
       <Modal
-        title={editingRuleId ? t('Edit Formatting Rule') : t('Add Formatting Rule')}
+        title={
+          editingRuleId ? t('Edit Formatting Rule') : t('Add Formatting Rule')
+        }
         show={isModalOpen}
         onHide={() => setIsModalOpen(false)}
         onHandledPrimaryAction={handleSaveRule}
         primaryButtonName={t('Save Rule')}
         width={480}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '8px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            paddingTop: '8px',
+          }}
+        >
           {/* Target Column */}
           <div>
-            <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+            <label
+              style={{
+                fontWeight: 600,
+                fontSize: '12px',
+                display: 'block',
+                marginBottom: '4px',
+              }}
+            >
               {t('Target Column / Metric')}
             </label>
             <div style={{ width: '100%' }}>
@@ -433,7 +484,14 @@ export default function EnhancedConditionalFormattingControl({
 
           {/* Rule Type */}
           <div>
-            <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+            <label
+              style={{
+                fontWeight: 600,
+                fontSize: '12px',
+                display: 'block',
+                marginBottom: '4px',
+              }}
+            >
               {t('Rule Type')}
             </label>
             <div style={{ width: '100%' }}>
@@ -442,10 +500,21 @@ export default function EnhancedConditionalFormattingControl({
                 onChange={val => setRuleType(val as 'threshold' | 'colorScale')}
                 options={
                   isDimension
-                    ? [{ value: 'threshold', label: t('Threshold / Comparison (Dimension)') }]
+                    ? [
+                        {
+                          value: 'threshold',
+                          label: t('Threshold / Comparison (Dimension)'),
+                        },
+                      ]
                     : [
-                        { value: 'threshold', label: t('Threshold / Comparison') },
-                        { value: 'colorScale', label: t('Color Scale (Heatmap Gradient)') },
+                        {
+                          value: 'threshold',
+                          label: t('Threshold / Comparison'),
+                        },
+                        {
+                          value: 'colorScale',
+                          label: t('Color Scale (Heatmap Gradient)'),
+                        },
                       ]
                 }
               />
@@ -456,13 +525,22 @@ export default function EnhancedConditionalFormattingControl({
             <>
               {/* Compare Target */}
               <div>
-                <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    display: 'block',
+                    marginBottom: '4px',
+                  }}
+                >
                   {t('Compare Against')}
                 </label>
                 <div style={{ width: '100%' }}>
                   <Select
                     value={compareTarget}
-                    onChange={val => setCompareTarget(val as 'static' | 'column')}
+                    onChange={val =>
+                      setCompareTarget(val as 'static' | 'column')
+                    }
                     options={[
                       {
                         value: 'static',
@@ -481,18 +559,40 @@ export default function EnhancedConditionalFormattingControl({
 
               {/* Operator & Value */}
               <Row gutter={10} align="middle">
-                <Col span={compareTarget === 'column' ? 8 : operator === 'between' ? 6 : 8}>
-                  <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                <Col
+                  span={
+                    compareTarget === 'column'
+                      ? 8
+                      : operator === 'between'
+                        ? 6
+                        : 8
+                  }
+                >
+                  <label
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
                     {t('Condition')}
                   </label>
                   <Select
                     value={operator}
-                    onChange={val => setOperator(val as any)}
+                    onChange={val =>
+                      setOperator(
+                        (val as EnhancedConditionalFormattingRule['operator']) ||
+                          '>',
+                      )
+                    }
                     options={
                       isDimension
                         ? DIMENSION_OPERATOR_OPTIONS
                         : compareTarget === 'column'
-                          ? METRIC_OPERATOR_OPTIONS.filter(o => o.value !== 'between')
+                          ? METRIC_OPERATOR_OPTIONS.filter(
+                              o => o.value !== 'between',
+                            )
                           : METRIC_OPERATOR_OPTIONS
                     }
                   />
@@ -501,7 +601,14 @@ export default function EnhancedConditionalFormattingControl({
                 {compareTarget === 'static' ? (
                   isDimension ? (
                     <Col span={16}>
-                      <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                      <label
+                        style={{
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          display: 'block',
+                          marginBottom: '4px',
+                        }}
+                      >
                         {t('Text / Value')}
                       </label>
                       <Input
@@ -513,7 +620,14 @@ export default function EnhancedConditionalFormattingControl({
                   ) : operator === 'between' ? (
                     <>
                       <Col span={9}>
-                        <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                        <label
+                          style={{
+                            fontWeight: 600,
+                            fontSize: '12px',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
                           {t('Min Value')}
                         </label>
                         <InputNumber
@@ -523,19 +637,35 @@ export default function EnhancedConditionalFormattingControl({
                         />
                       </Col>
                       <Col span={9}>
-                        <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                        <label
+                          style={{
+                            fontWeight: 600,
+                            fontSize: '12px',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
                           {t('Max Value')}
                         </label>
                         <InputNumber
                           value={targetValueRight}
-                          onChange={val => setTargetValueRight(Number(val) || 0)}
+                          onChange={val =>
+                            setTargetValueRight(Number(val) || 0)
+                          }
                           style={{ width: '100%' }}
                         />
                       </Col>
                     </>
                   ) : (
                     <Col span={16}>
-                      <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                      <label
+                        style={{
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          display: 'block',
+                          marginBottom: '4px',
+                        }}
+                      >
                         {t('Value')}
                       </label>
                       <InputNumber
@@ -547,13 +677,22 @@ export default function EnhancedConditionalFormattingControl({
                   )
                 ) : (
                   <Col span={16}>
-                    <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                    <label
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        display: 'block',
+                        marginBottom: '4px',
+                      }}
+                    >
                       {t('Compare Column')}
                     </label>
                     <Select
                       value={targetColumnCompare}
                       onChange={val => setTargetColumnCompare(String(val))}
-                      options={columnOptions.filter(o => o.value !== targetColumn)}
+                      options={columnOptions.filter(
+                        o => o.value !== targetColumn,
+                      )}
                     />
                   </Col>
                 )}
@@ -561,13 +700,22 @@ export default function EnhancedConditionalFormattingControl({
 
               {/* Format Target */}
               <div>
-                <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    display: 'block',
+                    marginBottom: '4px',
+                  }}
+                >
                   {t('Apply To')}
                 </label>
                 <div style={{ width: '100%' }}>
                   <Select
                     value={applyTo}
-                    onChange={val => setApplyTo(val as 'background' | 'text' | 'icon')}
+                    onChange={val =>
+                      setApplyTo(val as 'background' | 'text' | 'icon')
+                    }
                     options={[
                       { value: 'background', label: t('Background Color') },
                       { value: 'text', label: t('Text Color') },
@@ -581,7 +729,14 @@ export default function EnhancedConditionalFormattingControl({
               {applyTo === 'icon' && (
                 <Row gutter={10}>
                   <Col span={12}>
-                    <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                    <label
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        display: 'block',
+                        marginBottom: '4px',
+                      }}
+                    >
                       {t('Icon / Symbol')}
                     </label>
                     <div style={{ width: '100%' }}>
@@ -590,26 +745,41 @@ export default function EnhancedConditionalFormattingControl({
                         onChange={val => setIconName(String(val))}
                         options={[
                           { value: 'arrow-up', label: '▲ Solid Triangle Up' },
-                          { value: 'arrow-down', label: '▼ Solid Triangle Down' },
+                          {
+                            value: 'arrow-down',
+                            label: '▼ Solid Triangle Down',
+                          },
                           { value: 'trend-up', label: '↑ Linear Arrow Up' },
                           { value: 'trend-down', label: '↓ Linear Arrow Down' },
                           { value: 'circle-fill', label: '● Dot / Circle' },
                           { value: 'check', label: '✔ Checkmark' },
                           { value: 'cross', label: '✖ Cross' },
-                          { value: 'custom', label: t('Custom Symbol / Prefix') },
+                          {
+                            value: 'custom',
+                            label: t('Custom Symbol / Prefix'),
+                          },
                         ]}
                       />
                     </div>
                   </Col>
 
                   <Col span={12}>
-                    <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                    <label
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        display: 'block',
+                        marginBottom: '4px',
+                      }}
+                    >
                       {t('Position')}
                     </label>
                     <div style={{ width: '100%' }}>
                       <Select
                         value={iconPosition}
-                        onChange={val => setIconPosition(val as 'left' | 'right')}
+                        onChange={val =>
+                          setIconPosition(val as 'left' | 'right')
+                        }
                         options={[
                           { value: 'left', label: t('Prefix (Left)') },
                           { value: 'right', label: t('Suffix (Right)') },
@@ -620,7 +790,14 @@ export default function EnhancedConditionalFormattingControl({
 
                   {iconName === 'custom' && (
                     <Col span={24} style={{ marginTop: '8px' }}>
-                      <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                      <label
+                        style={{
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          display: 'block',
+                          marginBottom: '4px',
+                        }}
+                      >
                         {t('Custom Prefix / Symbol')}
                       </label>
                       <Input
@@ -635,10 +812,24 @@ export default function EnhancedConditionalFormattingControl({
 
               {/* Color Picker & Swatches */}
               <div>
-                <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    display: 'block',
+                    marginBottom: '4px',
+                  }}
+                >
                   {applyTo === 'icon' ? t('Icon Color') : t('Color')}
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '8px',
+                  }}
+                >
                   <input
                     type="color"
                     value={color.startsWith('#') ? color : '#52c41a'}
@@ -681,7 +872,8 @@ export default function EnhancedConditionalFormattingControl({
                         borderRadius: '3px',
                         backgroundColor: c,
                         cursor: 'pointer',
-                        border: color === c ? '2px solid #000' : '1px solid #d9d9d9',
+                        border:
+                          color === c ? '2px solid #000' : '1px solid #d9d9d9',
                       }}
                       title={c}
                     />
@@ -691,11 +883,23 @@ export default function EnhancedConditionalFormattingControl({
 
               {/* Single Transparency / Opacity Slider (No duplicate quick buttons) */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: '4px',
+                  }}
+                >
                   <label style={{ fontWeight: 600, fontSize: '12px' }}>
                     {t('Transparency / Opacity')}
                   </label>
-                  <span style={{ fontSize: '12px', color: '#595959', fontWeight: 500 }}>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      color: '#595959',
+                      fontWeight: 500,
+                    }}
+                  >
                     {Math.round(opacity * 100)}%
                   </span>
                 </div>
@@ -717,10 +921,23 @@ export default function EnhancedConditionalFormattingControl({
               {/* Color Scale Min & Max */}
               <Row gutter={16}>
                 <Col span={12}>
-                  <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
                     {t('Min Value Color (Lowest)')}
                   </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
                     <input
                       type="color"
                       value={minColor.startsWith('#') ? minColor : '#e6f7ff'}
@@ -744,10 +961,23 @@ export default function EnhancedConditionalFormattingControl({
                 </Col>
 
                 <Col span={12}>
-                  <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
                     {t('Max Value Color (Highest)')}
                   </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
                     <input
                       type="color"
                       value={maxColor.startsWith('#') ? maxColor : '#1890ff'}
@@ -774,7 +1004,13 @@ export default function EnhancedConditionalFormattingControl({
               {/* Clean Opacity sliders for color scale (No duplicate quick buttons) */}
               <Row gutter={16}>
                 <Col span={12}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '4px',
+                    }}
+                  >
                     <label style={{ fontWeight: 600, fontSize: '12px' }}>
                       {t('Min Opacity')}
                     </label>
@@ -793,7 +1029,13 @@ export default function EnhancedConditionalFormattingControl({
                   />
                 </Col>
                 <Col span={12}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '4px',
+                    }}
+                  >
                     <label style={{ fontWeight: 600, fontSize: '12px' }}>
                       {t('Max Opacity')}
                     </label>
@@ -815,7 +1057,14 @@ export default function EnhancedConditionalFormattingControl({
 
               {/* Gradient Preview */}
               <div>
-                <label style={{ fontWeight: 600, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    display: 'block',
+                    marginBottom: '4px',
+                  }}
+                >
                   {t('Gradient Preview')}
                 </label>
                 <div

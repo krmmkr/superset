@@ -59,7 +59,8 @@ function hexToRgba(color: string, opacity?: number): string {
     const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
     if (match) {
       const [, r, g, b] = match;
-      const alpha = opacity !== undefined ? Math.max(0, Math.min(1, opacity)) : 1;
+      const alpha =
+        opacity !== undefined ? Math.max(0, Math.min(1, opacity)) : 1;
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
   }
@@ -89,6 +90,94 @@ function interpolateColor(
   }
 
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+/**
+ * Evaluates whether a conditional formatting rule matches a given cell value and row context.
+ * Supports string comparisons (=, !=, contains, starts_with) and numeric comparisons
+ * (>, <, >=, <=, =, !=, between), against static values or dynamic columns.
+ */
+function isRuleMatched(
+  rule: EnhancedConditionalFormattingRule,
+  value: unknown,
+  rowData?: Record<string, unknown>,
+): boolean {
+  if (value === null || value === undefined) return false;
+
+  const isStringMatch =
+    rule.targetValueText !== undefined ||
+    rule.operator === 'contains' ||
+    rule.operator === 'starts_with' ||
+    (typeof value === 'string' && isNaN(Number(value)));
+
+  if (isStringMatch) {
+    const valStr = String(value).trim().toLowerCase();
+    let targetStr: string | undefined;
+
+    if (rule.compareTarget === 'column') {
+      if (!rowData || !rule.targetColumn) return false;
+      const rawColVal = rowData[rule.targetColumn];
+      if (rawColVal === null || rawColVal === undefined) return false;
+      targetStr = String(rawColVal).trim().toLowerCase();
+    } else {
+      targetStr = String(rule.targetValueText ?? rule.targetValue ?? '')
+        .trim()
+        .toLowerCase();
+    }
+
+    switch (rule.operator) {
+      case '=':
+        return valStr === targetStr;
+      case '!=':
+        return valStr !== targetStr;
+      case 'contains':
+        return valStr.includes(targetStr);
+      case 'starts_with':
+        return valStr.startsWith(targetStr);
+      default:
+        return valStr === targetStr;
+    }
+  }
+
+  // Numeric comparison
+  const numVal = Number(value);
+  if (isNaN(numVal)) return false;
+
+  let targetVal: number | undefined;
+  if (rule.compareTarget === 'column') {
+    if (!rowData || !rule.targetColumn) return false;
+    const rawColVal = rowData[rule.targetColumn];
+    if (rawColVal === null || rawColVal === undefined) return false;
+    targetVal = Number(rawColVal);
+  } else {
+    targetVal = rule.targetValue;
+  }
+
+  if (targetVal === undefined || isNaN(targetVal)) return false;
+
+  switch (rule.operator) {
+    case '>':
+      return numVal > targetVal;
+    case '<':
+      return numVal < targetVal;
+    case '>=':
+      return numVal >= targetVal;
+    case '<=':
+      return numVal <= targetVal;
+    case '=':
+      return numVal === targetVal;
+    case '!=':
+      return numVal !== targetVal;
+    case 'between': {
+      const rightVal = rule.targetValueRight;
+      if (rightVal !== undefined && !isNaN(rightVal)) {
+        return numVal > targetVal && numVal < rightVal;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
 }
 
 /**
@@ -136,8 +225,12 @@ function safeParseJson<T>(raw: string | undefined, fallback: T): T {
  * Normalize a column reference (object with column_name / label, or string)
  * to a plain string field name.
  */
-function normalizeCol(c: any): string {
-  return typeof c === 'object' ? c.column_name || c.label : String(c);
+function normalizeCol(c: unknown): string {
+  if (c && typeof c === 'object' && !Array.isArray(c)) {
+    const colObj = c as Record<string, unknown>;
+    return String(colObj.column_name || colObj.label || '');
+  }
+  return String(c ?? '');
 }
 
 /** Sort menu item definitions — static, allocated once. */
@@ -283,12 +376,12 @@ export default function transformProps(
 
   const hideMeasureColumn = Boolean(
     formData.hideMeasureColumn ??
-      formData.hide_measure_column ??
-      formData.hideMetricColumn ??
-      formData.hide_metric_column ??
-      formData.hideMetricsColumns ??
-      formData.hide_metrics_columns ??
-      false,
+    formData.hide_measure_column ??
+    formData.hideMetricColumn ??
+    formData.hide_metric_column ??
+    formData.hideMetricsColumns ??
+    formData.hide_metrics_columns ??
+    false,
   );
 
   const metricsLayout =
@@ -302,8 +395,7 @@ export default function transformProps(
   const nullPlaceholder =
     formData.nullPlaceholder ?? formData.null_placeholder ?? '-';
 
-  const enableExport =
-    formData.enableExport ?? formData.enable_export ?? true;
+  const enableExport = formData.enableExport ?? formData.enable_export ?? true;
 
   const enhancedRules: EnhancedConditionalFormattingRule[] =
     formData.enhancedConditionalFormatting ??
@@ -411,9 +503,11 @@ export default function transformProps(
       ? `rgba(${borderColorRaw.r}, ${borderColorRaw.g}, ${borderColorRaw.b}, ${borderColorRaw.a ?? 1})`
       : undefined;
 
-  const rowBandingColorObj = formData.rowBandingColor ?? formData.row_banding_color;
+  const rowBandingColorObj =
+    formData.rowBandingColor ?? formData.row_banding_color;
 
-  const rowBandingColorRaw = formData.rowBandingColor ?? formData.row_banding_color;
+  const rowBandingColorRaw =
+    formData.rowBandingColor ?? formData.row_banding_color;
   const rowBandingColor =
     rowBandingColorRaw &&
     typeof rowBandingColorRaw === 'object' &&
@@ -478,9 +572,7 @@ export default function transformProps(
     for (const col of metricCols) {
       const val = row[col];
       out[col] =
-        val === null || val === undefined || val === ''
-          ? null
-          : Number(val);
+        val === null || val === undefined || val === '' ? null : Number(val);
     }
     return out;
   });
@@ -622,119 +714,16 @@ export default function transformProps(
             }
           });
 
-        const evaluateRuleCondition = (
-          rule: EnhancedConditionalFormattingRule,
-          value: any,
-          rowData: any,
-        ): { fill: string } | null => {
-          if (value === null || value === undefined) return null;
-
-          const isStringMatch =
-            rule.targetValueText !== undefined ||
-            rule.operator === 'contains' ||
-            rule.operator === 'starts_with' ||
-            (typeof value === 'string' && isNaN(Number(value)));
-
-          if (isStringMatch) {
-            const valStr = String(value).trim().toLowerCase();
-            let targetStr: string | undefined;
-
-            if (rule.compareTarget === 'column') {
-              if (!rowData || !rule.targetColumn) return null;
-              const rawColVal = rowData[rule.targetColumn];
-              if (rawColVal === null || rawColVal === undefined) return null;
-              targetStr = String(rawColVal).trim().toLowerCase();
-            } else {
-              targetStr = String(
-                rule.targetValueText ?? rule.targetValue ?? '',
-              )
-                .trim()
-                .toLowerCase();
-            }
-
-            let matched = false;
-            switch (rule.operator) {
-              case '=':
-                matched = valStr === targetStr;
-                break;
-              case '!=':
-                matched = valStr !== targetStr;
-                break;
-              case 'contains':
-                matched = valStr.includes(targetStr);
-                break;
-              case 'starts_with':
-                matched = valStr.startsWith(targetStr);
-                break;
-              default:
-                matched = valStr === targetStr;
-            }
-
-            if (matched && rule.color) {
-              return { fill: hexToRgba(rule.color, rule.opacity) };
-            }
-            return null;
-          }
-
-          // Numeric comparison
-          const numVal = Number(value);
-          if (isNaN(numVal)) return null;
-
-          let targetVal: number | undefined;
-          if (rule.compareTarget === 'column') {
-            if (!rowData || !rule.targetColumn) return null;
-            const rawColVal = rowData[rule.targetColumn];
-            if (rawColVal === null || rawColVal === undefined) return null;
-            targetVal = Number(rawColVal);
-          } else {
-            targetVal = rule.targetValue;
-          }
-
-          if (targetVal === undefined || isNaN(targetVal)) return null;
-
-          let matched = false;
-          switch (rule.operator) {
-            case '>':
-              matched = numVal > targetVal;
-              break;
-            case '<':
-              matched = numVal < targetVal;
-              break;
-            case '>=':
-              matched = numVal >= targetVal;
-              break;
-            case '<=':
-              matched = numVal <= targetVal;
-              break;
-            case '=':
-              matched = numVal === targetVal;
-              break;
-            case '!=':
-              matched = numVal !== targetVal;
-              break;
-            case 'between': {
-              const rightVal = rule.targetValueRight;
-              if (rightVal !== undefined && !isNaN(rightVal)) {
-                matched = numVal > targetVal && numVal < rightVal;
-              }
-              break;
-            }
-            default:
-              matched = false;
-          }
-
-          if (matched && rule.color) {
-            return { fill: hexToRgba(rule.color, rule.opacity) };
-          }
-          return null;
-        };
-
         enhancedRules.forEach(rule => {
           if (rule.ruleType === 'threshold' && rule.applyTo === 'background') {
             backgroundConditions.push({
               field: rule.column,
-              mapping: (value: any, rowData: any) =>
-                evaluateRuleCondition(rule, value, rowData),
+              mapping: (value: unknown, rowData: Record<string, unknown>) => {
+                if (isRuleMatched(rule, value, rowData) && rule.color) {
+                  return { fill: hexToRgba(rule.color, rule.opacity) };
+                }
+                return null;
+              },
             });
           } else if (rule.ruleType === 'colorScale') {
             const minMax = columnMinMax[rule.column];
@@ -743,7 +732,7 @@ export default function transformProps(
 
             backgroundConditions.push({
               field: rule.column,
-              mapping: (value: any) => {
+              mapping: (value: unknown) => {
                 if (value === null || value === undefined) return null;
                 const num = Number(value);
                 if (isNaN(num)) return null;
@@ -772,102 +761,8 @@ export default function transformProps(
           .forEach(rule => {
             textConditions.push({
               field: rule.column,
-              mapping: (value: any, rowData: any) => {
-                if (value === null || value === undefined) return null;
-                const isStringMatch =
-                  rule.targetValueText !== undefined ||
-                  rule.operator === 'contains' ||
-                  rule.operator === 'starts_with' ||
-                  (typeof value === 'string' && isNaN(Number(value)));
-
-                if (isStringMatch) {
-                  const valStr = String(value).trim().toLowerCase();
-                  let targetStr: string | undefined;
-
-                  if (rule.compareTarget === 'column') {
-                    if (!rowData || !rule.targetColumn) return null;
-                    const rawColVal = rowData[rule.targetColumn];
-                    if (rawColVal === null || rawColVal === undefined) return null;
-                    targetStr = String(rawColVal).trim().toLowerCase();
-                  } else {
-                    targetStr = String(
-                      rule.targetValueText ?? rule.targetValue ?? '',
-                    )
-                      .trim()
-                      .toLowerCase();
-                  }
-
-                  let matched = false;
-                  switch (rule.operator) {
-                    case '=':
-                      matched = valStr === targetStr;
-                      break;
-                    case '!=':
-                      matched = valStr !== targetStr;
-                      break;
-                    case 'contains':
-                      matched = valStr.includes(targetStr);
-                      break;
-                    case 'starts_with':
-                      matched = valStr.startsWith(targetStr);
-                      break;
-                    default:
-                      matched = valStr === targetStr;
-                  }
-
-                  if (matched && rule.color) {
-                    return { fill: hexToRgba(rule.color, rule.opacity) };
-                  }
-                  return null;
-                }
-
-                const numVal = Number(value);
-                if (isNaN(numVal)) return null;
-
-                let targetVal: number | undefined;
-                if (rule.compareTarget === 'column') {
-                  if (!rowData || !rule.targetColumn) return null;
-                  const rawColVal = rowData[rule.targetColumn];
-                  if (rawColVal === null || rawColVal === undefined) return null;
-                  targetVal = Number(rawColVal);
-                } else {
-                  targetVal = rule.targetValue;
-                }
-
-                if (targetVal === undefined || isNaN(targetVal)) return null;
-
-                let matched = false;
-                switch (rule.operator) {
-                  case '>':
-                    matched = numVal > targetVal;
-                    break;
-                  case '<':
-                    matched = numVal < targetVal;
-                    break;
-                  case '>=':
-                    matched = numVal >= targetVal;
-                    break;
-                  case '<=':
-                    matched = numVal <= targetVal;
-                    break;
-                  case '=':
-                    matched = numVal === targetVal;
-                    break;
-                  case '!=':
-                    matched = numVal !== targetVal;
-                    break;
-                  case 'between': {
-                    const rightVal = rule.targetValueRight;
-                    if (rightVal !== undefined && !isNaN(rightVal)) {
-                      matched = numVal > targetVal && numVal < rightVal;
-                    }
-                    break;
-                  }
-                  default:
-                    matched = false;
-                }
-
-                if (matched && rule.color) {
+              mapping: (value: unknown, rowData: Record<string, unknown>) => {
+                if (isRuleMatched(rule, value, rowData) && rule.color) {
                   return { fill: hexToRgba(rule.color, rule.opacity) };
                 }
                 return null;
@@ -888,96 +783,8 @@ export default function transformProps(
             iconConditions.push({
               field: rule.column,
               position: rule.iconPosition || 'left',
-              mapping: (value: any, rowData: any) => {
-                if (value === null || value === undefined) return null;
-                const isStringMatch =
-                  rule.targetValueText !== undefined ||
-                  rule.operator === 'contains' ||
-                  rule.operator === 'starts_with' ||
-                  (typeof value === 'string' && isNaN(Number(value)));
-
-                let matched = false;
-                if (isStringMatch) {
-                  const valStr = String(value).trim().toLowerCase();
-                  let targetStr: string | undefined;
-
-                  if (rule.compareTarget === 'column') {
-                    if (!rowData || !rule.targetColumn) return null;
-                    const rawColVal = rowData[rule.targetColumn];
-                    if (rawColVal === null || rawColVal === undefined) return null;
-                    targetStr = String(rawColVal).trim().toLowerCase();
-                  } else {
-                    targetStr = String(
-                      rule.targetValueText ?? rule.targetValue ?? '',
-                    )
-                      .trim()
-                      .toLowerCase();
-                  }
-
-                  switch (rule.operator) {
-                    case '=':
-                      matched = valStr === targetStr;
-                      break;
-                    case '!=':
-                      matched = valStr !== targetStr;
-                      break;
-                    case 'contains':
-                      matched = valStr.includes(targetStr);
-                      break;
-                    case 'starts_with':
-                      matched = valStr.startsWith(targetStr);
-                      break;
-                    default:
-                      matched = valStr === targetStr;
-                  }
-                } else {
-                  const numVal = Number(value);
-                  if (isNaN(numVal)) return null;
-
-                  let targetVal: number | undefined;
-                  if (rule.compareTarget === 'column') {
-                    if (!rowData || !rule.targetColumn) return null;
-                    const rawColVal = rowData[rule.targetColumn];
-                    if (rawColVal === null || rawColVal === undefined) return null;
-                    targetVal = Number(rawColVal);
-                  } else {
-                    targetVal = rule.targetValue;
-                  }
-
-                  if (targetVal === undefined || isNaN(targetVal)) return null;
-
-                  switch (rule.operator) {
-                    case '>':
-                      matched = numVal > targetVal;
-                      break;
-                    case '<':
-                      matched = numVal < targetVal;
-                      break;
-                    case '>=':
-                      matched = numVal >= targetVal;
-                      break;
-                    case '<=':
-                      matched = numVal <= targetVal;
-                      break;
-                    case '=':
-                      matched = numVal === targetVal;
-                      break;
-                    case '!=':
-                      matched = numVal !== targetVal;
-                      break;
-                    case 'between': {
-                      const rightVal = rule.targetValueRight;
-                      if (rightVal !== undefined && !isNaN(rightVal)) {
-                        matched = numVal > targetVal && numVal < rightVal;
-                      }
-                      break;
-                    }
-                    default:
-                      matched = false;
-                  }
-                }
-
-                if (matched && rule.color) {
+              mapping: (value: unknown, rowData: Record<string, unknown>) => {
+                if (isRuleMatched(rule, value, rowData) && rule.color) {
                   return {
                     fill: hexToRgba(rule.color, rule.opacity),
                     icon: iconKey,
@@ -1021,7 +828,8 @@ export default function transformProps(
       },
       ...enhancedRules
         .filter(
-          r => r.applyTo === 'icon' && r.iconName === 'custom' && r.customPrefix,
+          r =>
+            r.applyTo === 'icon' && r.iconName === 'custom' && r.customPrefix,
         )
         .map(r => ({
           name: `custom_${r.id}`,

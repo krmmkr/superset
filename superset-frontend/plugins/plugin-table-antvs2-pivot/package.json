@@ -20,6 +20,7 @@
     "access": "public"
   },
   "peerDependencies": {
+    "@apache-superset/core": "*",
     "@superset-ui/chart-controls": "*",
     "@superset-ui/core": "*",
     "react": "^16.13.1 || ^17.0.0 || ^18.0.0"
@@ -29,6 +30,7 @@
     "@antv/s2-react": "^2.3.1"
   },
   "devDependencies": {
+    "@types/lodash": "^4.14.0",
     "@types/react": "^18.0.0",
     "typescript": "^5.0.0"
   }
