@@ -138,19 +138,21 @@ const FilterBarEmptyStateContainer = styled.div`
 `;
 
 const FilterControlsWrapper = styled.div<{ bounded?: boolean }>`
-  ${({ theme, bounded }) => `
+  ${({ theme }) => `
     display: flex;
     flex-direction: column;
     gap: ${theme.sizeUnit * 2}px;
     padding: ${theme.sizeUnit * 4}px;
     padding-top: 0; /* Works with other changes in PR https://github.com/apache/superset/pull/38646 to reduces space between filter header and 1st filter */
+  `}
+`;
+
+const ScrollableContent = styled.div<{ bounded?: boolean }>`
+  ${({ theme, bounded }) => `
     ${
       bounded
-        ? /* The buttons sit below the scroll area rather than over it, so
-             there is no room to reserve. */
-          `padding-bottom: ${theme.sizeUnit * 4}px;`
-        : /* Room for the sticky action buttons at the end of the list. */
-          `padding-bottom: ${theme.sizeUnit * 27}px;`
+        ? `padding-bottom: ${theme.sizeUnit * 4}px;`
+        : `padding-bottom: ${theme.sizeUnit * 27}px;`
     }
   `}
 `;
@@ -381,11 +383,11 @@ const VerticalFilterBar: FC<VerticalBarProps> = ({
               css={tabPaneStyle}
               onScroll={onScroll}
             >
-              <>
+              <ScrollableContent bounded={embedded}>
                 <UrlFiltersVertical />
-                <CrossFiltersVertical hideHeader={hasOnlyOneSectionType} />
                 {filterControls}
-              </>
+                <CrossFiltersVertical hideHeader={hasOnlyOneSectionType} />
+              </ScrollableContent>
             </div>
           )}
           {actions}
