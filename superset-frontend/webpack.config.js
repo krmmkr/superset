@@ -489,7 +489,6 @@ const config = {
       */
       'moment/min/moment-with-locales': false,
       '@antv/g2': false,
-      'react-dom/client': false,
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.yml'],
     fallback: {
