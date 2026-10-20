@@ -66,6 +66,7 @@ import { LabelLayout } from 'echarts/features';
 import { EchartsHandler, EchartsProps, EchartsStylesProps } from '../types';
 import { DEFAULT_LOCALE } from '../constants';
 import { mergeEchartsThemeOverrides } from '../utils/themeOverrides';
+import { loadLocale } from './echartsLocale';
 
 // Define this interface here to avoid creating a dependency back to superset-frontend,
 // TODO: to move the type to @superset-ui/core
@@ -115,15 +116,7 @@ use([
   LabelLayout,
 ]);
 
-const loadLocale = async (locale: string) => {
-  let lang;
-  try {
-    lang = await import(`echarts/lib/i18n/lang${locale}`);
-  } catch {
-    // Locale not supported in ECharts
-  }
-  return lang?.default;
-};
+
 
 function Echart(
   {
