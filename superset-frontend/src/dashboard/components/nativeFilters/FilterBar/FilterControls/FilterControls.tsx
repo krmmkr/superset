@@ -563,12 +563,7 @@ const FilterControls: FC<FilterControlsProps> = ({
       };
     });
 
-    return [
-      ...chartCustomizations,
-      ...dividerItems,
-      ...crossFilters,
-      ...nativeFiltersInScope,
-    ];
+    return [...nativeFiltersInScope, ...dividerItems, ...chartCustomizations];
   }, [
     filtersInScope,
     renderer,
@@ -583,107 +578,139 @@ const FilterControls: FC<FilterControlsProps> = ({
 
   const renderHorizontalContent = useCallback(
     () => (
-      <div
-        css={(theme: SupersetTheme) => css`
-          padding: 0 ${theme.sizeUnit * 4}px;
-          min-width: 0;
-          flex: 1;
-        `}
-      >
-        <DropdownContainer
-          items={items}
-          dropdownTriggerIcon={
-            <Icons.FilterOutlined
-              css={css`
-                && {
-                  margin-right: -4px;
-                  display: flex;
-                }
-              `}
-            />
-          }
-          dropdownTriggerText={t('More filters')}
-          dropdownTriggerCount={activeOverflowedFiltersInScope.length}
-          dropdownTriggerTooltip={
-            activeOverflowedFiltersInScope.length === 0
-              ? t('No applied filters')
-              : t(
-                  'Applied filters: %s',
-                  activeOverflowedFiltersInScope
-                    .map(filter => filter.name)
-                    .join(', '),
-                )
-          }
-          dropdownContent={
-            overflowedFiltersInScope.length ||
-            overflowedCrossFilters.length ||
-            overflowedCustomizationsInScope.length ||
-            (filtersOutOfScope.length && showCollapsePanel) ||
-            (customizationsOutOfScope.length && showCustomizationCollapsePanel)
-              ? (overflowedItems: DropdownItem[]) => {
-                  // Which ids are overflowed comes from DropdownContainer's own
-                  // fresh, synchronous partition of `items` (the argument it
-                  // passes here), not from `overflowedIds` state — that state
-                  // only updates one render later via onOverflowingStateChange,
-                  // so using it here could show a filter here that
-                  // DropdownContainer's *own* main row, computed this same
-                  // render, has already stopped excluding (duplicate chip).
-                  const overflowedItemIds = new Set(
-                    overflowedItems.map(item => item.id),
-                  );
-                  const freshOverflowedFiltersInScope = filtersInScope.filter(
-                    ({ id }) => overflowedItemIds.has(id),
-                  );
-                  const freshOverflowedCrossFilters =
-                    selectedCrossFilters.filter(({ emitterId, name }) =>
-                      overflowedItemIds.has(`${name}${emitterId}`),
-                    );
-                  const freshOverflowedCustomizationsInScope =
-                    customizationsInScope.filter(({ id }) =>
-                      overflowedItemIds.has(`chart-customization-${id}`),
-                    );
-                  return (
-                    <>
-                      <FiltersDropdownContent
-                        overflowedCrossFilters={freshOverflowedCrossFilters}
-                        filtersInScope={freshOverflowedFiltersInScope}
-                        filtersOutOfScope={filtersOutOfScope}
-                        overflowedCustomizationsInScope={
-                          freshOverflowedCustomizationsInScope
-                        }
-                        renderer={renderer}
-                        rendererCrossFilter={rendererCrossFilter}
-                        customizationRenderer={customizationRenderer}
-                        showCollapsePanel={showCollapsePanel}
-                        // Out-of-scope collapsible panels inside opened dropdown content
-                        forceRenderOutOfScope={hasRequiredFirst}
-                      />
-                      {showCustomizationCollapsePanel && (
-                        <CustomizationsOutOfScopeCollapsible
-                          customizationsOutOfScope={customizationsOutOfScope}
-                          renderer={customizationRenderer}
-                          forceRender={false}
-                        />
-                      )}
-                    </>
-                  );
-                }
-              : undefined
-          }
-          ref={popoverRef}
-          onOverflowingStateChange={({ overflowed: nextOverflowedIds }) => {
-            if (
-              nextOverflowedIds.length !== overflowedIds.length ||
-              overflowedIds.reduce(
-                (a, b, i) => a || b !== nextOverflowedIds[i],
-                false,
-              )
-            ) {
-              setOverflowedIds(nextOverflowedIds);
+      <>
+        <div
+          css={(theme: SupersetTheme) => css`
+            padding: 0 ${theme.sizeUnit * 4}px;
+            min-width: 0;
+            flex: 1;
+          `}
+        >
+          <DropdownContainer
+            items={items}
+            dropdownTriggerIcon={
+              <Icons.FilterOutlined
+                css={css`
+                  && {
+                    margin-right: -4px;
+                    display: flex;
+                  }
+                `}
+              />
             }
-          }}
-        />
-      </div>
+            dropdownTriggerText={t('More filters')}
+            dropdownTriggerCount={activeOverflowedFiltersInScope.length}
+            dropdownTriggerTooltip={
+              activeOverflowedFiltersInScope.length === 0
+                ? t('No applied filters')
+                : t(
+                    'Applied filters: %s',
+                    activeOverflowedFiltersInScope
+                      .map(filter => filter.name)
+                      .join(', '),
+                  )
+            }
+            dropdownContent={
+              overflowedFiltersInScope.length ||
+              overflowedCustomizationsInScope.length ||
+              (filtersOutOfScope.length && showCollapsePanel) ||
+              (customizationsOutOfScope.length && showCustomizationCollapsePanel)
+                ? (overflowedItems: DropdownItem[]) => {
+                    // Which ids are overflowed comes from DropdownContainer's own
+                    // fresh, synchronous partition of `items` (the argument it
+                    // passes here), not from `overflowedIds` state — that state
+                    // only updates one render later via onOverflowingStateChange,
+                    // so using it here could show a filter here that
+                    // DropdownContainer's *own* main row, computed this same
+                    // render, has already stopped excluding (duplicate chip).
+                    const overflowedItemIds = new Set(
+                      overflowedItems.map(item => item.id),
+                    );
+                    const freshOverflowedFiltersInScope = filtersInScope.filter(
+                      ({ id }) => overflowedItemIds.has(id),
+                    );
+                    const freshOverflowedCustomizationsInScope =
+                      customizationsInScope.filter(({ id }) =>
+                        overflowedItemIds.has(`chart-customization-${id}`),
+                      );
+                    return (
+                      <>
+                        <FiltersDropdownContent
+                          overflowedCrossFilters={[]}
+                          filtersInScope={freshOverflowedFiltersInScope}
+                          filtersOutOfScope={filtersOutOfScope}
+                          overflowedCustomizationsInScope={
+                            freshOverflowedCustomizationsInScope
+                          }
+                          renderer={renderer}
+                          rendererCrossFilter={rendererCrossFilter}
+                          customizationRenderer={customizationRenderer}
+                          showCollapsePanel={showCollapsePanel}
+                          // Out-of-scope collapsible panels inside opened dropdown content
+                          forceRenderOutOfScope={hasRequiredFirst}
+                        />
+                        {showCustomizationCollapsePanel && (
+                          <CustomizationsOutOfScopeCollapsible
+                            customizationsOutOfScope={customizationsOutOfScope}
+                            renderer={customizationRenderer}
+                            forceRender={false}
+                          />
+                        )}
+                      </>
+                    );
+                  }
+                : undefined
+            }
+            ref={popoverRef}
+            onOverflowingStateChange={({ overflowed: nextOverflowedIds }) => {
+              if (
+                nextOverflowedIds.length !== overflowedIds.length ||
+                overflowedIds.reduce(
+                  (a, b, i) => a || b !== nextOverflowedIds[i],
+                  false,
+                )
+              ) {
+                setOverflowedIds(nextOverflowedIds);
+              }
+            }}
+          />
+        </div>
+        {selectedCrossFilters.length > 0 && (
+          <div
+            css={(theme: SupersetTheme) => css`
+              padding: 0 ${theme.sizeUnit}px;
+              flex-shrink: 0;
+            `}
+          >
+            <DropdownContainer
+              items={[]}
+              dropdownTriggerIcon={
+                <Icons.FilterOutlined
+                  css={css`
+                    && {
+                      margin-right: -4px;
+                      display: flex;
+                    }
+                  `}
+                />
+              }
+              dropdownTriggerText={t('Cross filters')}
+              dropdownTriggerCount={selectedCrossFilters.length}
+              dropdownContent={() => (
+                <FiltersDropdownContent
+                  overflowedCrossFilters={selectedCrossFilters}
+                  filtersInScope={[]}
+                  filtersOutOfScope={[]}
+                  renderer={() => null}
+                  rendererCrossFilter={rendererCrossFilter}
+                  showCollapsePanel={false}
+                  forceRenderOutOfScope={false}
+                />
+              )}
+            />
+          </div>
+        )}
+      </>
     ),
     [
       items,

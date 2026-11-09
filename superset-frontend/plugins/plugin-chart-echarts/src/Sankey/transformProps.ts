@@ -1,3 +1,4 @@
+/* eslint-disable camelcase, theme-colors/no-literal-colors */
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,7 +42,29 @@ export default function transformProps(
   const refs: Refs = {};
   const { formData, height, hooks, queriesData, width, theme } = chartProps;
   const { onLegendStateChanged } = hooks;
-  const { colorScheme, metric, source, target, sliceId } = formData;
+  const {
+    colorScheme,
+    metric,
+    source,
+    target,
+    sliceId,
+    linkColorMode = 'gradient',
+    link_color_mode = linkColorMode,
+    enable3dEffect = true,
+    enable_3d_effect = enable3dEffect,
+    nodeWidth = 16,
+    node_width = nodeWidth,
+    nodeGap = 16,
+    node_gap = nodeGap,
+    nodeBorderRadius = 6,
+    node_border_radius = nodeBorderRadius,
+    linkOpacity = 0.75,
+    link_opacity = linkOpacity,
+    blurOpacity = 0.15,
+    blur_opacity = blurOpacity,
+    focusMode = 'adjacency',
+    focus_mode = focusMode,
+  } = formData;
   const { data } = queriesData[0];
   const colorFn = CategoricalColorNamespace.getScale(colorScheme);
   const metricLabel = getMetricLabel(metric);
@@ -69,10 +92,28 @@ export default function transformProps(
     name,
     itemStyle: {
       color: colorFn(name, sliceId),
+      borderRadius: enable_3d_effect
+        ? [
+            node_border_radius,
+            node_border_radius,
+            node_border_radius,
+            node_border_radius,
+          ]
+        : 0,
+      borderColor: enable_3d_effect
+        ? 'rgba(255, 255, 255, 0.25)'
+        : 'transparent',
+      borderWidth: enable_3d_effect ? 1 : 0,
+      shadowBlur: enable_3d_effect ? 10 : 0,
+      shadowColor: enable_3d_effect ? 'rgba(0, 0, 0, 0.45)' : 'transparent',
+      shadowOffsetX: enable_3d_effect ? 2 : 0,
+      shadowOffsetY: enable_3d_effect ? 2 : 0,
     },
     label: {
       color: theme.colorText,
       textShadow: theme.colorBgBase,
+      fontSize: 12,
+      fontWeight: 500,
     },
   }));
 
@@ -116,12 +157,72 @@ export default function transformProps(
     return tooltipHtml(rows, name);
   };
 
+  let maxRightLabelLen = 0;
+  set.forEach(name => {
+    if ((outgoingFlows.get(name) || 0) === 0) {
+      maxRightLabelLen = Math.max(maxRightLabelLen, name.length);
+    }
+  });
+
+  const dynamicRightMargin = Math.max(
+    55,
+    Math.min(260, Math.ceil(maxRightLabelLen * 7.5 + 24)),
+  );
+
   const echartOptions: EChartsOption = {
     series: {
-      animation: false,
+      animation: true,
       data: seriesData,
+      nodeWidth: node_width,
+      nodeGap: node_gap,
+      nodeAlign: 'justify',
+      layoutIterations: 32,
+      draggable: true,
+      left: 14,
+      right: dynamicRightMargin,
+      top: 15,
+      bottom: 15,
+      emphasis: {
+        focus: focus_mode,
+        itemStyle: {
+          shadowBlur: 16,
+          shadowColor: 'rgba(0, 0, 0, 0.7)',
+          opacity: 1,
+        },
+        lineStyle: {
+          opacity: 0.95,
+        },
+      },
+      blur: {
+        itemStyle: {
+          opacity: blur_opacity,
+        },
+        lineStyle: {
+          opacity: Math.max(0.04, blur_opacity * 0.75),
+        },
+      },
       lineStyle: {
-        color: 'source',
+        color: link_color_mode,
+        curveness: 0.5,
+        opacity: link_opacity,
+      },
+      itemStyle: {
+        borderRadius: enable_3d_effect
+          ? [
+              node_border_radius,
+              node_border_radius,
+              node_border_radius,
+              node_border_radius,
+            ]
+          : 0,
+        borderColor: enable_3d_effect
+          ? 'rgba(255, 255, 255, 0.25)'
+          : 'transparent',
+        borderWidth: enable_3d_effect ? 1 : 0,
+        shadowBlur: enable_3d_effect ? 10 : 0,
+        shadowColor: enable_3d_effect ? 'rgba(0, 0, 0, 0.45)' : 'transparent',
+        shadowOffsetX: enable_3d_effect ? 2 : 0,
+        shadowOffsetY: enable_3d_effect ? 2 : 0,
       },
       links,
       type: 'sankey',

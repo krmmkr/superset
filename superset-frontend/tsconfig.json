@@ -88,6 +88,7 @@
     { "path": "./plugins/plugin-chart-partition" },
     { "path": "./plugins/plugin-chart-world-map" },
     { "path": "./plugins/plugin-chart-ag-grid-table" },
+    { "path": "./plugins/plugin-ag-grid-table-custom" },
     { "path": "./plugins/plugin-chart-cartodiagram" },
     { "path": "./plugins/preset-chart-deckgl" },
     { "path": "./plugins/plugin-chart-echarts" },
@@ -95,7 +96,9 @@
     { "path": "./plugins/plugin-chart-handlebars" },
     { "path": "./plugins/plugin-chart-pivot-table" },
     { "path": "./plugins/plugin-chart-table" },
-    { "path": "./plugins/plugin-chart-word-cloud" }
+    { "path": "./plugins/plugin-chart-word-cloud" },
+    { "path": "./plugins/plugin-table-antvs2-pivot" },
+    { "path": "./plugins/plugin-table-antvs2-table" }
   ],
   "exclude": []
 }

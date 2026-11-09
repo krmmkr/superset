@@ -21,14 +21,28 @@ import Echart from '../components/Echart';
 
 export default function Sankey(props: SankeyTransformedProps) {
   const { height, width, echartOptions, refs, formData } = props;
+  const layoutMode = formData?.layout_mode ?? formData?.layoutMode ?? 'fit';
+  const minWidth = Number(formData?.min_width ?? formData?.minWidth ?? 600);
+  const isScrollable = layoutMode === 'scrollable';
+  const targetWidth = isScrollable ? Math.max(width, minWidth) : width;
 
   return (
-    <Echart
-      refs={refs}
-      height={height}
-      width={width}
-      echartOptions={echartOptions}
-      vizType={formData.vizType}
-    />
+    <div
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        overflowX: isScrollable ? 'auto' : 'hidden',
+        overflowY: 'hidden',
+        boxSizing: 'border-box',
+      }}
+    >
+      <Echart
+        refs={refs}
+        height={height}
+        width={targetWidth}
+        echartOptions={echartOptions}
+        vizType={formData.vizType}
+      />
+    </div>
   );
 }

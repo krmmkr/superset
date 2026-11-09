@@ -1,0 +1,42 @@
+{
+  "name": "superset-plugin-chart-calendar-heatmap-custom",
+  "version": "0.1.0",
+  "description": "Superset Calendar Heatmap Plugin (Custom)",
+  "sideEffects": false,
+  "main": "lib/index.js",
+  "module": "esm/index.js",
+  "files": [
+    "esm",
+    "lib",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && tsc --project tsconfig.build.esm.json",
+    "build:esm": "tsc --project tsconfig.build.esm.json",
+    "build:lib": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "keywords": [
+    "superset",
+    "calendar",
+    "heatmap",
+    "echarts",
+    "plugin"
+  ],
+  "license": "Apache-2.0",
+  "peerDependencies": {
+    "@superset-ui/chart-controls": "*",
+    "@superset-ui/core": "*",
+    "echarts": "^5.4.0",
+    "react": "^16.13.1 || ^17.0.0 || ^18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "echarts": "^5.6.0",
+    "typescript": "^5.3.0"
+  }
+}
