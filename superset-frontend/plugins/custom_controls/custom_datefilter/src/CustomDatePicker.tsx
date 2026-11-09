@@ -194,9 +194,9 @@ export default function CustomDatePicker(
   // Event handler for single DatePicker — dateString is always a plain string from antd
   const handleSingleDateChange = (
     _date: Dayjs | null,
-    dateString: string | string[],
+    dateString: string | string[] | null,
   ) => {
-    const strVal = Array.isArray(dateString) ? dateString[0] : dateString;
+    const strVal = Array.isArray(dateString) ? dateString[0] : (dateString ?? '');
     setLocalValue(strVal);
     emitSingleFilter(strVal || null);
   };
