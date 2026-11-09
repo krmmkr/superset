@@ -1436,6 +1436,10 @@ class PivotTableChartConfig(BaseChartConfig):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     chart_type: Literal["pivot_table"] = "pivot_table"
+    viz_type: Literal["pivot_table_v2", "antvs2_table_pivot"] = Field(
+        "pivot_table_v2",
+        description="'antvs2_table_pivot' for AntV S2 Pivot Table",
+    )
     rows: List[ColumnRef] = Field(
         ...,
         min_length=1,
@@ -2099,8 +2103,9 @@ class TableChartConfig(BaseChartConfig):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     chart_type: Literal["table"] = "table"
-    viz_type: Literal["table", "ag-grid-table"] = Field(
-        "table", description="'ag-grid-table' for interactive features"
+    viz_type: Literal["table", "ag-grid-table", "antvs2_table"] = Field(
+        "table",
+        description="'ag-grid-table' or 'antvs2_table' for interactive features",
     )
     query_mode: Literal["aggregate", "raw"] | None = Field(
         None,
@@ -2669,6 +2674,368 @@ class WaterfallChartConfig(BaseChartConfig):
         return self
 
 
+class CustomControlsChartConfig(BaseChartConfig):
+    """Config for custom controls filter chart (viz_type ``custom_controls``)."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    chart_type: Literal["custom_controls"] = "custom_controls"
+    filter_column: ColumnRef = Field(
+        ...,
+        validation_alias=AliasChoices("filter_column", "filterColumn", "column"),
+        description="Column to filter on and fetch options for",
+    )
+    control_type: Literal["Dropdown", "Radio", "Checkbox", "TextBox"] = Field(
+        "Dropdown",
+        validation_alias=AliasChoices("control_type", "controlType"),
+        description="Type of UI control to display ('Dropdown', 'Radio', 'Checkbox', 'TextBox')",
+    )
+    orientation: Literal["vertical", "horizontal"] = Field(
+        "vertical",
+        description="Layout orientation for Radio/Checkbox controls",
+    )
+    include_all_option: bool = Field(
+        False,
+        validation_alias=AliasChoices("include_all_option", "includeAllOption"),
+        description="Add an 'All' option to clear filters",
+    )
+    multi_select: bool = Field(
+        True,
+        validation_alias=AliasChoices("multi_select", "multiSelect"),
+        description="Allow multiple selections in Dropdown controls",
+    )
+    default_value: str = Field(
+        "",
+        validation_alias=AliasChoices("default_value", "defaultValue"),
+        description="Pre-selected default value (comma-separated for multi-select)",
+    )
+    hide_title: bool = Field(
+        False,
+        validation_alias=AliasChoices("hide_title", "hideTitle"),
+        description="Hide the column name title above the control",
+    )
+    bold_title: bool = Field(
+        True,
+        validation_alias=AliasChoices("bold_title", "boldTitle"),
+        description="Show the column title in bold",
+    )
+    filters: List[FilterConfig] | None = Field(
+        None,
+        description="Structured filters (column/op/value).",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_filter_column(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for key in ("filter_column", "filterColumn", "column"):
+                if key in data:
+                    val = data[key]
+                    if isinstance(val, list) and len(val) == 1:
+                        val = val[0]
+                    if isinstance(val, str):
+                        data[key] = {"name": val}
+        return data
+
+
+class CustomDatePickerChartConfig(BaseChartConfig):
+    """Config for custom date picker chart (viz_type ``custom_datepicker``)."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    chart_type: Literal["custom_datepicker"] = "custom_datepicker"
+    filter_column: ColumnRef = Field(
+        ...,
+        validation_alias=AliasChoices("filter_column", "filterColumn", "column"),
+        description="Temporal column to apply date filters to",
+    )
+    picker_type: Literal["DatePicker", "RangePicker"] = Field(
+        "DatePicker",
+        validation_alias=AliasChoices("picker_type", "pickerType"),
+        description="Date UI control type ('DatePicker' or 'RangePicker')",
+    )
+    show_time: bool = Field(
+        False,
+        validation_alias=AliasChoices("show_time", "showTime"),
+        description="Allow users to select specific times (hours, minutes)",
+    )
+    preset_ranges: bool = Field(
+        False,
+        validation_alias=AliasChoices("preset_ranges", "presetRanges"),
+        description="Show quick preset ranges on RangePicker controls",
+    )
+    default_type: Literal["None", "Static", "Dynamic"] = Field(
+        "None",
+        validation_alias=AliasChoices("default_type", "defaultType"),
+        description="Default filter mode ('None', 'Static', or 'Dynamic')",
+    )
+    default_static_value: str | None = Field(
+        None,
+        validation_alias=AliasChoices("default_static_value", "defaultStaticValue"),
+        description="Static default date ('YYYY-MM-DD' or 'YYYY-MM-DD and YYYY-MM-DD')",
+    )
+    default_dynamic_value: Literal[
+        "Today",
+        "Yesterday",
+        "Last 7 Days",
+        "Last 30 Days",
+        "This Month",
+        "This Month (Full)",
+        "Last Month",
+        "This Year",
+    ] = Field(
+        "Last 30 Days",
+        validation_alias=AliasChoices("default_dynamic_value", "defaultDynamicValue"),
+        description="Dynamic preset default when default_type is 'Dynamic'",
+    )
+    filters: List[FilterConfig] | None = Field(
+        None,
+        description="Structured filters (column/op/value).",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_filter_column(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for key in ("filter_column", "filterColumn", "column"):
+                if key in data:
+                    val = data[key]
+                    if isinstance(val, list) and len(val) == 1:
+                        val = val[0]
+                    if isinstance(val, str):
+                        data[key] = {"name": val}
+        return data
+
+
+class SankeyMultiLevelChartConfig(BaseChartConfig):
+    """Config for multi-level Sankey charts (viz_type ``sankey_multi_level``)."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    chart_type: Literal["sankey_multi_level"] = "sankey_multi_level"
+    groupby: List[ColumnRef] = Field(
+        ...,
+        min_length=2,
+        validation_alias=AliasChoices("groupby", "group_by", "stages", "dimensions"),
+        description=(
+            "Ordered stage columns for the multi-level Sankey flow "
+            "(at least 2 columns, ordered from source stage to final destination)."
+        ),
+    )
+    metric: ColumnRef = Field(
+        ...,
+        description="Metric sizing the flow bands between stages (e.g. SUM or COUNT)",
+    )
+    sort_by_metric: bool = Field(
+        True, description="Order flows by the metric value descending"
+    )
+    row_limit: int = Field(
+        1000, description="Maximum grouped flow paths", ge=1, le=50000
+    )
+    color_scheme: str | None = Field(
+        None,
+        description="Superset categorical color scheme ID (e.g. 'supersetColors')",
+        max_length=100,
+    )
+    layout_mode: Literal["fit", "scrollable"] = Field(
+        "fit",
+        description="Layout mode ('fit' to scale to widget width, 'scrollable' for horizontal scroll)",
+    )
+    min_width: int = Field(
+        600,
+        description="Minimum diagram width in pixels when layout_mode='scrollable'",
+        ge=300,
+        le=2000,
+    )
+    link_color_mode: Literal["gradient", "source", "target"] = Field(
+        "gradient",
+        description="Flow band color mode ('gradient', 'source', or 'target')",
+    )
+    enable_3d_effect: bool = Field(
+        True, description="Enable rounded 3D capsule styling on nodes"
+    )
+    node_width: int = Field(16, ge=8, le=40, description="Node pillar width in pixels")
+    node_gap: int = Field(16, ge=4, le=40, description="Vertical gap between nodes in pixels")
+    node_border_radius: int = Field(6, ge=0, le=20, description="Node corner radius in pixels")
+    link_opacity: float = Field(0.75, ge=0.1, le=1.0, description="Flow ribbon opacity")
+    blur_opacity: float = Field(
+        0.15, ge=0.0, le=0.8, description="Opacity of non-focused elements on hover"
+    )
+    focus_mode: Literal["adjacency", "trajectory", "series"] = Field(
+        "adjacency",
+        description="Hover highlight behavior ('adjacency', 'trajectory', or 'series')",
+    )
+    show_label_percentage: bool = Field(
+        False, description="Show stage flow percentage next to node labels"
+    )
+    show_label_percentage_type: Literal["stage", "whole", "both"] = Field(
+        "stage", description="Percentage type shown next to node labels"
+    )
+    show_stage_name: bool = Field(True, description="Show stage column name in tooltip")
+    show_stage_percentage: bool = Field(True, description="Show stage percentage in tooltip")
+    show_whole_percentage: bool = Field(True, description="Show percent of whole data in tooltip")
+    show_node_value: bool = Field(True, description="Show metric value in node tooltip")
+    show_link_percentages: bool = Field(True, description="Show flow percentages in link tooltip")
+    filters: List[FilterConfig] | None = Field(
+        None,
+        description="Structured filters (column/op/value).",
+    )
+
+    @field_validator("groupby", mode="before")
+    @classmethod
+    def normalize_groupby(cls, v: Any) -> Any:
+        return _normalize_group_by_input(v)
+
+    @model_validator(mode="after")
+    def validate_dimensions(self) -> "SankeyMultiLevelChartConfig":
+        for i, col in enumerate(self.groupby):
+            _reject_sql_expression_on_dimension(col, f"groupby[{i}]")
+            if col.saved_metric:
+                raise ValueError(
+                    f"groupby[{i}] cannot use saved_metric=True; "
+                    "saved metrics belong in the 'metric' field"
+                )
+        return self
+
+
+class CalendarHeatmapCustomChartConfig(BaseChartConfig):
+    """Config for custom calendar heatmap charts (viz_type ``calendar_heatmap_custom``)."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    chart_type: Literal["calendar_heatmap_custom"] = "calendar_heatmap_custom"
+    temporal_column: str = Field(
+        ...,
+        validation_alias=AliasChoices(
+            "temporal_column", "granularity_sqla", "date_column", "x"
+        ),
+        description="Temporal date/datetime column for the calendar cells",
+    )
+    metrics: List[ColumnRef] = Field(
+        ...,
+        min_length=1,
+        validation_alias=AliasChoices("metrics", "metric", "y"),
+        description="Primary metric(s) coloring and labeling each day cell",
+    )
+    tooltip_metrics: List[ColumnRef] | None = Field(
+        None,
+        validation_alias=AliasChoices("tooltip_metrics", "tooltipMetrics"),
+        description="Optional extra aggregated metrics to display in the hover tooltip",
+    )
+    time_grain: TimeGrain | None = Field(
+        "P1D",
+        validation_alias=AliasChoices("time_grain", "time_grain_sqla"),
+        description="Time grain for calendar aggregation (defaults to P1D daily)",
+    )
+    time_range: str | None = Field(
+        None,
+        description="Optional query time range filter (e.g. 'Last 3 months' or '2025-01-01 : 2025-12-31')",
+    )
+    calendar_time_range: str = Field(
+        "No filter",
+        validation_alias=AliasChoices("calendar_time_range", "calendarTimeRange"),
+        description="Optional visual calendar date range override",
+    )
+    calendar_orient: Literal["horizontal", "vertical"] = Field(
+        "horizontal",
+        validation_alias=AliasChoices("calendar_orient", "calendarOrient"),
+        description="Calendar orientation ('horizontal' or 'vertical')",
+    )
+    layout_mode: Literal["scrollable", "fit"] = Field(
+        "scrollable",
+        validation_alias=AliasChoices("layout_mode", "layoutMode"),
+        description="Layout mode ('scrollable' for fixed cell size or 'fit' to auto-scale)",
+    )
+    cell_size: int = Field(
+        20,
+        ge=8,
+        le=50,
+        validation_alias=AliasChoices("cell_size", "cellSize"),
+        description="Size of each day cell in pixels",
+    )
+    show_day_label: bool = Field(
+        True,
+        validation_alias=AliasChoices("show_day_label", "showDayLabel"),
+        description="Show day-of-week labels",
+    )
+    day_label_format: Literal["short", "medium", "full"] = Field(
+        "short",
+        validation_alias=AliasChoices("day_label_format", "dayLabelFormat"),
+        description="Day label format ('short', 'medium', 'full')",
+    )
+    show_month_label: bool = Field(
+        True,
+        validation_alias=AliasChoices("show_month_label", "showMonthLabel"),
+        description="Show month header labels",
+    )
+    month_label_format: Literal["short", "full"] = Field(
+        "short",
+        validation_alias=AliasChoices("month_label_format", "monthLabelFormat"),
+        description="Month label format ('short' or 'full')",
+    )
+    show_cell_label: bool = Field(
+        True,
+        validation_alias=AliasChoices("show_cell_label", "showCellLabel"),
+        description="Display metric value inside each calendar cell",
+    )
+    show_cell_date: bool = Field(
+        True,
+        validation_alias=AliasChoices("show_cell_date", "showCellDate"),
+        description="Display day-of-month number inside each calendar cell",
+    )
+    linear_color_scheme: str | None = Field(
+        None,
+        validation_alias=AliasChoices("linear_color_scheme", "color_scheme"),
+        description="Superset sequential/diverging linear color scheme ID",
+        max_length=100,
+    )
+    visual_map_type: Literal["continuous", "piecewise"] = Field(
+        "continuous",
+        validation_alias=AliasChoices("visual_map_type", "visualMapType"),
+        description="Color scale type ('continuous' gradient or 'piecewise' steps)",
+    )
+    show_visual_map: bool = Field(
+        True,
+        validation_alias=AliasChoices("show_visual_map", "showVisualMap"),
+        description="Display the visual map color legend",
+    )
+    number_format: str = Field(
+        "SMART_NUMBER",
+        validation_alias=AliasChoices("number_format", "numberFormat"),
+        description="D3 number format string for metric values",
+        max_length=50,
+    )
+    emit_filter: bool = Field(
+        True,
+        validation_alias=AliasChoices("emit_filter", "emitFilter"),
+        description="Emit dashboard date cross-filter when clicking a day cell",
+    )
+    crossfilter_mode: Literal["temporal", "categorical"] = Field(
+        "temporal",
+        validation_alias=AliasChoices("crossfilter_mode", "crossfilterMode"),
+        description="Cross-filter emission mode ('temporal' or 'categorical')",
+    )
+    filters: List[FilterConfig] | None = Field(
+        None,
+        description="Structured filters (column/op/value).",
+    )
+    row_limit: int = Field(10000, description="Maximum rows returned", ge=1, le=50000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_inputs(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for key in ("temporal_column", "granularity_sqla", "date_column", "x"):
+                if key in data and isinstance(data[key], dict):
+                    col_name = data[key].get("name") or data[key].get("column_name")
+                    if col_name:
+                        data[key] = col_name
+            for mkey in ("metrics", "metric", "y"):
+                if mkey in data and isinstance(data[mkey], dict):
+                    data[mkey] = [data[mkey]]
+        return data
+
+
 # Discriminated union for runtime validation (not exposed in JSON Schema)
 ChartConfig = Annotated[
     XYChartConfig
@@ -2683,14 +3050,20 @@ ChartConfig = Annotated[
     | BigNumberChartConfig
     | HistogramChartConfig
     | BoxPlotChartConfig
-    | WaterfallChartConfig,
+    | WaterfallChartConfig
+    | CustomControlsChartConfig
+    | CustomDatePickerChartConfig
+    | SankeyMultiLevelChartConfig
+    | CalendarHeatmapCustomChartConfig,
     Field(
         discriminator="chart_type",
         description=(
             "Chart configuration - specify chart_type as 'xy', 'table', "
             "'pie', 'gauge', 'treemap_v2', 'pivot_table', 'interactive_pivot', "
             "'mixed_timeseries', 'handlebars', "
-            "'big_number', 'histogram', 'box_plot', or 'waterfall'"
+            "'big_number', 'histogram', 'box_plot', 'waterfall', "
+            "'custom_controls', 'custom_datepicker', "
+            "'sankey_multi_level', or 'calendar_heatmap_custom'"
         ),
     ),
 ]
@@ -2716,11 +3089,17 @@ _VIZ_TYPE_TO_CHART_TYPE: dict[str, tuple[str, str | None]] = {
     "scatter": ("xy", "scatter"),
     "echarts_timeseries_scatter": ("xy", "scatter"),
     "ag-grid-table": ("table", None),
+    "antvs2_table": ("table", None),
     "big_number_total": ("big_number", None),
     "pivot_table_v2": ("pivot_table", None),
+    "antvs2_table_pivot": ("pivot_table", None),
     "ag-grid-pivot-table": ("interactive_pivot", None),
     "histogram_v2": ("histogram", None),
     "gauge_chart": ("gauge", None),
+    "sankey": ("sankey_multi_level", None),
+    "sankey_v2": ("sankey_multi_level", None),
+    "cal_heatmap": ("calendar_heatmap_custom", None),
+    "calendar_heatmap": ("calendar_heatmap_custom", None),
 }
 
 
@@ -2748,11 +3127,11 @@ def _normalize_chart_request_input(data: Any) -> Any:
             config["chart_type"] = mapped_type
             if kind is not None:
                 config.setdefault("kind", kind)
-            if mapped_type == "table":
+            if mapped_type in ("table", "pivot_table"):
                 config.setdefault("viz_type", chart_type)
             else:
                 config.pop("viz_type", None)
-        elif config.get("chart_type") != "table":
+        elif config.get("chart_type") not in ("table", "pivot_table"):
             config.pop("viz_type", None)
     return data
 

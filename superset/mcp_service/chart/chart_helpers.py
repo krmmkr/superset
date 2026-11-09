@@ -488,9 +488,19 @@ def resolve_metrics(form_data: dict[str, Any], viz_type: str) -> list[Any]:
     if viz_type == "bubble":
         return [m for field in ("x", "y", "size") if (m := form_data.get(field))]
 
-    metrics = form_data.get("metrics") or []
+    metrics = list(form_data.get("metrics") or [])
     if not metrics and (metric := form_data.get("metric")):
         metrics = [metric]
+    if viz_type == "calendar_heatmap_custom":
+        extra = (
+            form_data.get("tooltip_metrics")
+            or form_data.get("tooltipMetrics")
+            or []
+        )
+        if isinstance(extra, list):
+            for m in extra:
+                if m and m not in metrics:
+                    metrics.append(m)
     return metrics
 
 
@@ -507,12 +517,22 @@ def resolve_groupby(form_data: dict[str, Any]) -> list[Any]:
         groupby = list(raw_groupby)
 
     if groupby:
+        if form_data.get("viz_type") == "antvs2_table_pivot":
+            form_columns = form_data.get("columns")
+            if isinstance(form_columns, list):
+                for col in form_columns:
+                    if col not in groupby:
+                        groupby.append(col)
         return groupby
 
-    for field in ("entity", "series"):
+    for field in ("entity", "series", "filterColumn"):
         value = form_data.get(field)
         if isinstance(value, str) and value not in groupby:
             groupby.append(value)
+        elif isinstance(value, list):
+            for col in value:
+                if isinstance(col, str) and col not in groupby:
+                    groupby.append(col)
 
     form_columns = form_data.get("columns")
     if isinstance(form_columns, list):
@@ -711,6 +731,15 @@ def build_query_dicts_from_form_data(
             order_desc=order_desc,
         )
     ]
+    if viz_type == "calendar_heatmap_custom":
+        queries[0]["is_timeseries"] = True
+        if granularity := (
+            form_data.get("granularity") or form_data.get("granularity_sqla")
+        ):
+            queries[0]["granularity"] = granularity
+        queries[0].setdefault("extras", {})["time_grain_sqla"] = (
+            form_data.get("time_grain_sqla") or "P1D"
+        )
     if viz_type == "mixed_timeseries":
         queries.append(
             _build_mixed_timeseries_secondary(

@@ -307,14 +307,25 @@ test('should exclude dimensions from row/col subTotalsDimensions when showSubtot
   expect(result.s2Options.totals.col.subTotalsDimensions).toEqual([]);
 });
 
-test('should map hide_measure_column correctly to s2Options.style.colCell', () => {
+test('should map hide_measure_column and show_single_metric_header correctly to s2Options.style.colCell', () => {
   const chartPropsDefault = buildChartProps();
   const resultDefault = transformProps(chartPropsDefault as any);
-  expect(resultDefault.hideMeasureColumn).toBe(false);
-  expect(resultDefault.s2Options.style.colCell.hideValue).toBe(false);
-  expect(resultDefault.s2Options.style.colCell.hideMeasureColumn).toBe(false);
+  expect(resultDefault.hideMeasureColumn).toBe(true);
+  expect(resultDefault.s2Options.style.colCell.hideValue).toBe(true);
+  expect(resultDefault.s2Options.style.colCell.hideMeasureColumn).toBe(true);
+
+  const chartPropsShowSingle = buildChartProps({
+    show_single_metric_header: true,
+  });
+  const resultShowSingle = transformProps(chartPropsShowSingle as any);
+  expect(resultShowSingle.hideMeasureColumn).toBe(false);
+  expect(resultShowSingle.s2Options.style.colCell.hideValue).toBe(false);
+  expect(resultShowSingle.s2Options.style.colCell.hideMeasureColumn).toBe(
+    false,
+  );
 
   const chartPropsHidden = buildChartProps({
+    columns: [],
     hide_measure_column: true,
   });
   const resultHidden = transformProps(chartPropsHidden as any);
@@ -770,4 +781,112 @@ test('should handle edge cases in isRuleMatched: null values, negative numbers, 
   expect(textCond.mapping(-30)).toEqual({ fill: '#faad14' });
   expect(textCond.mapping(-60)).toBeNull();
   expect(textCond.mapping(60)).toBeNull();
+});
+
+test('should support statistical conditional calculations (avg, median, min, max, pct_of_max, pct_of_total)', () => {
+  // Base data has sales: [100, 200] -> min=100, max=200, sum=300, avg=150, median=150
+  const chartProps = buildChartProps({
+    enhanced_conditional_formatting: [
+      {
+        id: 'calc-avg',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '>',
+        compareTarget: 'avg',
+        color: '#52c41a',
+        applyTo: 'background',
+      },
+      {
+        id: 'calc-pct-max',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '>=',
+        compareTarget: 'pct_of_max',
+        targetValue: 75,
+        color: '#1890ff',
+        applyTo: 'text',
+      },
+      {
+        id: 'calc-pct-total',
+        column: 'sales',
+        ruleType: 'threshold',
+        operator: '>=',
+        compareTarget: 'pct_of_total',
+        targetValue: 50,
+        color: '#722ed1',
+        applyTo: 'icon',
+        iconName: 'check',
+      },
+    ],
+  });
+
+  const result = transformProps(chartProps as any);
+  const bgCond = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'sales',
+  );
+  // avg is 150 -> 200 > 150 matches, 100 > 150 does not
+  expect(bgCond.mapping(200)).toEqual({ fill: '#52c41a' });
+  expect(bgCond.mapping(100)).toBeNull();
+
+  const textCond = result.s2Options.conditions.text.find(
+    (c: any) => c.field === 'sales',
+  );
+  // max is 200 -> 150 is 75% of 200 (matches), 100 is 50% (null)
+  expect(textCond.mapping(150)).toEqual({ fill: '#1890ff' });
+  expect(textCond.mapping(100)).toBeNull();
+
+  const iconCond = result.s2Options.conditions.icon.find(
+    (c: any) => c.field === 'sales',
+  );
+  // sum is 300 -> 200 is 66.7% >= 50% (matches), 100 is 33.3% (null)
+  expect(iconCond.mapping(200)).toEqual({ fill: '#722ed1', icon: 'check' });
+  expect(iconCond.mapping(100)).toBeNull();
+});
+
+test('should support formatColumn (__all_metrics__ and cross-column target) and new string operators (in, not_contains, ends_with)', () => {
+  const chartProps = buildChartProps({
+    metrics: ['sales', 'profit'],
+    enhanced_conditional_formatting: [
+      {
+        id: 'row-highlight',
+        column: 'region',
+        formatColumn: '__all_metrics__',
+        ruleType: 'threshold',
+        operator: 'in',
+        compareTarget: 'static',
+        targetValueText: 'East, North',
+        color: '#52c41a',
+        applyTo: 'background',
+      },
+    ],
+  });
+  chartProps.queriesData[0].colnames = [
+    'region',
+    'category',
+    'sales',
+    'profit',
+  ];
+  chartProps.queriesData[0].coltypes = [1, 1, 0, 0];
+
+  const result = transformProps(chartProps as any);
+  const salesBg = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'sales',
+  );
+  const profitBg = result.s2Options.conditions.background.find(
+    (c: any) => c.field === 'profit',
+  );
+
+  expect(salesBg).toBeDefined();
+  expect(profitBg).toBeDefined();
+
+  // When rowData has region = 'East', both sales and profit are highlighted
+  expect(salesBg.mapping(100, { region: 'East' })).toEqual({ fill: '#52c41a' });
+  expect(profitBg.mapping(40, { region: 'North' })).toEqual({
+    fill: '#52c41a',
+  });
+  expect(salesBg.mapping(200, { region: 'West' })).toBeNull();
+
+  // Totals are skipped by default unless includeTotals is true
+  const mockTotalCell = { getMeta: () => ({ isTotals: true }) };
+  expect(salesBg.mapping(100, { region: 'East' }, mockTotalCell)).toBeNull();
 });

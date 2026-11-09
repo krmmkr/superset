@@ -67,8 +67,56 @@ const METRIC_OPERATOR_OPTIONS = [
 const DIMENSION_OPERATOR_OPTIONS = [
   { value: '=', label: '= (Exact Match)' },
   { value: '!=', label: '!= (Does Not Equal)' },
+  { value: 'in', label: 'in (Any in Comma List)' },
   { value: 'contains', label: 'contains (Includes Text)' },
+  { value: 'not_contains', label: 'not_contains (Excludes Text)' },
   { value: 'starts_with', label: 'starts_with (Begins With)' },
+  { value: 'ends_with', label: 'ends_with (Ends With)' },
+];
+
+const COLOR_SCALE_PRESETS = [
+  {
+    key: 'blue',
+    label: 'Blue Sequential',
+    minColor: '#e6f7ff',
+    midColor: '',
+    maxColor: '#1890ff',
+  },
+  {
+    key: 'green',
+    label: 'Green Sequential',
+    minColor: '#f6ffed',
+    midColor: '',
+    maxColor: '#52c41a',
+  },
+  {
+    key: 'red',
+    label: 'Red Sequential',
+    minColor: '#fff1f0',
+    midColor: '',
+    maxColor: '#ff4d4f',
+  },
+  {
+    key: 'rwg',
+    label: 'Red – White – Green (Diverging)',
+    minColor: '#ff4d4f',
+    midColor: '#ffffff',
+    maxColor: '#52c41a',
+  },
+  {
+    key: 'ryg',
+    label: 'Red – Yellow – Green (Traffic Light)',
+    minColor: '#ff4d4f',
+    midColor: '#faad14',
+    maxColor: '#52c41a',
+  },
+  {
+    key: 'owb',
+    label: 'Orange – White – Blue (Diverging)',
+    minColor: '#fa8c16',
+    midColor: '#ffffff',
+    maxColor: '#1890ff',
+  },
 ];
 
 function hexToRgba(color: string, opacity = 1): string {
@@ -101,23 +149,15 @@ export default function EnhancedConditionalFormattingControl({
   const [targetColumn, setTargetColumn] = useState<string>(
     columnOptions[0]?.value || '',
   );
+  const [formatColumn, setFormatColumn] = useState<string>('__same__');
   const [ruleType, setRuleType] = useState<'threshold' | 'colorScale'>(
     'threshold',
   );
-  const [operator, setOperator] = useState<
-    | '>'
-    | '<'
-    | '>='
-    | '<='
-    | '='
-    | '!='
-    | 'between'
-    | 'contains'
-    | 'starts_with'
-  >('>');
-  const [compareTarget, setCompareTarget] = useState<'static' | 'column'>(
-    'static',
-  );
+  const [operator, setOperator] =
+    useState<EnhancedConditionalFormattingRule['operator']>('>');
+  const [compareTarget, setCompareTarget] =
+    useState<EnhancedConditionalFormattingRule['compareTarget']>('static');
+  const [compareMultiplier, setCompareMultiplier] = useState<number>(1);
   const [targetValue, setTargetValue] = useState<number>(0);
   const [targetValueRight, setTargetValueRight] = useState<number>(100);
   const [targetValueText, setTargetValueText] = useState<string>('');
@@ -133,12 +173,31 @@ export default function EnhancedConditionalFormattingControl({
   const [iconPosition, setIconPosition] = useState<'left' | 'right'>('left');
   const [customPrefix, setCustomPrefix] = useState<string>('');
   const [minColor, setMinColor] = useState<string>('#e6f7ff');
+  const [midColor, setMidColor] = useState<string>('');
   const [maxColor, setMaxColor] = useState<string>('#1890ff');
   const [minOpacity, setMinOpacity] = useState<number>(0.3);
   const [maxOpacity, setMaxOpacity] = useState<number>(1);
+  const [includeTotals, setIncludeTotals] = useState<boolean>(false);
 
   const selectedColObj = columnOptions.find(o => o.value === targetColumn);
   const isDimension = selectedColObj?.isDimension ?? false;
+
+  const formatColumnOptions = [
+    {
+      value: '__same__',
+      label: t('Same Column (%s)', selectedColObj?.label || targetColumn),
+    },
+    {
+      value: '__all_metrics__',
+      label: t('All Metrics (Row / Pivot Cells)'),
+    },
+    ...columnOptions
+      .filter(o => o.value !== targetColumn)
+      .map(o => ({
+        value: o.value,
+        label: `${o.label}${o.isDimension ? ` (${t('Header')})` : ` (${t('Metric')})`}`,
+      })),
+  ];
 
   const handleTargetColumnChange = (newCol: string) => {
     setTargetColumn(newCol);
@@ -146,8 +205,14 @@ export default function EnhancedConditionalFormattingControl({
     if (newColObj?.isDimension) {
       setRuleType('threshold');
       setOperator('=');
+      if (compareTarget !== 'static' && compareTarget !== 'column') {
+        setCompareTarget('static');
+      }
     } else {
       setOperator('>');
+    }
+    if (formatColumn === newCol) {
+      setFormatColumn('__same__');
     }
     if (targetColumnCompare === newCol) {
       const alternate =
@@ -156,14 +221,37 @@ export default function EnhancedConditionalFormattingControl({
     }
   };
 
+  const handleCompareTargetChange = (
+    newTarget: EnhancedConditionalFormattingRule['compareTarget'],
+  ) => {
+    setCompareTarget(newTarget);
+    if (newTarget === 'min' || newTarget === 'max') {
+      setOperator('=');
+    } else if (
+      operator === 'between' &&
+      newTarget !== 'static' &&
+      newTarget !== 'pct_of_max' &&
+      newTarget !== 'pct_of_total'
+    ) {
+      setOperator('>');
+    }
+    if (newTarget === 'pct_of_max' && targetValue === 0) {
+      setTargetValue(80);
+    } else if (newTarget === 'pct_of_total' && targetValue === 0) {
+      setTargetValue(20);
+    }
+  };
+
   const openAddModal = () => {
     setEditingRuleId(null);
     const defaultCol = columnOptions[0]?.value || '';
     const defaultColObj = columnOptions[0];
     setTargetColumn(defaultCol);
+    setFormatColumn('__same__');
     setRuleType('threshold');
     setOperator(defaultColObj?.isDimension ? '=' : '>');
     setCompareTarget('static');
+    setCompareMultiplier(1);
     setTargetValue(0);
     setTargetValueRight(100);
     setTargetValueText('');
@@ -175,19 +263,24 @@ export default function EnhancedConditionalFormattingControl({
     setIconPosition('left');
     setCustomPrefix('');
     setMinColor('#e6f7ff');
+    setMidColor('');
     setMaxColor('#1890ff');
     setMinOpacity(0.3);
     setMaxOpacity(1);
+    setIncludeTotals(false);
     setIsModalOpen(true);
   };
 
   const openEditModal = (rule: EnhancedConditionalFormattingRule) => {
     setEditingRuleId(rule.id);
     setTargetColumn(rule.column);
+    setFormatColumn(rule.formatColumn || '__same__');
     setRuleType(rule.ruleType);
+    setIncludeTotals(!!rule.includeTotals);
     if (rule.ruleType === 'threshold') {
       setOperator(rule.operator || '>');
       setCompareTarget(rule.compareTarget || 'static');
+      setCompareMultiplier(rule.compareMultiplier ?? 1);
       setTargetValue(rule.targetValue ?? 0);
       setTargetValueRight(rule.targetValueRight ?? 100);
       setTargetValueText(rule.targetValueText ?? '');
@@ -202,6 +295,7 @@ export default function EnhancedConditionalFormattingControl({
       setCustomPrefix(rule.customPrefix || '');
     } else {
       setMinColor(rule.minColor || '#e6f7ff');
+      setMidColor(rule.midColor || '');
       setMaxColor(rule.maxColor || '#1890ff');
       setMinOpacity(rule.minOpacity ?? 0.3);
       setMaxOpacity(rule.maxOpacity ?? 1);
@@ -215,26 +309,42 @@ export default function EnhancedConditionalFormattingControl({
   };
 
   const handleSaveRule = () => {
+    const isValBased =
+      compareTarget === 'static' ||
+      compareTarget === 'pct_of_max' ||
+      compareTarget === 'pct_of_total';
+    const hasMultiplier =
+      !isDimension &&
+      (compareTarget === 'column' ||
+        compareTarget === 'avg' ||
+        compareTarget === 'median') &&
+      compareMultiplier !== 1;
+
     const newRule: EnhancedConditionalFormattingRule = {
       id:
         editingRuleId ||
         `rule_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       column: targetColumn,
+      ...(formatColumn && formatColumn !== '__same__' ? { formatColumn } : {}),
+      ...(includeTotals ? { includeTotals: true } : {}),
       ruleType,
       ...(ruleType === 'threshold'
         ? {
             operator,
             compareTarget,
-            ...(compareTarget === 'static'
+            ...(hasMultiplier ? { compareMultiplier } : {}),
+            ...(isValBased
               ? isDimension
                 ? { targetValueText }
                 : {
                     targetValue,
                     ...(operator === 'between' ? { targetValueRight } : {}),
                   }
-              : {
-                  targetColumn: targetColumnCompare,
-                }),
+              : compareTarget === 'column'
+                ? {
+                    targetColumn: targetColumnCompare,
+                  }
+                : {}),
             color,
             opacity,
             applyTo,
@@ -248,6 +358,7 @@ export default function EnhancedConditionalFormattingControl({
           }
         : {
             minColor,
+            ...(midColor ? { midColor } : {}),
             maxColor,
             minOpacity,
             maxOpacity,
@@ -263,6 +374,56 @@ export default function EnhancedConditionalFormattingControl({
 
     onChange?.(updated);
     setIsModalOpen(false);
+  };
+
+  const formatRuleDescription = (rule: EnhancedConditionalFormattingRule) => {
+    const ruleOpacity = rule.opacity ?? 1;
+    const styleBadge = `${
+      rule.applyTo === 'icon'
+        ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}`
+        : rule.applyTo === 'text'
+          ? 'Text'
+          : 'Bg'
+    }${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''}`;
+
+    const targetSuffix =
+      rule.formatColumn && rule.formatColumn !== '__same__'
+        ? ` → ${rule.formatColumn === '__all_metrics__' ? t('All Metrics') : rule.formatColumn}`
+        : '';
+
+    if (rule.ruleType === 'colorScale') {
+      return `Color Scale (${Math.round((rule.minOpacity ?? 0.3) * 100)}% - ${Math.round((rule.maxOpacity ?? 1) * 100)}%)${targetSuffix}`;
+    }
+
+    const mult =
+      rule.compareMultiplier && rule.compareMultiplier !== 1
+        ? `${rule.compareMultiplier}× `
+        : '';
+
+    switch (rule.compareTarget) {
+      case 'column':
+        return `${rule.operator} ${mult}${rule.targetColumn}${targetSuffix} (${styleBadge})`;
+      case 'avg':
+        return `${rule.operator} ${mult}AVG${targetSuffix} (${styleBadge})`;
+      case 'median':
+        return `${rule.operator} ${mult}MEDIAN${targetSuffix} (${styleBadge})`;
+      case 'min':
+        return `${rule.operator} MIN${targetSuffix} (${styleBadge})`;
+      case 'max':
+        return `${rule.operator} MAX${targetSuffix} (${styleBadge})`;
+      case 'pct_of_max':
+        return `${rule.operator === 'between' ? `${rule.targetValue}%-${rule.targetValueRight}%` : `${rule.operator} ${rule.targetValue}%`} of Max${targetSuffix} (${styleBadge})`;
+      case 'pct_of_total':
+        return `${rule.operator === 'between' ? `${rule.targetValue}%-${rule.targetValueRight}%` : `${rule.operator} ${rule.targetValue}%`} of Total${targetSuffix} (${styleBadge})`;
+      default:
+        if (rule.operator === 'between') {
+          return `${rule.targetValue} - ${rule.targetValueRight}${targetSuffix} (${styleBadge})`;
+        }
+        if (rule.targetValueText !== undefined && rule.targetValueText !== '') {
+          return `${rule.operator} "${rule.targetValueText}"${targetSuffix} (${styleBadge})`;
+        }
+        return `${rule.operator} ${rule.targetValue}${targetSuffix} (${styleBadge})`;
+    }
   };
 
   const getIconSymbol = (name?: string, prefix?: string) => {
@@ -368,7 +529,9 @@ export default function EnhancedConditionalFormattingControl({
                       width: '28px',
                       height: '14px',
                       borderRadius: '2px',
-                      background: `linear-gradient(to right, ${hexToRgba(rule.minColor || '#e6f7ff', rule.minOpacity ?? 0.3)}, ${hexToRgba(rule.maxColor || '#1890ff', rule.maxOpacity ?? 1)})`,
+                      background: rule.midColor
+                        ? `linear-gradient(to right, ${hexToRgba(rule.minColor || '#ff4d4f', rule.minOpacity ?? 0.3)}, ${rule.midColor}, ${hexToRgba(rule.maxColor || '#52c41a', rule.maxOpacity ?? 1)})`
+                        : `linear-gradient(to right, ${hexToRgba(rule.minColor || '#e6f7ff', rule.minOpacity ?? 0.3)}, ${hexToRgba(rule.maxColor || '#1890ff', rule.maxOpacity ?? 1)})`,
                       border: '1px solid rgba(0,0,0,0.15)',
                       display: 'inline-block',
                       flexShrink: 0,
@@ -386,16 +549,7 @@ export default function EnhancedConditionalFormattingControl({
                   {rule.column}
                 </span>
                 <span style={{ color: '#595959', fontSize: '11px' }}>
-                  {rule.ruleType === 'threshold'
-                    ? rule.compareTarget === 'column'
-                      ? `${rule.operator} ${rule.targetColumn} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
-                      : rule.operator === 'between'
-                        ? `${rule.targetValue} - ${rule.targetValueRight} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
-                        : rule.targetValueText !== undefined &&
-                            rule.targetValueText !== ''
-                          ? `${rule.operator} "${rule.targetValueText}" (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
-                          : `${rule.operator} ${rule.targetValue} (${rule.applyTo === 'icon' ? `Icon ${rule.iconPosition === 'right' ? 'Suffix' : 'Prefix'}` : rule.applyTo === 'text' ? 'Text' : 'Bg'}${ruleOpacity < 1 ? `, ${Math.round(ruleOpacity * 100)}%` : ''})`
-                    : `Color Scale (${Math.round((rule.minOpacity ?? 0.3) * 100)}% - ${Math.round((rule.maxOpacity ?? 1) * 100)}%)`}
+                  {formatRuleDescription(rule)}
                 </span>
               </div>
 
@@ -451,7 +605,7 @@ export default function EnhancedConditionalFormattingControl({
         onHide={() => setIsModalOpen(false)}
         onHandledPrimaryAction={handleSaveRule}
         primaryButtonName={t('Save Rule')}
-        width={480}
+        width={500}
       >
         <div
           style={{
@@ -461,40 +615,36 @@ export default function EnhancedConditionalFormattingControl({
             paddingTop: '8px',
           }}
         >
-          {/* Target Column */}
-          <div>
-            <label
-              style={{
-                fontWeight: 600,
-                fontSize: '12px',
-                display: 'block',
-                marginBottom: '4px',
-              }}
-            >
-              {t('Target Column / Metric')}
-            </label>
-            <div style={{ width: '100%' }}>
+          {/* Condition Column & Rule Type */}
+          <Row gutter={10}>
+            <Col span={12}>
+              <label
+                style={{
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  display: 'block',
+                  marginBottom: '4px',
+                }}
+              >
+                {t('When Column (Condition)')}
+              </label>
               <Select
                 value={targetColumn}
                 onChange={val => handleTargetColumnChange(String(val))}
                 options={columnOptions}
               />
-            </div>
-          </div>
-
-          {/* Rule Type */}
-          <div>
-            <label
-              style={{
-                fontWeight: 600,
-                fontSize: '12px',
-                display: 'block',
-                marginBottom: '4px',
-              }}
-            >
-              {t('Rule Type')}
-            </label>
-            <div style={{ width: '100%' }}>
+            </Col>
+            <Col span={12}>
+              <label
+                style={{
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  display: 'block',
+                  marginBottom: '4px',
+                }}
+              >
+                {t('Rule Type')}
+              </label>
               <Select
                 value={ruleType}
                 onChange={val => setRuleType(val as 'threshold' | 'colorScale')}
@@ -503,23 +653,23 @@ export default function EnhancedConditionalFormattingControl({
                     ? [
                         {
                           value: 'threshold',
-                          label: t('Threshold / Comparison (Dimension)'),
+                          label: t('Condition / Match'),
                         },
                       ]
                     : [
                         {
                           value: 'threshold',
-                          label: t('Threshold / Comparison'),
+                          label: t('Threshold / Calculation'),
                         },
                         {
                           value: 'colorScale',
-                          label: t('Color Scale (Heatmap Gradient)'),
+                          label: t('Color Scale (Gradient)'),
                         },
                       ]
                 }
               />
-            </div>
-          </div>
+            </Col>
+          </Row>
 
           {ruleType === 'threshold' && (
             <>
@@ -539,33 +689,71 @@ export default function EnhancedConditionalFormattingControl({
                   <Select
                     value={compareTarget}
                     onChange={val =>
-                      setCompareTarget(val as 'static' | 'column')
+                      handleCompareTargetChange(
+                        val as EnhancedConditionalFormattingRule['compareTarget'],
+                      )
                     }
-                    options={[
-                      {
-                        value: 'static',
-                        label: isDimension
-                          ? t('Static Text Value')
-                          : t('Static Number Value'),
-                      },
-                      {
-                        value: 'column',
-                        label: t('Another Column (Dynamic Comparison)'),
-                      },
-                    ]}
+                    options={
+                      isDimension
+                        ? [
+                            {
+                              value: 'static',
+                              label: t('Text Value / Comma List'),
+                            },
+                            {
+                              value: 'column',
+                              label: t('Another Column'),
+                            },
+                          ]
+                        : [
+                            {
+                              value: 'static',
+                              label: t('Static Value'),
+                            },
+                            {
+                              value: 'column',
+                              label: t('Another Column'),
+                            },
+                            {
+                              value: 'avg',
+                              label: t('Column Average (AVG)'),
+                            },
+                            {
+                              value: 'median',
+                              label: t('Column Median (MEDIAN)'),
+                            },
+                            {
+                              value: 'max',
+                              label: t('Column Maximum (Highest Value)'),
+                            },
+                            {
+                              value: 'min',
+                              label: t('Column Minimum (Lowest Value)'),
+                            },
+                            {
+                              value: 'pct_of_max',
+                              label: t('% of Column Max (0–100%)'),
+                            },
+                            {
+                              value: 'pct_of_total',
+                              label: t('% of Column Total (0–100%)'),
+                            },
+                          ]
+                    }
                   />
                 </div>
               </div>
 
-              {/* Operator & Value */}
+              {/* Operator & Value / Calculation Target */}
               <Row gutter={10} align="middle">
                 <Col
                   span={
-                    compareTarget === 'column'
-                      ? 8
-                      : operator === 'between'
-                        ? 6
-                        : 8
+                    (compareTarget === 'static' ||
+                      compareTarget === 'pct_of_max' ||
+                      compareTarget === 'pct_of_total') &&
+                    operator === 'between'
+                      ? 6
+                      : 9
                   }
                 >
                   <label
@@ -589,18 +777,22 @@ export default function EnhancedConditionalFormattingControl({
                     options={
                       isDimension
                         ? DIMENSION_OPERATOR_OPTIONS
-                        : compareTarget === 'column'
-                          ? METRIC_OPERATOR_OPTIONS.filter(
+                        : compareTarget === 'static' ||
+                            compareTarget === 'pct_of_max' ||
+                            compareTarget === 'pct_of_total'
+                          ? METRIC_OPERATOR_OPTIONS
+                          : METRIC_OPERATOR_OPTIONS.filter(
                               o => o.value !== 'between',
                             )
-                          : METRIC_OPERATOR_OPTIONS
                     }
                   />
                 </Col>
 
-                {compareTarget === 'static' ? (
+                {compareTarget === 'static' ||
+                compareTarget === 'pct_of_max' ||
+                compareTarget === 'pct_of_total' ? (
                   isDimension ? (
-                    <Col span={16}>
+                    <Col span={15}>
                       <label
                         style={{
                           fontWeight: 600,
@@ -609,12 +801,18 @@ export default function EnhancedConditionalFormattingControl({
                           marginBottom: '4px',
                         }}
                       >
-                        {t('Text / Value')}
+                        {operator === 'in'
+                          ? t('Values (Comma-Separated)')
+                          : t('Text / Value')}
                       </label>
                       <Input
                         value={targetValueText}
                         onChange={e => setTargetValueText(e.target.value)}
-                        placeholder="e.g. East, Technology"
+                        placeholder={
+                          operator === 'in'
+                            ? 'e.g. East, West, Central'
+                            : 'e.g. East'
+                        }
                       />
                     </Col>
                   ) : operator === 'between' ? (
@@ -628,7 +826,9 @@ export default function EnhancedConditionalFormattingControl({
                             marginBottom: '4px',
                           }}
                         >
-                          {t('Min Value')}
+                          {compareTarget === 'static'
+                            ? t('Min Value')
+                            : t('Min %')}
                         </label>
                         <InputNumber
                           value={targetValue}
@@ -645,7 +845,9 @@ export default function EnhancedConditionalFormattingControl({
                             marginBottom: '4px',
                           }}
                         >
-                          {t('Max Value')}
+                          {compareTarget === 'static'
+                            ? t('Max Value')
+                            : t('Max %')}
                         </label>
                         <InputNumber
                           value={targetValueRight}
@@ -657,7 +859,7 @@ export default function EnhancedConditionalFormattingControl({
                       </Col>
                     </>
                   ) : (
-                    <Col span={16}>
+                    <Col span={15}>
                       <label
                         style={{
                           fontWeight: 600,
@@ -666,7 +868,9 @@ export default function EnhancedConditionalFormattingControl({
                           marginBottom: '4px',
                         }}
                       >
-                        {t('Value')}
+                        {compareTarget === 'static'
+                          ? t('Value')
+                          : t('Percentage (0–100%)')}
                       </label>
                       <InputNumber
                         value={targetValue}
@@ -675,8 +879,56 @@ export default function EnhancedConditionalFormattingControl({
                       />
                     </Col>
                   )
-                ) : (
-                  <Col span={16}>
+                ) : compareTarget === 'column' ? (
+                  <>
+                    <Col span={isDimension ? 15 : 10}>
+                      <label
+                        style={{
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          display: 'block',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        {t('Compare Column')}
+                      </label>
+                      <Select
+                        value={targetColumnCompare}
+                        onChange={val => setTargetColumnCompare(String(val))}
+                        options={columnOptions.filter(
+                          o => o.value !== targetColumn,
+                        )}
+                      />
+                    </Col>
+                    {!isDimension && (
+                      <Col span={5}>
+                        <label
+                          style={{
+                            fontWeight: 600,
+                            fontSize: '12px',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          {t('× Ratio')}
+                        </label>
+                        <InputNumber
+                          step={0.1}
+                          value={compareMultiplier}
+                          onChange={val =>
+                            setCompareMultiplier(
+                              val !== null && val !== undefined
+                                ? Number(val)
+                                : 1,
+                            )
+                          }
+                          style={{ width: '100%' }}
+                        />
+                      </Col>
+                    )}
+                  </>
+                ) : compareTarget === 'avg' || compareTarget === 'median' ? (
+                  <Col span={15}>
                     <label
                       style={{
                         fontWeight: 600,
@@ -685,32 +937,84 @@ export default function EnhancedConditionalFormattingControl({
                         marginBottom: '4px',
                       }}
                     >
-                      {t('Compare Column')}
+                      {compareTarget === 'avg'
+                        ? t('× Multiplier of Average (1 = exact AVG)')
+                        : t('× Multiplier of Median (1 = exact MEDIAN)')}
                     </label>
-                    <Select
-                      value={targetColumnCompare}
-                      onChange={val => setTargetColumnCompare(String(val))}
-                      options={columnOptions.filter(
-                        o => o.value !== targetColumn,
-                      )}
+                    <InputNumber
+                      step={0.1}
+                      value={compareMultiplier}
+                      onChange={val =>
+                        setCompareMultiplier(
+                          val !== null && val !== undefined ? Number(val) : 1,
+                        )
+                      }
+                      style={{ width: '100%' }}
                     />
+                  </Col>
+                ) : (
+                  <Col span={15}>
+                    <label
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        display: 'block',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      {t('Target')}
+                    </label>
+                    <div
+                      style={{
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '0 10px',
+                        borderRadius: '4px',
+                        border: '1px solid #d9d9d9',
+                        backgroundColor: '#fafafa',
+                        fontSize: '12px',
+                        color: '#595959',
+                      }}
+                    >
+                      {compareTarget === 'max'
+                        ? t('Column Highest Value (MAX)')
+                        : t('Column Lowest Value (MIN)')}
+                    </div>
                   </Col>
                 )}
               </Row>
 
-              {/* Format Target */}
-              <div>
-                <label
-                  style={{
-                    fontWeight: 600,
-                    fontSize: '12px',
-                    display: 'block',
-                    marginBottom: '4px',
-                  }}
-                >
-                  {t('Apply To')}
-                </label>
-                <div style={{ width: '100%' }}>
+              {/* Format Column & Apply Style To */}
+              <Row gutter={10}>
+                <Col span={12}>
+                  <label
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {t('Format Column(s)')}
+                  </label>
+                  <Select
+                    value={formatColumn}
+                    onChange={val => setFormatColumn(String(val))}
+                    options={formatColumnOptions}
+                  />
+                </Col>
+                <Col span={12}>
+                  <label
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {t('Style')}
+                  </label>
                   <Select
                     value={applyTo}
                     onChange={val =>
@@ -722,8 +1026,8 @@ export default function EnhancedConditionalFormattingControl({
                       { value: 'icon', label: t('Icon / Arrow Indicator') },
                     ]}
                   />
-                </div>
-              </div>
+                </Col>
+              </Row>
 
               {/* Icon Configuration when applyTo === 'icon' */}
               {applyTo === 'icon' && (
@@ -881,7 +1185,7 @@ export default function EnhancedConditionalFormattingControl({
                 </div>
               </div>
 
-              {/* Single Transparency / Opacity Slider (No duplicate quick buttons) */}
+              {/* Single Transparency / Opacity Slider */}
               <div>
                 <div
                   style={{
@@ -918,8 +1222,8 @@ export default function EnhancedConditionalFormattingControl({
 
           {ruleType === 'colorScale' && (
             <>
-              {/* Color Scale Min & Max */}
-              <Row gutter={16}>
+              {/* Format Target & Palette Presets */}
+              <Row gutter={10}>
                 <Col span={12}>
                   <label
                     style={{
@@ -929,13 +1233,73 @@ export default function EnhancedConditionalFormattingControl({
                       marginBottom: '4px',
                     }}
                   >
-                    {t('Min Value Color (Lowest)')}
+                    {t('Format Column(s)')}
+                  </label>
+                  <Select
+                    value={formatColumn}
+                    onChange={val => setFormatColumn(String(val))}
+                    options={formatColumnOptions}
+                  />
+                </Col>
+                <Col span={12}>
+                  <label
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {t('Palette Preset')}
+                  </label>
+                  <Select
+                    value={
+                      COLOR_SCALE_PRESETS.find(
+                        p =>
+                          p.minColor === minColor &&
+                          p.midColor === midColor &&
+                          p.maxColor === maxColor,
+                      )?.key || 'custom'
+                    }
+                    onChange={val => {
+                      const preset = COLOR_SCALE_PRESETS.find(
+                        p => p.key === val,
+                      );
+                      if (preset) {
+                        setMinColor(preset.minColor);
+                        setMidColor(preset.midColor);
+                        setMaxColor(preset.maxColor);
+                      }
+                    }}
+                    options={[
+                      ...COLOR_SCALE_PRESETS.map(p => ({
+                        value: p.key,
+                        label: t(p.label),
+                      })),
+                      { value: 'custom', label: t('Custom Colors') },
+                    ]}
+                  />
+                </Col>
+              </Row>
+
+              {/* Color Scale Min, Mid (optional), Max */}
+              <Row gutter={10}>
+                <Col span={8}>
+                  <label
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {t('Min Color')}
                   </label>
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '6px',
                     }}
                   >
                     <input
@@ -943,7 +1307,7 @@ export default function EnhancedConditionalFormattingControl({
                       value={minColor.startsWith('#') ? minColor : '#e6f7ff'}
                       onChange={e => setMinColor(e.target.value)}
                       style={{
-                        width: '36px',
+                        width: '32px',
                         height: '32px',
                         padding: 0,
                         border: '1px solid #d9d9d9',
@@ -960,7 +1324,7 @@ export default function EnhancedConditionalFormattingControl({
                   </div>
                 </Col>
 
-                <Col span={12}>
+                <Col span={8}>
                   <label
                     style={{
                       fontWeight: 600,
@@ -969,13 +1333,54 @@ export default function EnhancedConditionalFormattingControl({
                       marginBottom: '4px',
                     }}
                   >
-                    {t('Max Value Color (Highest)')}
+                    {t('Mid Color (Optional)')}
                   </label>
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '6px',
+                    }}
+                  >
+                    <input
+                      type="color"
+                      value={midColor.startsWith('#') ? midColor : '#ffffff'}
+                      onChange={e => setMidColor(e.target.value)}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        padding: 0,
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        opacity: midColor ? 1 : 0.45,
+                      }}
+                    />
+                    <Input
+                      value={midColor}
+                      onChange={e => setMidColor(e.target.value)}
+                      placeholder={t('None')}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <label
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {t('Max Color')}
+                  </label>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
                     }}
                   >
                     <input
@@ -983,7 +1388,7 @@ export default function EnhancedConditionalFormattingControl({
                       value={maxColor.startsWith('#') ? maxColor : '#1890ff'}
                       onChange={e => setMaxColor(e.target.value)}
                       style={{
-                        width: '36px',
+                        width: '32px',
                         height: '32px',
                         padding: 0,
                         border: '1px solid #d9d9d9',
@@ -1001,7 +1406,7 @@ export default function EnhancedConditionalFormattingControl({
                 </Col>
               </Row>
 
-              {/* Clean Opacity sliders for color scale (No duplicate quick buttons) */}
+              {/* Clean Opacity sliders for color scale */}
               <Row gutter={16}>
                 <Col span={12}>
                   <div
@@ -1071,13 +1476,35 @@ export default function EnhancedConditionalFormattingControl({
                   style={{
                     height: '24px',
                     borderRadius: '4px',
-                    background: `linear-gradient(to right, ${hexToRgba(minColor, minOpacity)}, ${hexToRgba(maxColor, maxOpacity)})`,
+                    background: midColor
+                      ? `linear-gradient(to right, ${hexToRgba(minColor, minOpacity)}, ${hexToRgba(midColor, (minOpacity + maxOpacity) / 2)}, ${hexToRgba(maxColor, maxOpacity)})`
+                      : `linear-gradient(to right, ${hexToRgba(minColor, minOpacity)}, ${hexToRgba(maxColor, maxOpacity)})`,
                     border: '1px solid #d9d9d9',
                   }}
                 />
               </div>
             </>
           )}
+
+          {/* Include Totals & Subtotals */}
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={includeTotals}
+              onChange={e => setIncludeTotals(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>{t('Also apply to Grand Totals & Subtotals')}</span>
+          </label>
         </div>
       </Modal>
     </div>

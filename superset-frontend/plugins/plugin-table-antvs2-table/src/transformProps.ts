@@ -282,6 +282,8 @@ export default function transformProps(
   );
 
   // Superset data payload
+  const verboseMap: Record<string, string> =
+    (chartProps as any).datasource?.verboseMap || {};
   const queryData = queriesData[0] || {};
   const data: DataRecord[] = queryData.data || [];
   const colnames: string[] = (queryData as any).colnames || [];
@@ -302,7 +304,8 @@ export default function transformProps(
   const s2Data = data.map(row => {
     const out: Record<string, string | number> = {};
     for (const col of groupby) {
-      out[col] = String(row[col]);
+      out[col] =
+        row[col] === null || row[col] === undefined ? '' : String(row[col]);
     }
     for (const col of metricCols) {
       out[col] = Number(row[col]) || 0;
@@ -316,7 +319,7 @@ export default function transformProps(
     },
     meta: allFields.map(f => {
       const isMetric = metricCols.includes(f);
-      const displayName = customColumnNames[f] || f;
+      const displayName = customColumnNames[f] || verboseMap[f] || f;
       if (isMetric) {
         const customFormat = columnFormatsObj[f];
         const formatter = getNumberFormatter(customFormat || 'SMART_NUMBER');

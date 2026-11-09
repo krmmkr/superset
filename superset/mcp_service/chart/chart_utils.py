@@ -42,6 +42,9 @@ from superset.mcp_service.chart.schemas import (
     ChartSemantics,
     ColumnRef,
     CurrencyFormat,
+    CalendarHeatmapCustomChartConfig,
+    CustomControlsChartConfig,
+    CustomDatePickerChartConfig,
     FilterConfig,
     GaugeChartConfig,
     HandlebarsChartConfig,
@@ -49,6 +52,7 @@ from superset.mcp_service.chart.schemas import (
     MixedTimeseriesChartConfig,
     PieChartConfig,
     PivotTableChartConfig,
+    SankeyMultiLevelChartConfig,
     SortByConfig,
     TableChartConfig,
     TreemapChartConfig,
@@ -487,6 +491,9 @@ def map_table_config(config: TableChartConfig) -> Dict[str, Any]:
                     "order_desc": True,
                 }
             )
+            if config.viz_type == "antvs2_table":
+                form_data["groupby"] = raw_columns
+                form_data["query_mode"] = "aggregate"
 
         # Handle aggregated columns only
         elif aggregated_metrics and not raw_columns:
@@ -543,7 +550,7 @@ def merge_table_column_config(
     and properties. The nested merge is important because the Superset UI stores
     additional column settings that the MCP schema does not expose.
     """
-    table_viz_types = {"table", "ag-grid-table"}
+    table_viz_types = {"table", "ag-grid-table", "antvs2_table"}
     if (
         existing_form_data.get("viz_type") not in table_viz_types
         or new_form_data.get("viz_type") not in table_viz_types
@@ -1378,6 +1385,119 @@ def map_waterfall_config(config: WaterfallChartConfig) -> Dict[str, Any]:
     return form_data
 
 
+def map_custom_controls_config(config: CustomControlsChartConfig) -> Dict[str, Any]:
+    """Map custom controls chart config to Superset form_data (viz_type custom_controls)."""
+    form_data: Dict[str, Any] = {
+        "viz_type": "custom_controls",
+        "filterColumn": config.filter_column.name,
+        "groupby": [config.filter_column.name],
+        "metrics": [],
+        "series_limit": 1000,
+        "controlType": config.control_type,
+        "orientation": config.orientation,
+        "includeAllOption": config.include_all_option,
+        "multiSelect": config.multi_select,
+        "defaultValue": config.default_value,
+        "hideTitle": config.hide_title,
+        "boldTitle": config.bold_title,
+    }
+    _add_adhoc_filters(form_data, config.filters)
+    return form_data
+
+
+def map_custom_datepicker_config(config: CustomDatePickerChartConfig) -> Dict[str, Any]:
+    """Map custom datepicker chart config to Superset form_data (viz_type custom_datepicker)."""
+    form_data: Dict[str, Any] = {
+        "viz_type": "custom_datepicker",
+        "filterColumn": config.filter_column.name,
+        "groupby": [config.filter_column.name],
+        "pickerType": config.picker_type,
+        "showTime": config.show_time,
+        "presetRanges": config.preset_ranges,
+        "defaultType": config.default_type,
+        "defaultDynamicValue": config.default_dynamic_value,
+    }
+    if config.default_static_value is not None:
+        form_data["defaultStaticValue"] = config.default_static_value
+    _add_adhoc_filters(form_data, config.filters)
+    return form_data
+
+
+def map_sankey_multi_level_config(
+    config: SankeyMultiLevelChartConfig,
+) -> Dict[str, Any]:
+    """Map multi-level Sankey config to Superset form_data (viz_type sankey_multi_level)."""
+    form_data: Dict[str, Any] = {
+        "viz_type": "sankey_multi_level",
+        "groupby": [g.name for g in config.groupby],
+        "metric": create_metric_object(config.metric),
+        "sort_by_metric": config.sort_by_metric,
+        "row_limit": config.row_limit,
+        "color_scheme": config.color_scheme or "supersetColors",
+        "layout_mode": config.layout_mode,
+        "min_width": config.min_width,
+        "link_color_mode": config.link_color_mode,
+        "enable_3d_effect": config.enable_3d_effect,
+        "node_width": config.node_width,
+        "node_gap": config.node_gap,
+        "node_border_radius": config.node_border_radius,
+        "link_opacity": config.link_opacity,
+        "blur_opacity": config.blur_opacity,
+        "focus_mode": config.focus_mode,
+        "show_label_percentage": config.show_label_percentage,
+        "show_label_percentage_type": config.show_label_percentage_type,
+        "show_stage_name": config.show_stage_name,
+        "show_stage_percentage": config.show_stage_percentage,
+        "show_whole_percentage": config.show_whole_percentage,
+        "show_node_value": config.show_node_value,
+        "show_link_percentages": config.show_link_percentages,
+    }
+    _add_adhoc_filters(form_data, config.filters)
+    return form_data
+
+
+def map_calendar_heatmap_custom_config(
+    config: CalendarHeatmapCustomChartConfig,
+) -> Dict[str, Any]:
+    """Map custom calendar heatmap config to Superset form_data (viz_type calendar_heatmap_custom)."""
+    time_grain_val = (
+        config.time_grain.value
+        if hasattr(config.time_grain, "value")
+        else (config.time_grain or "P1D")
+    )
+    form_data: Dict[str, Any] = {
+        "viz_type": "calendar_heatmap_custom",
+        "granularity_sqla": config.temporal_column,
+        "time_grain_sqla": time_grain_val,
+        "metrics": [create_metric_object(m) for m in config.metrics],
+        "tooltip_metrics": [
+            create_metric_object(m) for m in (config.tooltip_metrics or [])
+        ],
+        "calendar_time_range": config.calendar_time_range,
+        "calendar_orient": config.calendar_orient,
+        "layout_mode": config.layout_mode,
+        "cell_size": config.cell_size,
+        "show_day_label": config.show_day_label,
+        "day_label_format": config.day_label_format,
+        "show_month_label": config.show_month_label,
+        "month_label_format": config.month_label_format,
+        "show_cell_label": config.show_cell_label,
+        "show_cell_date": config.show_cell_date,
+        "linear_color_scheme": config.linear_color_scheme or "superset_seq_1",
+        "visual_map_type": config.visual_map_type,
+        "show_visual_map": config.show_visual_map,
+        "number_format": config.number_format,
+        "emit_filter": config.emit_filter,
+        "crossfilter_mode": config.crossfilter_mode,
+        "row_limit": config.row_limit,
+    }
+    if config.time_range:
+        form_data["time_range"] = config.time_range
+    _add_adhoc_filters(form_data, config.filters)
+    _ensure_generated_temporal_binding(form_data, config.temporal_column)
+    return form_data
+
+
 def map_big_number_config(
     config: BigNumberChartConfig, dataset_id: int | str | None = None
 ) -> Dict[str, Any]:
@@ -1526,13 +1646,14 @@ def map_pivot_table_config(config: PivotTableChartConfig) -> Dict[str, Any]:
         raise ValueError("Pivot table must have at least one metric")
 
     metrics = [create_metric_object(col) for col in config.metrics]
+    viz_type = getattr(config, "viz_type", "pivot_table_v2")
+    row_cols = [col.name for col in config.rows]
+    col_cols = [col.name for col in config.columns] if config.columns else []
 
     form_data: Dict[str, Any] = {
-        "viz_type": "pivot_table_v2",
-        "groupbyRows": [col.name for col in config.rows],
-        "groupbyColumns": [col.name for col in config.columns]
-        if config.columns
-        else [],
+        "viz_type": viz_type,
+        "groupbyRows": row_cols,
+        "groupbyColumns": col_cols,
         "metrics": metrics,
         "aggregateFunction": config.aggregate_function,
         "rowTotals": config.show_row_totals,
@@ -1545,6 +1666,17 @@ def map_pivot_table_config(config: PivotTableChartConfig) -> Dict[str, Any]:
         "colOrder": "key_a_to_z",
         "row_limit": config.row_limit,
     }
+
+    if viz_type == "antvs2_table_pivot":
+        form_data.update(
+            {
+                "groupby": row_cols,
+                "columns": col_cols,
+                "show_row_totals": config.show_row_totals,
+                "show_col_totals": config.show_column_totals,
+                "metrics_layout": "columns",
+            }
+        )
 
     if config.date_format:
         form_data["date_format"] = config.date_format

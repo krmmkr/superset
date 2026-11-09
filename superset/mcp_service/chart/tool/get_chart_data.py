@@ -123,6 +123,12 @@ _VIZ_CATEGORY: dict[str, str] = {
     "world_map": "map",
     "pivot_table_v2": "table",
     "ag-grid-pivot-table": "table",
+    "antvs2_table_pivot": "table",
+    "antvs2_table": "table",
+    "custom_controls": "filter",
+    "custom_datepicker": "filter",
+    "sankey_multi_level": "sankey",
+    "calendar_heatmap_custom": "heatmap",
     # Own category: cumulative-flow semantics differ from a plain bar, like
     # funnel/gauge carry distinct categories.
     "waterfall": "waterfall",

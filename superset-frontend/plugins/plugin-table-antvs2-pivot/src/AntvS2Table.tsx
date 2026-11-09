@@ -21,7 +21,6 @@ import {
   useCallback,
   useState,
   useMemo,
-  useEffect,
   createElement,
   Fragment,
 } from 'react';
@@ -35,8 +34,6 @@ import {
   CornerCell,
   S2Event,
   TextAlign,
-  asyncGetAllPlainData,
-  download,
 } from '@antv/s2';
 import '@antv/s2-react/dist/s2-react.min.css';
 import { DataMask } from '@superset-ui/core';
@@ -116,6 +113,36 @@ class CustomRowCell extends RowCell {
 }
 
 class CustomCornerCell extends CornerCell {
+  getFormattedFieldValue() {
+    const base = super.getFormattedFieldValue();
+    const { hideValue } =
+      (this.spreadsheet?.options?.style?.colCell as any) || {};
+    const rawColumns: string[] =
+      (this.spreadsheet?.dataSet?.fields?.columns as string[]) || [];
+    const columns = rawColumns.filter(col => col !== '$$extra$$');
+    const values: string[] =
+      (this.spreadsheet?.dataSet?.fields?.values as string[]) || [];
+    if (
+      hideValue &&
+      columns.length > 0 &&
+      values.length === 1 &&
+      this.isLastRowCornerCell()
+    ) {
+      const lastColField = columns[columns.length - 1];
+      const colDisplayName =
+        this.spreadsheet?.dataSet?.getFieldName(lastColField) || lastColField;
+      if (colDisplayName && base.formattedValue) {
+        const combined = `${base.formattedValue} ↓ / ${colDisplayName} →`;
+        return {
+          ...base,
+          formattedValue: combined,
+          value: combined,
+        };
+      }
+    }
+    return base;
+  }
+
   getTextStyle() {
     const textStyle = super.getTextStyle();
     return {
@@ -125,39 +152,170 @@ class CustomCornerCell extends CornerCell {
   }
 }
 
-/** Static CSS for the tooltip sort menu — allocated once at module level. */
-const TOOLTIP_MENU_STYLE = `
-  .s2-tooltip-custom-menu .ant-menu {
-    font-size: 11px !important;
-    line-height: 1.2 !important;
-    width: 135px !important;
-  }
-  .s2-tooltip-custom-menu .ant-menu-item {
-    height: 22px !important;
-    line-height: 22px !important;
-    padding: 0 8px !important;
-    margin: 1px 0 !important;
-    font-size: 11px !important;
-  }
-  .s2-tooltip-custom-menu .ant-menu-item .ant-menu-title-content {
-    font-size: 11px !important;
-  }
-  .s2-tooltip-custom-menu .ant-menu-item-icon,
-  .s2-tooltip-custom-menu .antv-s2-operator-icon {
-    font-size: 10px !important;
-    margin-right: 4px !important;
-  }
-`;
+/**
+ * Build dynamic CSS for the S2 tooltip container and sort menu so it matches
+ * Superset's light and dark themes.
+ */
+function buildTooltipStyleSheet({
+  isDark,
+  tooltipBg,
+  textColor,
+  secondaryTextColor,
+  tertiaryTextColor,
+  borderColor,
+  hoverBgColor,
+  selectedBgColor,
+  selectedTextColor,
+  headerBgColor,
+  fontFamily,
+  fontSize,
+  borderRadius,
+  boxShadow,
+}: {
+  isDark: boolean;
+  tooltipBg: string;
+  textColor: string;
+  secondaryTextColor: string;
+  tertiaryTextColor: string;
+  borderColor: string;
+  hoverBgColor: string;
+  selectedBgColor: string;
+  selectedTextColor: string;
+  headerBgColor: string;
+  fontFamily: string;
+  fontSize: number;
+  borderRadius: number;
+  boxShadow: string;
+}) {
+  return `
+    .antv-s2-tooltip-container.superset-s2-tooltip,
+    .antv-s2-tooltip-container {
+      --antv-s2-tooltip-background: ${tooltipBg};
+      --antv-s2-tooltip-operator-background: ${tooltipBg};
+      --antv-s2-tooltip-operator-menu-selected-background: ${selectedBgColor};
+      --antv-s2-font: ${textColor};
+      --antv-s2-font-85: ${textColor};
+      --antv-s2-font-65: ${secondaryTextColor};
+      --antv-s2-font-45: ${tertiaryTextColor};
+      --antv-s2-border: ${borderColor};
+      background: ${tooltipBg} !important;
+      color: ${textColor} !important;
+      font-family: ${fontFamily} !important;
+      font-size: ${fontSize}px !important;
+      border: 1px solid ${borderColor} !important;
+      border-radius: ${borderRadius}px !important;
+      box-shadow: ${boxShadow} !important;
+      backdrop-filter: blur(8px);
+    }
+    .antv-s2-tooltip-container .antv-s2-tooltip-name,
+    .antv-s2-tooltip-container .antv-s2-tooltip-highlight {
+      color: ${textColor} !important;
+    }
+    .antv-s2-tooltip-container .antv-s2-tooltip-head-info-list {
+      color: ${textColor} !important;
+      font-weight: 600;
+      padding: 8px 12px 6px !important;
+      border-bottom: 1px solid ${borderColor};
+    }
+    .antv-s2-tooltip-container .antv-s2-tooltip-detail-list {
+      padding: 6px 12px 8px !important;
+    }
+    .antv-s2-tooltip-container .antv-s2-tooltip-detail-item,
+    .antv-s2-tooltip-container .antv-s2-tooltip-summary {
+      color: ${secondaryTextColor} !important;
+    }
+    .antv-s2-tooltip-container .antv-s2-tooltip-detail-item-val,
+    .antv-s2-tooltip-container .antv-s2-tooltip-summary-val {
+      color: ${textColor} !important;
+      font-weight: 600;
+    }
+    .antv-s2-tooltip-container .antv-s2-tooltip-description,
+    .antv-s2-tooltip-container .antv-s2-tooltip-tips {
+      color: ${tertiaryTextColor} !important;
+    }
+    .antv-s2-tooltip-container .antv-s2-tooltip-infos {
+      background: ${headerBgColor} !important;
+      background-color: ${headerBgColor} !important;
+      color: ${tertiaryTextColor} !important;
+      border-top: 1px solid ${borderColor};
+    }
+    .antv-s2-tooltip-container .antv-s2-tooltip-operator {
+      background: ${tooltipBg} !important;
+      color: ${textColor} !important;
+    }
+    .s2-tooltip-custom-menu .ant-menu {
+      background: ${tooltipBg} !important;
+      color: ${textColor} !important;
+      font-family: ${fontFamily} !important;
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      width: 140px !important;
+      border-inline-end: none !important;
+    }
+    .s2-tooltip-custom-menu .ant-menu-item {
+      height: 24px !important;
+      line-height: 24px !important;
+      padding: 0 8px !important;
+      margin: 2px 4px !important;
+      border-radius: 4px !important;
+      font-size: 11px !important;
+      color: ${textColor} !important;
+    }
+    .s2-tooltip-custom-menu .ant-menu-item:hover,
+    .s2-tooltip-custom-menu .ant-menu-item-active {
+      background-color: ${hoverBgColor} !important;
+      color: ${textColor} !important;
+    }
+    .s2-tooltip-custom-menu .ant-menu-item-selected {
+      background-color: ${selectedBgColor} !important;
+      color: ${selectedTextColor} !important;
+      font-weight: 600;
+    }
+    .s2-tooltip-custom-menu .ant-menu-item .ant-menu-title-content {
+      font-size: 11px !important;
+    }
+    .s2-tooltip-custom-menu .ant-menu-item-icon,
+    .s2-tooltip-custom-menu .antv-s2-operator-icon {
+      font-size: 10px !important;
+      margin-right: 6px !important;
+      color: ${ isDark ? secondaryTextColor : textColor } !important;
+      fill: ${ isDark ? secondaryTextColor : textColor } !important;
+    }
+  `;
+}
 
 /**
  * Build cell interaction state styling. Takes hover/selected bg color and
  * returns the interactionState block used across all cell types.
  */
-function buildInteractionState(bg: string) {
+function buildInteractionState(isDark = false, borderColor = 'transparent') {
+  const crosshairBg = isDark
+    ? 'rgba(255, 255, 255, 0.025)'
+    : 'rgba(0, 0, 0, 0.02)';
+  const focusBg = isDark
+    ? 'rgba(255, 255, 255, 0.055)'
+    : 'rgba(0, 0, 0, 0.045)';
   return {
-    hover: { backgroundColor: bg, backgroundOpacity: 1 },
-    hoverFocus: { backgroundColor: bg, backgroundOpacity: 1 },
-    selected: { backgroundColor: bg, backgroundOpacity: 1 },
+    hover: {
+      backgroundColor: crosshairBg,
+      backgroundOpacity: 1,
+    },
+    hoverFocus: {
+      backgroundColor: focusBg,
+      backgroundOpacity: 1,
+      borderColor,
+      borderOpacity: 0,
+      borderWidth: 0,
+    },
+    selected: {
+      backgroundColor: focusBg,
+      backgroundOpacity: 1,
+    },
+    prepareSelect: {
+      borderColor,
+      borderOpacity: 0,
+      borderWidth: 0,
+    },
   };
 }
 
@@ -170,6 +328,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     s2DataConfig,
     s2Options,
     setDataMask,
+    selectedValues,
     emitCrossFilters,
     crossfilterColumns,
     groupby,
@@ -187,27 +346,12 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     colHeaderWordWrap,
     rowHeaderWordWrap,
     dataCellWordWrap,
-    enableExport = true,
+    hideMeasureColumn,
   } = props;
 
   const divRef = useRef<HTMLDivElement>(null);
-  const s2InstanceRef = useRef<any>(null);
 
   const [sortParams, setSortParams] = useState<any[]>([]);
-
-  const handleExportCsv = useCallback(async () => {
-    if (!s2InstanceRef.current) return;
-    try {
-      const csvData = await asyncGetAllPlainData({
-        sheetInstance: s2InstanceRef.current,
-        split: ',',
-        formatOptions: true,
-      });
-      download(csvData, 'pivot_table.csv');
-    } catch {
-      // Export error handled silently
-    }
-  }, []);
 
   const fieldsKey = useMemo(
     () =>
@@ -225,15 +369,17 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     setSortParams([]);
   }
 
-  useEffect(() => {
-    return () => {
-      s2InstanceRef.current = null;
-    };
-  }, []);
-
   const mergedDataCfg = useMemo(
     () => ({
       ...s2DataConfig,
+      fields: {
+        ...s2DataConfig?.fields,
+        rows: [...(s2DataConfig?.fields?.rows || [])],
+        columns: ((s2DataConfig?.fields?.columns || []) as string[]).filter(
+          col => col !== '$$extra$$',
+        ),
+        values: [...(s2DataConfig?.fields?.values || [])],
+      },
       sortParams:
         sortParams.length > 0 ? sortParams : s2DataConfig.sortParams || [],
     }),
@@ -248,8 +394,13 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       const meta = cellItem?.viewMeta || cellItem?.meta;
       if (!meta?.query) return;
 
+      const pivotColumns = (
+        (s2DataConfig?.fields?.columns || []) as string[]
+      ).filter(col => col !== '$$extra$$');
       const colsToEmit =
-        crossfilterColumns.length > 0 ? crossfilterColumns : groupby;
+        crossfilterColumns.length > 0
+          ? crossfilterColumns
+          : [...groupby, ...pivotColumns];
 
       const filterDict: Record<string, any> = {};
       const filters: any[] = [];
@@ -265,6 +416,20 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       if (filters.length === 0) return;
 
       const filterDictStr = JSON.stringify(filterDict);
+      const currentSelected = Object.values(selectedValues || {});
+      const isAlreadySelected = currentSelected.includes(filterDictStr);
+
+      if (isAlreadySelected) {
+        setDataMask({
+          extraFormData: {},
+          filterState: {
+            value: null,
+            selectedValues: [],
+          },
+        });
+        return;
+      }
+
       const dataMask: DataMask = {
         extraFormData: { filters } as any,
         filterState: {
@@ -274,18 +439,33 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       };
       setDataMask(dataMask);
     },
-    [emitCrossFilters, setDataMask, crossfilterColumns, groupby],
+    [
+      emitCrossFilters,
+      setDataMask,
+      selectedValues,
+      crossfilterColumns,
+      groupby,
+      s2DataConfig?.fields?.columns,
+    ],
   );
 
   // ── Theme ────────────────────────────────────
   const theme = useTheme();
   const isDarkMode = useThemeMode();
 
+  const fontFamily =
+    theme?.fontFamily ||
+    "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
+  const fontSize = theme?.fontSizeSM || 12;
+  const headerFontWeight = theme?.fontWeightStrong || 600;
   const textColor = theme?.colorText || '#262626';
   const bgColor = theme?.colorBgContainer || '#ffffff';
   const isDark = isDarkMode;
   const headerBgColor =
-    headerColor || theme?.colorBgLayout || theme?.colorFillAlter || '#fafafa';
+    headerColor ||
+    (isDark
+      ? theme?.colorFillQuaternary || theme?.colorFillAlter || '#1d1d1d'
+      : theme?.colorFillAlter || theme?.colorBgLayout || '#fafafa');
   const resolvedBorderColor =
     borderColor ||
     (isDark
@@ -293,12 +473,15 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       : theme?.colorBorderSecondary || theme?.colorBorder || '#f0f0f0');
   const hoverBgColor = isDark
     ? theme?.colorFillContentHover || 'rgba(255, 255, 255, 0.08)'
-    : theme?.colorBgTextHover || theme?.colorFillAlter || '#f5f5f5';
+    : theme?.colorBgTextHover || theme?.colorFillSecondary || '#f0f0f0';
+  const defaultBandingColor = isDark
+    ? 'rgba(255, 255, 255, 0.025)'
+    : theme?.colorFillQuaternary || '#fafafa';
 
   const isTransparentBanding = rowBandingColorObj && rowBandingColorObj.a === 0;
   const resolvedRowBandingColor = isTransparentBanding
     ? bgColor
-    : rowBandingColor || hoverBgColor;
+    : rowBandingColor || defaultBandingColor;
   const rawHeaderColor = headerColorObj;
   let headerTextColor =
     theme?.colorTextHeading || theme?.colorText || '#262626';
@@ -314,7 +497,62 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   }
 
   const totalText = textColor;
-  const totalFontWeight = 700;
+  const totalFontWeight = theme?.fontWeightStrong || 600;
+
+  const tooltipBg =
+    theme?.colorBgElevated || (isDark ? '#1f1f1f' : '#ffffff');
+  const secondaryTextColor =
+    theme?.colorTextSecondary ||
+    (isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.65)');
+  const tertiaryTextColor =
+    theme?.colorTextTertiary ||
+    (isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.45)');
+  const selectedBgColor =
+    theme?.controlItemBgActive ||
+    (isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)');
+  const selectedTextColor = theme?.colorPrimary || textColor;
+  const tooltipBorderRadius = theme?.borderRadius || 6;
+  const tooltipBoxShadow =
+    theme?.boxShadowSecondary ||
+    (isDark
+      ? '0 6px 16px 0 rgba(0, 0, 0, 0.48)'
+      : '0 6px 16px 0 rgba(0, 0, 0, 0.08)');
+
+  const tooltipStyleSheet = useMemo(
+    () =>
+      buildTooltipStyleSheet({
+        isDark,
+        tooltipBg,
+        textColor,
+        secondaryTextColor,
+        tertiaryTextColor,
+        borderColor: resolvedBorderColor,
+        hoverBgColor,
+        selectedBgColor,
+        selectedTextColor,
+        headerBgColor,
+        fontFamily,
+        fontSize,
+        borderRadius: tooltipBorderRadius,
+        boxShadow: tooltipBoxShadow,
+      }),
+    [
+      isDark,
+      tooltipBg,
+      textColor,
+      secondaryTextColor,
+      tertiaryTextColor,
+      resolvedBorderColor,
+      hoverBgColor,
+      selectedBgColor,
+      selectedTextColor,
+      headerBgColor,
+      fontFamily,
+      fontSize,
+      tooltipBorderRadius,
+      tooltipBoxShadow,
+    ],
+  );
 
   const isDefaultTheme = !formData.theme || formData.theme === 'default';
 
@@ -329,10 +567,33 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
   } = advancedS2OptionsObj || {};
 
   const customThemeCfg = useMemo(() => {
-    const hoverInteraction = buildInteractionState(hoverBgColor);
+    const hoverInteraction = buildInteractionState(isDark, resolvedBorderColor);
+    const resizeHighlightColor = isDark
+      ? theme?.colorTextTertiary || 'rgba(255, 255, 255, 0.45)'
+      : theme?.colorTextTertiary || 'rgba(0, 0, 0, 0.35)';
+    const resizeAreaTheme = {
+      size: 2,
+      background: resizeHighlightColor,
+      backgroundOpacity: 0,
+      guideLineColor: resizeHighlightColor,
+      guideLineDisableColor: isDark
+        ? 'rgba(255, 255, 255, 0.15)'
+        : 'rgba(0, 0, 0, 0.15)',
+      guideLineDash: [3, 3],
+      interactionState: {
+        hover: {
+          backgroundColor: resizeHighlightColor,
+          backgroundOpacity: isDark ? 0.65 : 0.55,
+        },
+      },
+    };
     const cellBorders = {
       horizontalBorderColor: resolvedBorderColor,
       verticalBorderColor: resolvedBorderColor,
+    };
+    const baseTextProps = {
+      fontFamily,
+      fontSize,
     };
 
     const baseThemeCfg: any = {
@@ -340,10 +601,15 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       theme: isDefaultTheme
         ? {
             background: { color: bgColor },
+            resizeArea: resizeAreaTheme,
+            prepareSelectMask: {
+              backgroundColor: resizeHighlightColor,
+              backgroundOpacity: 0.15,
+            },
             splitLine: {
               ...cellBorders,
-              horizontalBorderColorOpacity: isDark ? 0.6 : 1,
-              verticalBorderColorOpacity: isDark ? 0.6 : 1,
+              horizontalBorderColorOpacity: isDark ? 0.65 : 1,
+              verticalBorderColorOpacity: isDark ? 0.65 : 1,
             },
             dataCell: {
               cell: {
@@ -352,13 +618,18 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
                 ...cellBorders,
                 interactionState: hoverInteraction,
               },
-              text: { fill: textColor, textAlign: 'center' },
+              text: { ...baseTextProps, fill: textColor, textAlign: 'center' },
               bolderText: {
+                ...baseTextProps,
                 fill: totalText,
                 fontWeight: totalFontWeight,
                 textAlign: 'center',
               },
-              measureText: { fill: textColor, textAlign: 'center' },
+              measureText: {
+                ...baseTextProps,
+                fill: textColor,
+                textAlign: 'center',
+              },
             },
             cornerCell: {
               cell: {
@@ -366,9 +637,17 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
                 ...cellBorders,
                 interactionState: hoverInteraction,
               },
-              text: { fill: headerTextColor, fontWeight: 'bold' },
-              bolderText: { fill: headerTextColor },
-              measureText: { fill: headerTextColor },
+              text: {
+                ...baseTextProps,
+                fill: headerTextColor,
+                fontWeight: headerFontWeight,
+              },
+              bolderText: {
+                ...baseTextProps,
+                fill: headerTextColor,
+                fontWeight: headerFontWeight,
+              },
+              measureText: { ...baseTextProps, fill: headerTextColor },
             },
             seriesNumberCell: {
               cell: {
@@ -376,9 +655,13 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
                 ...cellBorders,
                 interactionState: hoverInteraction,
               },
-              text: { fill: headerTextColor },
-              bolderText: { fill: headerTextColor },
-              measureText: { fill: headerTextColor },
+              text: { ...baseTextProps, fill: headerTextColor },
+              bolderText: {
+                ...baseTextProps,
+                fill: headerTextColor,
+                fontWeight: headerFontWeight,
+              },
+              measureText: { ...baseTextProps, fill: headerTextColor },
             },
             rowCell: {
               cell: {
@@ -386,10 +669,14 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
                 ...cellBorders,
                 interactionState: hoverInteraction,
               },
-              text: { fill: textColor },
-              bolderText: { fill: totalText, fontWeight: totalFontWeight },
-              measureText: { fill: textColor },
-              seriesText: { fill: textColor },
+              text: { ...baseTextProps, fill: textColor },
+              bolderText: {
+                ...baseTextProps,
+                fill: totalText,
+                fontWeight: totalFontWeight,
+              },
+              measureText: { ...baseTextProps, fill: textColor },
+              seriesText: { ...baseTextProps, fill: textColor },
             },
             colCell: {
               cell: {
@@ -398,12 +685,22 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
                 interactionState: hoverInteraction,
               },
               text: {
+                ...baseTextProps,
                 fill: headerTextColor,
-                fontWeight: 'bold',
+                fontWeight: headerFontWeight,
                 textAlign: 'center',
               },
-              bolderText: { fill: headerTextColor, textAlign: 'center' },
-              measureText: { fill: headerTextColor, textAlign: 'center' },
+              bolderText: {
+                ...baseTextProps,
+                fill: headerTextColor,
+                fontWeight: headerFontWeight,
+                textAlign: 'center',
+              },
+              measureText: {
+                ...baseTextProps,
+                fill: headerTextColor,
+                textAlign: 'center',
+              },
             },
             scrollBar: {
               thumbColor:
@@ -420,7 +717,18 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
               lineCap: 'round',
             },
           }
-        : {},
+        : {
+            resizeArea: resizeAreaTheme,
+            prepareSelectMask: {
+              backgroundColor: resizeHighlightColor,
+              backgroundOpacity: 0.15,
+            },
+            dataCell: { cell: { interactionState: hoverInteraction } },
+            rowCell: { cell: { interactionState: hoverInteraction } },
+            colCell: { cell: { interactionState: hoverInteraction } },
+            cornerCell: { cell: { interactionState: hoverInteraction } },
+            seriesNumberCell: { cell: { interactionState: hoverInteraction } },
+          },
     };
 
     const userOptions = advancedS2OptionsObj?.options || {};
@@ -434,6 +742,8 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     const themeKeys = [
       'background',
       'splitLine',
+      'resizeArea',
+      'prepareSelectMask',
       'dataCell',
       'rowCell',
       'colCell',
@@ -492,6 +802,11 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     advPalette,
     totalText,
     totalFontWeight,
+    fontFamily,
+    fontSize,
+    headerFontWeight,
+    resolvedBorderColor,
+    resolvedRowBandingColor,
     isDefaultTheme,
     advancedS2OptionsObj,
   ]);
@@ -682,15 +997,26 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       }
     }
 
-    // Ensure tooltip has a render function for the operation menu in 2.x
+    // Ensure tooltip matches Superset theme and has a render function for the operation menu in 2.x
     finalOptions.tooltip = finalOptions.tooltip || {};
+    finalOptions.tooltip.className = 'superset-s2-tooltip';
+    finalOptions.tooltip.style = {
+      background: tooltipBg,
+      color: textColor,
+      fontFamily,
+      fontSize: `${fontSize}px`,
+      borderRadius: `${tooltipBorderRadius}px`,
+      border: `1px solid ${resolvedBorderColor}`,
+      boxShadow: tooltipBoxShadow,
+      ...finalOptions.tooltip.style,
+    };
     finalOptions.tooltip.operation = finalOptions.tooltip.operation || {};
     finalOptions.tooltip.operation.menu = {
       render: (props: any) =>
         createElement(
           Fragment,
           null,
-          createElement('style', null, TOOLTIP_MENU_STYLE),
+          createElement('style', null, tooltipStyleSheet),
           createElement(
             'div',
             { className: 's2-tooltip-custom-menu' },
@@ -707,11 +1033,20 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
     defaultDimensionAlign,
     defaultMetricAlign,
     columnAlignmentsObj,
+    columnBoldTextObj,
     headerColor,
     metricCols,
     colHeaderWordWrap,
     rowHeaderWordWrap,
     dataCellWordWrap,
+    tooltipBg,
+    textColor,
+    fontFamily,
+    fontSize,
+    tooltipBorderRadius,
+    resolvedBorderColor,
+    tooltipBoxShadow,
+    tooltipStyleSheet,
   ]);
 
   // Generate a key to force SheetComponent remount when config/theme changes.
@@ -755,7 +1090,10 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         formData.colHeaderWordWrap ?? formData.col_header_word_wrap ?? false,
         formData.rowHeaderWordWrap ?? formData.row_header_word_wrap ?? false,
         formData.dataCellWordWrap ?? formData.data_cell_word_wrap ?? false,
-        formData.hideMeasureColumn ?? formData.hide_measure_column ?? false,
+        hideMeasureColumn ?? false,
+        formData.showSingleMetricHeader ??
+          formData.show_single_metric_header ??
+          false,
         formData.metricsLayout ?? formData.metrics_layout ?? 'columns',
         formData.totalsPosition ?? formData.totals_position ?? 'bottom_right',
         formData.nullPlaceholder ?? formData.null_placeholder ?? '-',
@@ -802,6 +1140,9 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
       formData.row_header_word_wrap,
       formData.dataCellWordWrap,
       formData.data_cell_word_wrap,
+      hideMeasureColumn,
+      formData.showSingleMetricHeader,
+      formData.show_single_metric_header,
       formData.hideMeasureColumn,
       formData.hide_measure_column,
       formData.metricsLayout,
@@ -825,37 +1166,7 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         position: 'relative',
       }}
     >
-      {enableExport && (
-        <button
-          onClick={handleExportCsv}
-          title="Export CSV"
-          style={{
-            position: 'absolute',
-            top: 4,
-            right: 8,
-            zIndex: 10,
-            padding: '3px 8px',
-            fontSize: '11px',
-            fontWeight: 500,
-            borderRadius: '4px',
-            border: `1px solid ${resolvedBorderColor}`,
-            backgroundColor: headerBgColor,
-            color: textColor,
-            cursor: 'pointer',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-            opacity: 0.85,
-            transition: 'opacity 0.2s',
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.opacity = '1';
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.opacity = '0.85';
-          }}
-        >
-          Export CSV
-        </button>
-      )}
+      <style>{tooltipStyleSheet}</style>
       {createElement(SheetComponent as any, {
         key: sheetKey,
         sheetType,
@@ -866,7 +1177,6 @@ export default function AntvS2Table(props: S2TableTransformedProps) {
         options: { ...optionsWithStyles, height },
         themeCfg: customThemeCfg,
         onMounted: (s2: any) => {
-          s2InstanceRef.current = s2;
           s2.on(S2Event.RANGE_SORT, (newSortParams: any) => {
             if (Array.isArray(newSortParams)) {
               setSortParams(newSortParams);

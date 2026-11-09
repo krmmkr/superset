@@ -92,31 +92,123 @@ function interpolateColor(
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+interface ColumnStats {
+  min: number;
+  max: number;
+  sum: number;
+  avg: number;
+  median: number;
+}
+
+function computeColumnStats(
+  data: Record<string, unknown>[],
+  col: string,
+): ColumnStats | undefined {
+  const values = data
+    .map(row => row[col])
+    .filter(v => v !== null && v !== undefined && v !== '')
+    .map(v => Number(v))
+    .filter(v => !isNaN(v));
+  if (values.length === 0) return undefined;
+  const sorted = [...values].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const sum = sorted.reduce((acc, v) => acc + v, 0);
+  const avg = sum / sorted.length;
+  const mid = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 !== 0
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+  return { min, max, sum, avg, median };
+}
+
+function resolveColumnValue(
+  colName: string,
+  currentField: string,
+  cellValue: unknown,
+  rowData?: Record<string, unknown>,
+  cell?: any,
+): unknown {
+  if (colName === currentField && cellValue !== undefined) {
+    return cellValue;
+  }
+  if (rowData && rowData[colName] !== undefined) {
+    return rowData[colName];
+  }
+  const metaQuery = (rowData as any)?.query || cell?.getMeta?.()?.query;
+  if (metaQuery && metaQuery[colName] !== undefined) {
+    return metaQuery[colName];
+  }
+  if (cell?.spreadsheet?.dataSet?.getCellData && metaQuery) {
+    const cellData = cell.spreadsheet.dataSet.getCellData({
+      query: { ...metaQuery, $$extra$$: colName },
+    });
+    if (cellData !== undefined && cellData !== null) {
+      if (typeof cellData === 'object' && 'raw' in cellData) {
+        const rawVal = (cellData as any).raw?.[colName];
+        if (rawVal !== undefined) return rawVal;
+      }
+      if (typeof cellData === 'object' && colName in cellData) {
+        return (cellData as any)[colName];
+      }
+      if (typeof cellData !== 'object') {
+        return cellData;
+      }
+    }
+  }
+  return colName === currentField ? cellValue : undefined;
+}
+
 /**
  * Evaluates whether a conditional formatting rule matches a given cell value and row context.
- * Supports string comparisons (=, !=, contains, starts_with) and numeric comparisons
- * (>, <, >=, <=, =, !=, between), against static values or dynamic columns.
+ * Supports string comparisons (=, !=, contains, not_contains, starts_with, ends_with, in)
+ * and numeric comparisons (>, <, >=, <=, =, !=, between) against static values,
+ * dynamic columns, or column-level statistical calculations (avg, median, min, max, pct_of_max, pct_of_total).
  */
 function isRuleMatched(
   rule: EnhancedConditionalFormattingRule,
   value: unknown,
   rowData?: Record<string, unknown>,
+  currentField = rule.column,
+  cell?: any,
+  statsMap?: Record<string, ColumnStats | undefined>,
 ): boolean {
-  if (value === null || value === undefined) return false;
+  if (cell?.getMeta?.()?.isTotals && !rule.includeTotals) {
+    return false;
+  }
+
+  const evaluatedVal = resolveColumnValue(
+    rule.column,
+    currentField,
+    value,
+    rowData,
+    cell,
+  );
+  if (evaluatedVal === null || evaluatedVal === undefined) return false;
 
   const isStringMatch =
     rule.targetValueText !== undefined ||
     rule.operator === 'contains' ||
+    rule.operator === 'not_contains' ||
     rule.operator === 'starts_with' ||
-    (typeof value === 'string' && isNaN(Number(value)));
+    rule.operator === 'ends_with' ||
+    rule.operator === 'in' ||
+    (typeof evaluatedVal === 'string' && isNaN(Number(evaluatedVal)));
 
   if (isStringMatch) {
-    const valStr = String(value).trim().toLowerCase();
+    const valStr = String(evaluatedVal).trim().toLowerCase();
     let targetStr: string | undefined;
 
     if (rule.compareTarget === 'column') {
-      if (!rowData || !rule.targetColumn) return false;
-      const rawColVal = rowData[rule.targetColumn];
+      if (!rule.targetColumn) return false;
+      const rawColVal = resolveColumnValue(
+        rule.targetColumn,
+        currentField,
+        value,
+        rowData,
+        cell,
+      );
       if (rawColVal === null || rawColVal === undefined) return false;
       targetStr = String(rawColVal).trim().toLowerCase();
     } else {
@@ -132,25 +224,78 @@ function isRuleMatched(
         return valStr !== targetStr;
       case 'contains':
         return valStr.includes(targetStr);
+      case 'not_contains':
+        return !valStr.includes(targetStr);
       case 'starts_with':
         return valStr.startsWith(targetStr);
+      case 'ends_with':
+        return valStr.endsWith(targetStr);
+      case 'in': {
+        const items = targetStr
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+        return items.includes(valStr);
+      }
       default:
         return valStr === targetStr;
     }
   }
 
   // Numeric comparison
-  const numVal = Number(value);
-  if (isNaN(numVal)) return false;
+  const rawNum = Number(evaluatedVal);
+  if (isNaN(rawNum)) return false;
 
+  let numVal = rawNum;
   let targetVal: number | undefined;
-  if (rule.compareTarget === 'column') {
-    if (!rowData || !rule.targetColumn) return false;
-    const rawColVal = rowData[rule.targetColumn];
-    if (rawColVal === null || rawColVal === undefined) return false;
-    targetVal = Number(rawColVal);
-  } else {
-    targetVal = rule.targetValue;
+  const compareTarget = rule.compareTarget || 'static';
+  const multiplier = rule.compareMultiplier ?? 1;
+  const colStats = statsMap?.[rule.column];
+
+  switch (compareTarget) {
+    case 'column': {
+      if (!rule.targetColumn) return false;
+      const rawColVal = resolveColumnValue(
+        rule.targetColumn,
+        currentField,
+        value,
+        rowData,
+        cell,
+      );
+      if (rawColVal === null || rawColVal === undefined) return false;
+      targetVal = Number(rawColVal) * multiplier;
+      break;
+    }
+    case 'avg':
+      if (!colStats) return false;
+      targetVal = colStats.avg * multiplier;
+      break;
+    case 'median':
+      if (!colStats) return false;
+      targetVal = colStats.median * multiplier;
+      break;
+    case 'min':
+      if (!colStats) return false;
+      targetVal = colStats.min;
+      break;
+    case 'max':
+      if (!colStats) return false;
+      targetVal = colStats.max;
+      break;
+    case 'pct_of_max':
+      if (!colStats || colStats.max === 0) return false;
+      numVal = (rawNum / colStats.max) * 100;
+      targetVal = rule.targetValue;
+      break;
+    case 'pct_of_total':
+      if (!colStats || colStats.sum === 0) return false;
+      numVal = (rawNum / colStats.sum) * 100;
+      targetVal = rule.targetValue;
+      break;
+    case 'static':
+    default:
+      targetVal = rule.targetValue;
+      break;
   }
 
   if (targetVal === undefined || isNaN(targetVal)) return false;
@@ -374,13 +519,17 @@ export default function transformProps(
       ? Number(colHeightRaw)
       : undefined;
 
-  const hideMeasureColumn = Boolean(
+  const explicitHideMeasure =
     formData.hideMeasureColumn ??
     formData.hide_measure_column ??
     formData.hideMetricColumn ??
     formData.hide_metric_column ??
     formData.hideMetricsColumns ??
-    formData.hide_metrics_columns ??
+    formData.hide_metrics_columns;
+
+  const showSingleMetricHeader = Boolean(
+    formData.showSingleMetricHeader ??
+    formData.show_single_metric_header ??
     false,
   );
 
@@ -395,7 +544,7 @@ export default function transformProps(
   const nullPlaceholder =
     formData.nullPlaceholder ?? formData.null_placeholder ?? '-';
 
-  const enableExport = formData.enableExport ?? formData.enable_export ?? true;
+  const enableExport = formData.enableExport ?? formData.enable_export ?? false;
 
   const enhancedRules: EnhancedConditionalFormattingRule[] =
     formData.enhancedConditionalFormatting ??
@@ -527,6 +676,8 @@ export default function transformProps(
   );
 
   // Superset data payload
+  const verboseMap: Record<string, string> =
+    (chartProps as any).datasource?.verboseMap || {};
   const queryData = queriesData[0] || {};
   const data: DataRecord[] = queryData.data || [];
   const colnames: string[] = (queryData as any).colnames || [];
@@ -546,6 +697,10 @@ export default function transformProps(
   );
 
   const allFields = [...groupby, ...columns, ...metricCols];
+
+  const hideMeasureColumn =
+    Boolean(explicitHideMeasure) ||
+    (columns.length > 0 && metricCols.length === 1 && !showSingleMetricHeader);
 
   // Find tree dimension width in Tree mode
   let treeWidth: number | undefined;
@@ -586,7 +741,7 @@ export default function transformProps(
     },
     meta: allFields.map(f => {
       const isMetric = metricCols.includes(f);
-      const displayName = customColumnNames[f] || f;
+      const displayName = customColumnNames[f] || verboseMap[f] || f;
       if (isMetric) {
         const customFormat = columnFormatsObj[f];
         const formatter = getNumberFormatter(customFormat || 'SMART_NUMBER');
@@ -695,108 +850,230 @@ export default function transformProps(
     placeholder: {
       cell: nullPlaceholder,
     },
-    conditions: {
-      background: (() => {
-        const backgroundConditions: any[] = [];
-        const columnMinMax: Record<string, { min: number; max: number }> = {};
-        enhancedRules
-          .filter(r => r.ruleType === 'colorScale')
-          .forEach(r => {
-            const col = r.column;
-            const values = data
-              .map(row => Number(row[col]))
-              .filter(v => !isNaN(v) && v !== null && v !== undefined);
-            if (values.length > 0) {
-              columnMinMax[col] = {
-                min: Math.min(...values),
-                max: Math.max(...values),
-              };
+    conditions: (() => {
+      const columnStatsMap: Record<string, ColumnStats | undefined> = {};
+      enhancedRules.forEach(r => {
+        if (r.column && !(r.column in columnStatsMap)) {
+          columnStatsMap[r.column] = computeColumnStats(
+            data as Record<string, unknown>[],
+            r.column,
+          );
+        }
+      });
+
+      const getTargetFields = (
+        rule: EnhancedConditionalFormattingRule,
+      ): string[] => {
+        if (
+          !rule.formatColumn ||
+          rule.formatColumn === '__same__' ||
+          rule.formatColumn === rule.column
+        ) {
+          return [rule.column];
+        }
+        if (rule.formatColumn === '__all_metrics__') {
+          return metricCols.length > 0 ? metricCols : [rule.column];
+        }
+        return [rule.formatColumn];
+      };
+
+      type ConditionEvaluator = (
+        value: unknown,
+        rowData?: Record<string, unknown>,
+        cell?: any,
+      ) => any;
+
+      const wrapEvaluator = (
+        evaluatorsByField: Record<string, ConditionEvaluator[]>,
+        field: string,
+        evalFn: ConditionEvaluator,
+      ): ConditionEvaluator => {
+        if (!evaluatorsByField[field]) {
+          evaluatorsByField[field] = [];
+        }
+        evaluatorsByField[field].push(evalFn);
+        return (
+          value: unknown,
+          rowData?: Record<string, unknown>,
+          cell?: any,
+        ) => {
+          if (cell === undefined) {
+            return evalFn(value, rowData, cell);
+          }
+          const list = evaluatorsByField[field] || [evalFn];
+          for (let i = list.length - 1; i >= 0; i -= 1) {
+            const res = list[i](value, rowData, cell);
+            if (res !== null && res !== undefined) {
+              return res;
             }
-          });
+          }
+          return null;
+        };
+      };
 
-        enhancedRules.forEach(rule => {
-          if (rule.ruleType === 'threshold' && rule.applyTo === 'background') {
+      const bgEvaluators: Record<string, ConditionEvaluator[]> = {};
+      const textEvaluators: Record<string, ConditionEvaluator[]> = {};
+      const iconEvaluators: Record<string, ConditionEvaluator[]> = {};
+
+      const backgroundConditions: any[] = [];
+      const textConditions: any[] = [];
+      const iconConditions: any[] = [];
+
+      enhancedRules.forEach(rule => {
+        const targetFields = getTargetFields(rule);
+
+        if (rule.ruleType === 'threshold' && rule.applyTo === 'background') {
+          targetFields.forEach(targetField => {
+            const evalFn: ConditionEvaluator = (value, rowData, cell) => {
+              if (
+                isRuleMatched(
+                  rule,
+                  value,
+                  rowData,
+                  targetField,
+                  cell,
+                  columnStatsMap,
+                ) &&
+                rule.color
+              ) {
+                return { fill: hexToRgba(rule.color, rule.opacity) };
+              }
+              return null;
+            };
             backgroundConditions.push({
-              field: rule.column,
-              mapping: (value: unknown, rowData: Record<string, unknown>) => {
-                if (isRuleMatched(rule, value, rowData) && rule.color) {
-                  return { fill: hexToRgba(rule.color, rule.opacity) };
-                }
-                return null;
-              },
+              field: targetField,
+              mapping: wrapEvaluator(bgEvaluators, targetField, evalFn),
             });
-          } else if (rule.ruleType === 'colorScale') {
-            const minMax = columnMinMax[rule.column];
-            const min = minMax?.min ?? 0;
-            const max = minMax?.max ?? 100;
+          });
+        } else if (rule.ruleType === 'colorScale') {
+          const stats = columnStatsMap[rule.column];
+          const min = stats?.min ?? 0;
+          const max = stats?.max ?? 100;
 
-            backgroundConditions.push({
-              field: rule.column,
-              mapping: (value: unknown) => {
-                if (value === null || value === undefined) return null;
-                const num = Number(value);
-                if (isNaN(num)) return null;
-                const ratio =
-                  max === min
-                    ? 0.5
-                    : Math.max(0, Math.min(1, (num - min) / (max - min)));
-                const fill = interpolateColor(
+          targetFields.forEach(targetField => {
+            const evalFn: ConditionEvaluator = (value, rowData, cell) => {
+              if (cell?.getMeta?.()?.isTotals && !rule.includeTotals) {
+                return null;
+              }
+              const evaluatedVal = resolveColumnValue(
+                rule.column,
+                targetField,
+                value,
+                rowData,
+                cell,
+              );
+              if (evaluatedVal === null || evaluatedVal === undefined) {
+                return null;
+              }
+              const num = Number(evaluatedVal);
+              if (isNaN(num)) return null;
+              const ratio =
+                max === min
+                  ? 0.5
+                  : Math.max(0, Math.min(1, (num - min) / (max - min)));
+
+              let fill: string;
+              if (rule.midColor) {
+                const midOpacity =
+                  rule.minOpacity !== undefined || rule.maxOpacity !== undefined
+                    ? ((rule.minOpacity ?? 1) + (rule.maxOpacity ?? 1)) / 2
+                    : undefined;
+                if (ratio <= 0.5) {
+                  fill = interpolateColor(
+                    rule.minColor || '#ff4d4f',
+                    rule.midColor,
+                    ratio * 2,
+                    rule.minOpacity,
+                    midOpacity,
+                  );
+                } else {
+                  fill = interpolateColor(
+                    rule.midColor,
+                    rule.maxColor || '#52c41a',
+                    (ratio - 0.5) * 2,
+                    midOpacity,
+                    rule.maxOpacity,
+                  );
+                }
+              } else {
+                fill = interpolateColor(
                   rule.minColor || '#e6f7ff',
                   rule.maxColor || '#1890ff',
                   ratio,
                   rule.minOpacity,
                   rule.maxOpacity,
                 );
-                return { fill };
-              },
+              }
+              return { fill };
+            };
+            backgroundConditions.push({
+              field: targetField,
+              mapping: wrapEvaluator(bgEvaluators, targetField, evalFn),
             });
-          }
-        });
-        return backgroundConditions;
-      })(),
-      text: (() => {
-        const textConditions: any[] = [];
-        enhancedRules
-          .filter(r => r.ruleType === 'threshold' && r.applyTo === 'text')
-          .forEach(rule => {
+          });
+        } else if (rule.ruleType === 'threshold' && rule.applyTo === 'text') {
+          targetFields.forEach(targetField => {
+            const evalFn: ConditionEvaluator = (value, rowData, cell) => {
+              if (
+                isRuleMatched(
+                  rule,
+                  value,
+                  rowData,
+                  targetField,
+                  cell,
+                  columnStatsMap,
+                ) &&
+                rule.color
+              ) {
+                return { fill: hexToRgba(rule.color, rule.opacity) };
+              }
+              return null;
+            };
             textConditions.push({
-              field: rule.column,
-              mapping: (value: unknown, rowData: Record<string, unknown>) => {
-                if (isRuleMatched(rule, value, rowData) && rule.color) {
-                  return { fill: hexToRgba(rule.color, rule.opacity) };
-                }
-                return null;
-              },
+              field: targetField,
+              mapping: wrapEvaluator(textEvaluators, targetField, evalFn),
             });
           });
-        return textConditions;
-      })(),
-      icon: (() => {
-        const iconConditions: any[] = [];
-        enhancedRules
-          .filter(r => r.ruleType === 'threshold' && r.applyTo === 'icon')
-          .forEach(rule => {
-            const iconKey =
-              rule.iconName === 'custom'
-                ? `custom_${rule.id}`
-                : rule.iconName || 'arrow-up';
+        } else if (rule.ruleType === 'threshold' && rule.applyTo === 'icon') {
+          const iconKey =
+            rule.iconName === 'custom'
+              ? `custom_${rule.id}`
+              : rule.iconName || 'arrow-up';
+          targetFields.forEach(targetField => {
+            const evalFn: ConditionEvaluator = (value, rowData, cell) => {
+              if (
+                isRuleMatched(
+                  rule,
+                  value,
+                  rowData,
+                  targetField,
+                  cell,
+                  columnStatsMap,
+                ) &&
+                rule.color
+              ) {
+                return {
+                  fill: hexToRgba(rule.color, rule.opacity),
+                  icon: iconKey,
+                };
+              }
+              return null;
+            };
             iconConditions.push({
-              field: rule.column,
+              field: targetField,
               position: rule.iconPosition || 'left',
-              mapping: (value: unknown, rowData: Record<string, unknown>) => {
-                if (isRuleMatched(rule, value, rowData) && rule.color) {
-                  return {
-                    fill: hexToRgba(rule.color, rule.opacity),
-                    icon: iconKey,
-                  };
-                }
-                return null;
-              },
+              mapping: wrapEvaluator(iconEvaluators, targetField, evalFn),
             });
           });
-        return iconConditions;
-      })(),
-    },
+        }
+      });
+
+      return {
+        background: backgroundConditions,
+        text: textConditions,
+        icon: iconConditions,
+      };
+    })(),
     customSVGIcons: [
       {
         name: 'arrow-up',

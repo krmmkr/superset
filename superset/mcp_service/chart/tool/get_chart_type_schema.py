@@ -32,6 +32,9 @@ from superset.extensions import event_logger
 from superset.mcp_service.chart.schemas import (
     BigNumberChartConfig,
     BoxPlotChartConfig,
+    CalendarHeatmapCustomChartConfig,
+    CustomControlsChartConfig,
+    CustomDatePickerChartConfig,
     GaugeChartConfig,
     HandlebarsChartConfig,
     HistogramChartConfig,
@@ -39,6 +42,7 @@ from superset.mcp_service.chart.schemas import (
     MixedTimeseriesChartConfig,
     PieChartConfig,
     PivotTableChartConfig,
+    SankeyMultiLevelChartConfig,
     TableChartConfig,
     TreemapChartConfig,
     WaterfallChartConfig,
@@ -73,6 +77,10 @@ _CHART_TYPE_ADAPTERS: Dict[str, TypeAdapter[Any]] = {
     "histogram": TypeAdapter(HistogramChartConfig),
     "box_plot": TypeAdapter(BoxPlotChartConfig),
     "waterfall": TypeAdapter(WaterfallChartConfig),
+    "custom_controls": TypeAdapter(CustomControlsChartConfig),
+    "custom_datepicker": TypeAdapter(CustomDatePickerChartConfig),
+    "sankey_multi_level": TypeAdapter(SankeyMultiLevelChartConfig),
+    "calendar_heatmap_custom": TypeAdapter(CalendarHeatmapCustomChartConfig),
 }
 
 VALID_CHART_TYPES = sorted(_CHART_TYPE_ADAPTERS.keys())
@@ -231,6 +239,41 @@ _CHART_EXAMPLES: Dict[str, list[Dict[str, Any]]] = {
             "chart_type": "treemap_v2",
             "groupby": [{"name": "region"}, {"name": "product"}],
             "metric": {"name": "revenue", "aggregate": "SUM"},
+        },
+    ],
+    "custom_controls": [
+        {
+            "chart_type": "custom_controls",
+            "filter_column": {"name": "region"},
+            "control_type": "Dropdown",
+            "multi_select": True,
+        },
+    ],
+    "custom_datepicker": [
+        {
+            "chart_type": "custom_datepicker",
+            "filter_column": {"name": "order_date"},
+            "picker_type": "RangePicker",
+            "preset_ranges": True,
+        },
+    ],
+    "sankey_multi_level": [
+        {
+            "chart_type": "sankey_multi_level",
+            "groupby": [
+                {"name": "source_channel"},
+                {"name": "product_category"},
+                {"name": "order_status"},
+            ],
+            "metric": {"name": "revenue", "aggregate": "SUM"},
+        },
+    ],
+    "calendar_heatmap_custom": [
+        {
+            "chart_type": "calendar_heatmap_custom",
+            "temporal_column": "order_date",
+            "metrics": [{"name": "revenue", "aggregate": "SUM"}],
+            "time_grain": "P1D",
         },
     ],
 }

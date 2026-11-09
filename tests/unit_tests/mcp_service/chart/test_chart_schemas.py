@@ -1219,3 +1219,95 @@ class TestRequestSchemaAliasChoices:
     def test_list_charts_select_columns_columns_alias(self) -> None:
         req = ListChartsRequest.model_validate({"columns": ["id", "slice_name"]})
         assert req.select_columns == ["id", "slice_name"]
+
+
+class TestCustomChartPluginsRegistration:
+    """Test custom chart types (custom_controls, custom_datepicker, sankey_multi_level, calendar_heatmap_custom)."""
+
+    def test_custom_controls_chart_request(self) -> None:
+        from superset.mcp_service.chart.chart_utils import map_config_to_form_data
+
+        req = GenerateChartRequest.model_validate(
+            {
+                "dataset_id": 1,
+                "config": {
+                    "chart_type": "custom_controls",
+                    "filter_column": "region",
+                    "control_type": "Dropdown",
+                    "multi_select": True,
+                },
+            }
+        )
+        form_data = map_config_to_form_data(req.config)
+        assert form_data["viz_type"] == "custom_controls"
+        assert form_data["filterColumn"] == "region"
+        assert form_data["controlType"] == "Dropdown"
+        assert form_data["multiSelect"] is True
+
+    def test_custom_datepicker_chart_request(self) -> None:
+        from superset.mcp_service.chart.chart_utils import map_config_to_form_data
+
+        req = GenerateChartRequest.model_validate(
+            {
+                "dataset_id": 1,
+                "config": {
+                    "chart_type": "custom_datepicker",
+                    "filter_column": "order_date",
+                    "picker_type": "RangePicker",
+                    "preset_ranges": True,
+                },
+            }
+        )
+        form_data = map_config_to_form_data(req.config)
+        assert form_data["viz_type"] == "custom_datepicker"
+        assert form_data["filterColumn"] == "order_date"
+        assert form_data["pickerType"] == "RangePicker"
+        assert form_data["presetRanges"] is True
+
+    def test_sankey_multi_level_chart_request(self) -> None:
+        from superset.mcp_service.chart.chart_utils import map_config_to_form_data
+
+        req = GenerateChartRequest.model_validate(
+            {
+                "dataset_id": 1,
+                "config": {
+                    "chart_type": "sankey_multi_level",
+                    "groupby": [
+                        {"name": "source_channel"},
+                        {"name": "product_category"},
+                        {"name": "order_status"},
+                    ],
+                    "metric": {"name": "revenue", "aggregate": "SUM"},
+                },
+            }
+        )
+        form_data = map_config_to_form_data(req.config)
+        assert form_data["viz_type"] == "sankey_multi_level"
+        assert form_data["groupby"] == [
+            "source_channel",
+            "product_category",
+            "order_status",
+        ]
+        assert form_data["metric"]["aggregate"] == "SUM"
+
+    def test_calendar_heatmap_custom_chart_request(self) -> None:
+        from superset.mcp_service.chart.chart_utils import map_config_to_form_data
+
+        req = GenerateChartRequest.model_validate(
+            {
+                "dataset_id": 1,
+                "config": {
+                    "chart_type": "calendar_heatmap_custom",
+                    "temporal_column": "order_date",
+                    "metrics": [{"name": "revenue", "aggregate": "SUM"}],
+                    "calendar_orient": "horizontal",
+                },
+            }
+        )
+        form_data = map_config_to_form_data(req.config)
+        assert form_data["viz_type"] == "calendar_heatmap_custom"
+        assert form_data["granularity_sqla"] == "order_date"
+        assert form_data["time_grain_sqla"] == "P1D"
+        assert len(form_data["metrics"]) == 1
+        assert form_data["metrics"][0]["aggregate"] == "SUM"
+

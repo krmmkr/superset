@@ -31,6 +31,7 @@ import {
 export type EnhancedConditionalFormattingRule = {
   id: string;
   column: string;
+  formatColumn?: string;
   ruleType: 'threshold' | 'colorScale';
   operator?:
     | '>'
@@ -41,8 +42,20 @@ export type EnhancedConditionalFormattingRule = {
     | '!='
     | 'between'
     | 'contains'
-    | 'starts_with';
-  compareTarget?: 'static' | 'column';
+    | 'not_contains'
+    | 'starts_with'
+    | 'ends_with'
+    | 'in';
+  compareTarget?:
+    | 'static'
+    | 'column'
+    | 'avg'
+    | 'median'
+    | 'min'
+    | 'max'
+    | 'pct_of_max'
+    | 'pct_of_total';
+  compareMultiplier?: number;
   targetValue?: number;
   targetValueRight?: number;
   targetValueText?: string;
@@ -54,9 +67,11 @@ export type EnhancedConditionalFormattingRule = {
   iconPosition?: 'left' | 'right';
   customPrefix?: string;
   minColor?: string;
+  midColor?: string;
   maxColor?: string;
   minOpacity?: number;
   maxOpacity?: number;
+  includeTotals?: boolean;
 };
 
 export interface S2TableFormData extends QueryFormData {
@@ -86,6 +101,8 @@ export interface S2TableFormData extends QueryFormData {
   colHeight?: string;
   hideMeasureColumn?: boolean;
   hide_measure_column?: boolean;
+  showSingleMetricHeader?: boolean;
+  show_single_metric_header?: boolean;
   metrics_layout?: 'columns' | 'rows';
   metricsLayout?: 'columns' | 'rows';
   totals_position?: 'bottom_right' | 'top_left';

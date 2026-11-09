@@ -154,12 +154,12 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'hide_measure_column',
+            name: 'show_single_metric_header',
             config: {
               type: 'CheckboxControl',
-              label: t('Hide Metric Columns / Headers'),
+              label: t('Show Single Metric Sub-Header'),
               description: t(
-                'Hide the metric (measure) column header. Useful when pivoting on columns with a single metric to remove redundant metric headers.',
+                'When pivoting on columns with a single metric, the redundant metric sub-header under each column is hidden by default. Enable this to show the metric name under every column.',
               ),
               default: false,
               renderTrigger: true,
@@ -498,20 +498,6 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-        [
-          {
-            name: 'enable_export',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Enable CSV Export'),
-              description: t(
-                'Show a CSV export button on the chart to download the formatted pivot table.',
-              ),
-              default: true,
-              renderTrigger: true,
-            },
-          },
-        ],
       ],
     },
     {
@@ -750,7 +736,7 @@ const config: ControlPanelConfig = {
               label: t('Cross-filter Columns'),
               description: t(
                 'Which dimension columns to emit. ' +
-                  'Empty = all groupby dimensions. ' +
+                  'Empty = all row and column pivot dimensions. ' +
                   'Emitted as JSON dict for Jinja parsing.',
               ),
               validators: [],
