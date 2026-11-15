@@ -108,6 +108,47 @@ const KIND_LABELS: Record<canvasApi.ScopeKind, string> = {
   customization: t('Parameter'),
 };
 
+function nodeProps(
+  result: CanvasDefinitionResult,
+  nodeId: string,
+): Record<string, unknown> | undefined {
+  const node = result.definition?.nodes?.[nodeId];
+  if (!node) return undefined;
+  return node.widgetId ? result.widgets?.[node.widgetId]?.props : node.props;
+}
+
+function datasetIdOf(
+  props: Record<string, unknown> | undefined,
+): number | null {
+  if (!props) return null;
+  if (typeof props.datasetId === 'number') return props.datasetId;
+  const binding = props.dataBinding as Record<string, unknown> | undefined;
+  return typeof binding?.datasetId === 'number' ? binding.datasetId : null;
+}
+
+function targetBindsParam(
+  props: Record<string, unknown> | undefined,
+  paramName: string,
+): boolean {
+  if (!props || !paramName) return false;
+  const chrome = props.chrome as Record<string, unknown> | undefined;
+  if (
+    chrome?.targetParam === paramName ||
+    chrome?.timeGrainParam === paramName ||
+    chrome?.dimensionParam === paramName ||
+    chrome?.metricParam === paramName ||
+    props.targetParam === paramName ||
+    props.thresholdParam === paramName
+  ) {
+    return true;
+  }
+  const token = `{{${paramName}}}`;
+  return ['message', 'content', 'label'].some(k => {
+    const val = props[k];
+    return typeof val === 'string' && val.includes(token);
+  });
+}
+
 export interface ScopeMappingModalProps {
   open: boolean;
   onClose: () => void;
@@ -146,30 +187,33 @@ export default function ScopeMappingModal({
         ...Object.keys(stored ?? {}),
       ]);
       for (const id of ids) {
+        const props = nodeProps(result, id);
+        const suffix =
+          kind === 'crossFilter' && props && !props.crossFilter
+            ? ` [${t('Disabled on widget')}]`
+            : '';
         const name = titles[id] || id;
         entries.push({
           key: `${kind}:${id}`,
           kind,
           id,
-          label: `[${KIND_LABELS[kind]}] ${name}`,
+          label: `[${KIND_LABELS[kind]}] ${name}${suffix}`,
         });
       }
     };
     collect('filter', result.filterScopes, interactions?.filters);
-    collect('crossFilter', result.crossFilterScopes, interactions?.crossFilters);
+    collect(
+      'crossFilter',
+      result.crossFilterScopes,
+      interactions?.crossFilters,
+    );
     collect(
       'customization',
       result.customizationScopes,
       interactions?.customizations,
     );
     return entries;
-  }, [
-    result.filterScopes,
-    result.crossFilterScopes,
-    result.customizationScopes,
-    interactions,
-    titles,
-  ]);
+  }, [result, interactions, titles]);
 
   const [selectedKey, setSelectedKey] = useState<string>('');
   const [crossFiltersEnabled, setCrossFiltersEnabled] = useState<boolean>(
@@ -186,17 +230,48 @@ export default function ScopeMappingModal({
   );
 
   const candidateTargets = useMemo(() => {
-    const out: { label: string; value: string }[] = [];
+    const out: { label: string; value: string; rank: number }[] = [];
+    const srcProps = activeSource
+      ? nodeProps(result, activeSource.id)
+      : undefined;
+    const srcDatasetId = datasetIdOf(srcProps);
+    const paramName =
+      activeSource?.kind === 'customization' &&
+      typeof srcProps?.name === 'string'
+        ? srcProps.name
+        : '';
+
     for (const [id, widgetType] of Object.entries(result.widgetTypes ?? {})) {
       if (activeSource && id === activeSource.id) continue;
       if (CONTAINER_TYPES.has(widgetType)) continue;
+      const tProps = nodeProps(result, id);
+      let badge = '';
+      let rank = 1;
+      if (activeSource?.kind === 'customization' && paramName) {
+        if (targetBindsParam(tProps, paramName)) {
+          badge = ` — ${t('Bound')}`;
+          rank = 0;
+        }
+      } else if (activeSource && srcDatasetId !== null) {
+        const tDatasetId = datasetIdOf(tProps);
+        if (tDatasetId === srcDatasetId) {
+          badge = ` — ${t('Same dataset')}`;
+          rank = 0;
+        } else if (tDatasetId !== null) {
+          badge = ` — ${t('Different dataset')}`;
+          rank = 2;
+        }
+      }
       out.push({
         value: id,
-        label: `${titles[id] || id} (${widgetType})`,
+        label: `${titles[id] || id} (${widgetType})${badge}`,
+        rank,
       });
     }
-    return out;
-  }, [result.widgetTypes, titles, activeSource]);
+    return out
+      .sort((a, b) => a.rank - b.rank)
+      .map(({ label, value }) => ({ label, value }));
+  }, [result, titles, activeSource]);
 
   useEffect(() => {
     if (!open) return;
@@ -207,7 +282,12 @@ export default function ScopeMappingModal({
     if (!selectedKey && sources[0]) {
       setSelectedKey(sources[0].key);
     }
-  }, [open, result.definition?.settings?.crossFilters?.enabled, selectedKey, sources]);
+  }, [
+    open,
+    result.definition?.settings?.crossFilters?.enabled,
+    selectedKey,
+    sources,
+  ]);
 
   useEffect(() => {
     if (!activeSource) return;

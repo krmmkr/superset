@@ -149,3 +149,64 @@ test('ScopeMappingModal resets scope to auto', async () => {
   ]);
   fetchMock.removeRoutes();
 });
+
+test('ScopeMappingModal annotates dataset and parameter compatibility on targets', () => {
+  const compatResult: CanvasDefinitionResult = {
+    ...baseResult,
+    titles: {
+      ...baseResult.titles,
+      param1: 'Goal',
+    },
+    widgetTypes: {
+      ...baseResult.widgetTypes,
+      param1: 'parameter',
+    },
+    customizationScopes: { param1: ['chart1', 'chart2'] },
+    definition: {
+      ...baseResult.definition,
+      nodes: {
+        ...baseResult.definition.nodes,
+        chart1: {
+          ...baseResult.definition.nodes.chart1,
+          props: {
+            crossFilter: true,
+            dataBinding: { datasetId: 13 },
+            chrome: { targetParam: 'goal' },
+          },
+        },
+        chart2: {
+          ...baseResult.definition.nodes.chart2,
+          props: { dataBinding: { datasetId: 99 } },
+        },
+        table1: {
+          ...baseResult.definition.nodes.table1,
+          props: { dataBinding: { datasetId: 13 } },
+        },
+        param1: {
+          widgetType: 'parameter',
+          schemaVersion: 1,
+          props: { name: 'goal' },
+          layout: {},
+        },
+      },
+    },
+  };
+
+  render(
+    <ScopeMappingModal
+      open
+      onClose={jest.fn()}
+      result={compatResult}
+      draftToken="draft-123"
+      revision={4}
+      onApplied={jest.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByText(/Top Countries \(ag-grid-table\) — Same dataset/),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(/Sales by Product \(echarts\) — Different dataset/),
+  ).toBeInTheDocument();
+});
