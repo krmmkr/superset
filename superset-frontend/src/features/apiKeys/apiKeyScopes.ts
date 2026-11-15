@@ -20,6 +20,7 @@ import { t } from '@apache-superset/core/translation';
 
 const API_KEY_SCOPE_RESOURCES = [
   'annotation',
+  'canvas',
   'chart',
   'dashboard',
   'database',
@@ -35,6 +36,7 @@ const API_KEY_SCOPE_RESOURCES = [
   'task',
   'theme',
   'user',
+  'widget',
 ] as const;
 
 const API_KEY_SCOPE_ACTIONS = ['read', 'write'] as const;

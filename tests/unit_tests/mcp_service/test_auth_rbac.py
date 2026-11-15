@@ -568,6 +568,7 @@ def test_resource_scope_name_covers_all_tool_resource_classes() -> None:
     MCP tools. If a new resource class is added, add it to the map."""
     assert set(RESOURCE_SCOPE_NAME.keys()) == {
         "Annotation",
+        "Canvas",
         "Chart",
         "Dashboard",
         "Database",
@@ -583,6 +584,7 @@ def test_resource_scope_name_covers_all_tool_resource_classes() -> None:
         "Task",
         "Theme",
         "User",
+        "Widget",
     }
 
 
