@@ -1101,3 +1101,79 @@ test('per-widget cardStyles apply background, borderless, subtitle, and hideTitl
   ) as HTMLElement;
   expect(oddNode.querySelector('[data-test="canvas-widget-title"]')).toBeNull();
 });
+
+test('inline title editing in edit mode dispatches rename op', () => {
+  const onApplyOps = jest.fn().mockResolvedValue(undefined);
+  const titledResult: CanvasDefinitionResult = {
+    ...result,
+    titles: { ...result.titles, c1: 'Revenue' },
+  };
+  const { container } = render(
+    <CanvasGrid
+      canvasId={7}
+      result={titledResult}
+      values={emptyScopeValues()}
+      onValueChange={jest.fn()}
+      layout={layoutOf(titledResult)}
+      editable
+      onApplyOps={onApplyOps}
+    />,
+  );
+
+  const c1Node = container.querySelector('[data-node-id="c1"]') as HTMLElement;
+  const renameBtn = c1Node.querySelector(
+    '[data-test="canvas-widget-rename-btn"]',
+  ) as HTMLElement;
+  fireEvent.click(renameBtn);
+
+  const input = c1Node.querySelector(
+    '[data-test="canvas-widget-title-input"]',
+  ) as HTMLInputElement;
+  fireEvent.change(input, { target: { value: 'Net Revenue' } });
+  fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', charCode: 13 });
+
+  expect(onApplyOps).toHaveBeenCalledWith([
+    { op: 'rename', id: 'c1', name: 'Net Revenue' },
+  ]);
+});
+
+test('quick card style popover in edit mode dispatches set_settings op', async () => {
+  const onApplyOps = jest.fn().mockResolvedValue(undefined);
+  const titledResult: CanvasDefinitionResult = {
+    ...result,
+    titles: { ...result.titles, c1: 'Revenue' },
+  };
+  const { container } = render(
+    <CanvasGrid
+      canvasId={7}
+      result={titledResult}
+      values={emptyScopeValues()}
+      onValueChange={jest.fn()}
+      layout={layoutOf(titledResult)}
+      editable
+      onApplyOps={onApplyOps}
+    />,
+  );
+
+  const c1Node = container.querySelector('[data-node-id="c1"]') as HTMLElement;
+  const styleBtn = c1Node.querySelector(
+    '[data-test="canvas-widget-style-btn"]',
+  ) as HTMLElement;
+  fireEvent.click(styleBtn);
+
+  const tintBtn = await screen.findByRole('button', { name: 'Blue' });
+  fireEvent.click(tintBtn);
+
+  expect(onApplyOps).toHaveBeenCalledWith([
+    {
+      op: 'set_settings',
+      key: 'display',
+      value: {
+        ...titledResult.definition.settings.display,
+        cardStyles: {
+          c1: { backgroundColor: 'rgba(22, 119, 255, 0.10)' },
+        },
+      },
+    },
+  ]);
+});

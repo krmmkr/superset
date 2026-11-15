@@ -20,12 +20,24 @@ import { ReactNode, useCallback, useMemo, useState } from 'react';
 import type { canvas as canvasApi } from '@apache-superset/core';
 import { t } from '@apache-superset/core/translation';
 import { css, styled } from '@apache-superset/core/theme';
-import { Tag } from '@superset-ui/core/components';
+import {
+  Button,
+  Icons,
+  Input,
+  Popover,
+  Switch,
+  Tag,
+} from '@superset-ui/core/components';
 import { ErrorBoundary } from 'src/components/ErrorBoundary';
 import { useWidgetRenderers } from 'src/core';
 import CanvasGridSurface from './CanvasGridSurface';
 import type { CanvasLayout } from './useCanvasLayout';
-import { CanvasDefinitionResult, DraftChange, GridPlacement } from './types';
+import {
+  CanvasDefinitionResult,
+  CardStyle,
+  DraftChange,
+  GridPlacement,
+} from './types';
 import { MARKS, OUTLINED } from './changeMarks';
 import {
   CanvasDraftContext,
@@ -253,6 +265,48 @@ const Placeholder = styled.div`
   `}
 `;
 
+const StylePopoverBody = styled.div`
+  ${({ theme }) => css`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.sizeUnit * 2}px;
+    width: 240px;
+  `}
+`;
+
+const StyleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const SwatchRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const SwatchButton = styled.button<{ $color?: string; $active?: boolean }>`
+  ${({ theme, $color, $active }) => css`
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    background: ${$color || theme.colorBgContainer};
+    border: 2px solid ${$active ? theme.colorPrimary : theme.colorBorder};
+    padding: 0;
+  `}
+`;
+
+const CARD_BG_PRESETS = [
+  { label: 'Default', value: undefined },
+  { label: 'Blue', value: 'rgba(22, 119, 255, 0.10)' },
+  { label: 'Green', value: 'rgba(82, 196, 26, 0.10)' },
+  { label: 'Amber', value: 'rgba(250, 140, 22, 0.10)' },
+  { label: 'Purple', value: 'rgba(114, 46, 209, 0.10)' },
+] as const;
+
 export interface CanvasGridProps {
   canvasId: number;
   result: CanvasDefinitionResult;
@@ -278,6 +332,8 @@ export interface CanvasGridProps {
   draftToken?: string;
   /** The version being previewed; widgets read their data from it. */
   versionUuid?: string;
+  /** Apply draft operations (rename, set_settings, set_props) in edit mode. */
+  onApplyOps?: (ops: Record<string, unknown>[]) => Promise<void>;
 }
 
 /**
@@ -297,7 +353,10 @@ export default function CanvasGrid({
   editable,
   draftToken,
   versionUuid,
+  onApplyOps,
 }: CanvasGridProps) {
+  const [editingTitleNode, setEditingTitleNode] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
   const getRenderer = useWidgetRenderers();
   const {
     definition,
@@ -600,13 +659,41 @@ export default function CanvasGrid({
     const effectiveTitle = cardStyle?.hideTitle ? undefined : title;
     const subtitle = cardStyle?.subtitle;
     const titleAlign = cardStyle?.titleAlign ?? display.titleAlign ?? 'left';
-    // A widget with no title, subtitle, mark, or card style needs no wrapper.
+    const canQuickEdit = editable && Boolean(onApplyOps);
+    const isEditingTitle = canQuickEdit && editingTitleNode === nodeId;
+    const commitTitle = () => {
+      const nextName = draftTitle.trim();
+      setEditingTitleNode(null);
+      if (nextName && nextName !== title && onApplyOps) {
+        void onApplyOps([{ op: 'rename', id: nodeId, name: nextName }]);
+      }
+    };
+    const updateCardStyle = (patch: Partial<CardStyle>) => {
+      if (!onApplyOps) return;
+      const merged: CardStyle = { ...cardStyle, ...patch };
+      if (!merged.backgroundColor) delete merged.backgroundColor;
+      if (!merged.subtitle) delete merged.subtitle;
+      const nextCardStyles = {
+        ...display.cardStyles,
+        [nodeId]: merged,
+      };
+      void onApplyOps([
+        {
+          op: 'set_settings',
+          key: 'display',
+          value: { ...display, cardStyles: nextCardStyles },
+        },
+      ]);
+    };
+    // A widget with no title, subtitle, mark, or card style needs no wrapper
+    // unless quick edit controls are active.
     if (
       !effectiveTitle &&
       !subtitle &&
       !mark &&
       !cardStyle?.backgroundColor &&
-      !cardStyle?.borderless
+      !cardStyle?.borderless &&
+      !canQuickEdit
     ) {
       return widget;
     }
@@ -618,15 +705,154 @@ export default function CanvasGrid({
         data-test="canvas-widget-card"
         data-borderless={cardStyle?.borderless ? 'true' : undefined}
       >
-        {(effectiveTitle || (mark && mark !== 'removed')) && (
+        {(effectiveTitle || (mark && mark !== 'removed') || canQuickEdit) && (
           <TitleRow $align={titleAlign}>
-            {effectiveTitle && (
-              <WidgetTitle
-                title={effectiveTitle}
-                data-test="canvas-widget-title"
-              >
-                {effectiveTitle}
-              </WidgetTitle>
+            {isEditingTitle ? (
+              <Input
+                size="small"
+                autoFocus
+                value={draftTitle}
+                data-test="canvas-widget-title-input"
+                onPointerDown={e => e.stopPropagation()}
+                onChange={e => setDraftTitle(e.target.value)}
+                onPressEnter={commitTitle}
+                onBlur={commitTitle}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') {
+                    setEditingTitleNode(null);
+                  }
+                }}
+              />
+            ) : (
+              effectiveTitle && (
+                <WidgetTitle
+                  title={effectiveTitle}
+                  data-test="canvas-widget-title"
+                  onDoubleClick={() => {
+                    if (!canQuickEdit) return;
+                    setDraftTitle(effectiveTitle);
+                    setEditingTitleNode(nodeId);
+                  }}
+                >
+                  {effectiveTitle}
+                </WidgetTitle>
+              )
+            )}
+            {canQuickEdit && !isEditingTitle && (
+              <>
+                {effectiveTitle && (
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<Icons.EditOutlined />}
+                    aria-label={t('Rename widget')}
+                    data-test="canvas-widget-rename-btn"
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={() => {
+                      setDraftTitle(effectiveTitle);
+                      setEditingTitleNode(nodeId);
+                    }}
+                  />
+                )}
+                <Popover
+                  trigger="click"
+                  placement="bottomRight"
+                  content={
+                    <StylePopoverBody
+                      onPointerDown={e => e.stopPropagation()}
+                      data-test="canvas-widget-style-popover"
+                    >
+                      <StyleRow>
+                        <span>{t('Hide title')}</span>
+                        <Switch
+                          size="small"
+                          checked={Boolean(cardStyle?.hideTitle)}
+                          onChange={checked =>
+                            updateCardStyle({ hideTitle: checked })
+                          }
+                        />
+                      </StyleRow>
+                      <StyleRow>
+                        <span>{t('Borderless')}</span>
+                        <Switch
+                          size="small"
+                          checked={Boolean(cardStyle?.borderless)}
+                          onChange={checked =>
+                            updateCardStyle({ borderless: checked })
+                          }
+                        />
+                      </StyleRow>
+                      <StyleRow>
+                        <span>{t('Title align')}</span>
+                        <SwatchRow>
+                          {(['left', 'center', 'right'] as const).map(align => (
+                            <Button
+                              key={align}
+                              size="small"
+                              type={
+                                titleAlign === align ? 'primary' : 'default'
+                              }
+                              onClick={() =>
+                                updateCardStyle({ titleAlign: align })
+                              }
+                            >
+                              {align[0].toUpperCase()}
+                            </Button>
+                          ))}
+                        </SwatchRow>
+                      </StyleRow>
+                      <StyleRow>
+                        <span>{t('Tint')}</span>
+                        <SwatchRow>
+                          {CARD_BG_PRESETS.map(preset => (
+                            <SwatchButton
+                              key={preset.label}
+                              type="button"
+                              aria-label={preset.label}
+                              $color={preset.value}
+                              $active={
+                                cardStyle?.backgroundColor === preset.value
+                              }
+                              onClick={() =>
+                                updateCardStyle({
+                                  backgroundColor: preset.value,
+                                })
+                              }
+                            />
+                          ))}
+                        </SwatchRow>
+                      </StyleRow>
+                      <Input
+                        size="small"
+                        placeholder={t('Subtitle (Enter to save)')}
+                        defaultValue={cardStyle?.subtitle ?? ''}
+                        onPressEnter={e =>
+                          updateCardStyle({
+                            subtitle: (
+                              e.target as HTMLInputElement
+                            ).value.trim(),
+                          })
+                        }
+                        onBlur={e => {
+                          const nextSub = e.target.value.trim();
+                          if (nextSub !== (cardStyle?.subtitle ?? '')) {
+                            updateCardStyle({ subtitle: nextSub });
+                          }
+                        }}
+                      />
+                    </StylePopoverBody>
+                  }
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<Icons.BgColorsOutlined />}
+                    aria-label={t('Customize card')}
+                    data-test="canvas-widget-style-btn"
+                    onPointerDown={e => e.stopPropagation()}
+                  />
+                </Popover>
+              </>
             )}
             {mark && mark !== 'removed' && (
               <Mark color={MARKS[mark].color} data-test="canvas-widget-mark">

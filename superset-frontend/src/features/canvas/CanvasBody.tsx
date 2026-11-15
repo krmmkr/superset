@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { canvas as canvasApi } from '@apache-superset/core';
 import { t } from '@apache-superset/core/translation';
+import { getClientErrorObject, SupersetClient } from '@superset-ui/core';
 import { Button, EmptyState } from '@superset-ui/core/components';
 import { useToasts } from 'src/components/MessageToasts/withToasts';
 import ActiveFiltersBar from './ActiveFiltersBar';
@@ -32,6 +33,7 @@ import { useDraftActions } from './useDraftActions';
 import { useDraftHistory } from './useDraftHistory';
 import { useStartDraft } from './useStartDraft';
 import { useCanvasLayout } from './useCanvasLayout';
+import { DRAFT_TOKEN_HEADER } from './useCanvasDefinition';
 import {
   CanvasSelectionContext,
   useCanvasSelectionState,
@@ -132,6 +134,26 @@ export default function CanvasBody({
   // after that read would be replayed by nothing. The single place this
   // policy is decided.
   const editable = result.canEdit && Boolean(draftToken) && !committing;
+  const applyDraftOps = useCallback(
+    async (ops: Record<string, unknown>[]) => {
+      if (!draftToken) return;
+      try {
+        await SupersetClient.request({
+          method: 'PATCH',
+          endpoint: '/api/v1/canvas/draft',
+          headers: { [DRAFT_TOKEN_HEADER]: draftToken },
+          jsonPayload: { revision: layout.revision, ops },
+        });
+        reload();
+      } catch (err) {
+        const { error: msg } = await getClientErrorObject(
+          err as Parameters<typeof getClientErrorObject>[0],
+        );
+        addDangerToast(msg ?? t('Failed to update widget'));
+      }
+    },
+    [draftToken, layout.revision, reload, addDangerToast],
+  );
   // Held here rather than in the grid: `editable` and the placements are
   // already here, and this is above the toolbar as well as the canvas, so an
   // action on the selected widget has somewhere to live later.
@@ -228,6 +250,7 @@ export default function CanvasBody({
             // Widgets read their data from the draft while one is open.
             draftToken={draftToken}
             versionUuid={versionUuid}
+            onApplyOps={draftToken ? applyDraftOps : undefined}
           />
         </>
       )}
