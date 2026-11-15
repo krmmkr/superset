@@ -55,6 +55,7 @@ def test_empty_canvas_is_valid() -> None:
                 "showTimestamps": False,
                 "titleAlign": "left",
                 "hiddenTitles": [],
+                "cardStyles": {},
             },
             "crossFilters": {"enabled": True},
         },

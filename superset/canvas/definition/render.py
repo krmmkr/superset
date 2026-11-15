@@ -111,8 +111,13 @@ def render_context(
         grid_extents[parent] = max((r.row + r.row_span - 1 for r in rects), default=0)
 
     content_rows = _content_rows(nodes, node_types, grid_extents)
-    hidden_titles = set(
-        definition.get("settings", {}).get("display", {}).get("hiddenTitles", [])
+    display = definition.get("settings", {}).get("display", {})
+    hidden_titles = set(display.get("hiddenTitles", []))
+    card_styles = display.get("cardStyles") or {}
+    hidden_titles.update(
+        node_id
+        for node_id, style in card_styles.items()
+        if isinstance(style, dict) and style.get("hideTitle")
     )
     titles = {
         node_id: widgets[widget_id].name

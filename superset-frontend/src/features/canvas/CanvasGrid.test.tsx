@@ -1055,3 +1055,49 @@ test('a group that already holds what is in it keeps the height it was sent', ()
     ).gridRow,
   ).toBe('2/span 4');
 });
+
+test('per-widget cardStyles apply background, borderless, subtitle, and hideTitle', () => {
+  const styledResult: CanvasDefinitionResult = {
+    ...result,
+    titles: { ...result.titles, c1: 'Revenue', odd: 'Odd Title' },
+    definition: {
+      ...result.definition,
+      settings: {
+        ...result.definition.settings,
+        display: {
+          ...result.definition.settings.display,
+          cardStyles: {
+            c1: {
+              backgroundColor: 'rgb(240, 248, 255)',
+              borderless: true,
+              subtitle: 'Last 30 days',
+              titleAlign: 'center',
+            },
+            odd: {
+              hideTitle: true,
+            },
+          },
+        },
+      },
+    },
+  };
+  const { container } = renderGrid(emptyScopeValues(), jest.fn(), styledResult);
+
+  const c1Node = container.querySelector('[data-node-id="c1"]') as HTMLElement;
+  const c1Card = c1Node.querySelector(
+    '[data-test="canvas-widget-card"]',
+  ) as HTMLElement;
+  expect(c1Card).toHaveAttribute('data-borderless', 'true');
+  expect(getComputedStyle(c1Card).backgroundColor).toBe('rgb(240, 248, 255)');
+  expect(
+    c1Node.querySelector('[data-test="canvas-widget-subtitle"]'),
+  ).toHaveTextContent('Last 30 days');
+  expect(
+    c1Node.querySelector('[data-test="canvas-widget-title"]'),
+  ).toHaveTextContent('Revenue');
+
+  const oddNode = container.querySelector(
+    '[data-node-id="odd"]',
+  ) as HTMLElement;
+  expect(oddNode.querySelector('[data-test="canvas-widget-title"]')).toBeNull();
+});

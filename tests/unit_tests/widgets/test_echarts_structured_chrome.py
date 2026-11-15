@@ -71,6 +71,16 @@ def test_chrome_schema_is_flat_one_level_under_chrome() -> None:
         "visibleBars",
         "timeGrainParam",
         "dimensionParam",
+        "metricParam",
+        "numberFormat",
+        "currencySymbol",
+        "aboveTargetColor",
+        "belowTargetColor",
+        "stack",
+        "horizontal",
+        "yAxisMin",
+        "yAxisMax",
+        "showGridLines",
     }
     # Flat, not nested: every field's own schema is a plain scalar (string,
     # boolean, integer, or a nullable enum) — never another $ref to a

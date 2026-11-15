@@ -56,6 +56,7 @@ export interface WidgetRows extends PlacementData {
 export interface WidgetQueryOverrides {
   timeGrain?: string;
   dimension?: string;
+  metric?: string;
   templateParams?: Record<string, unknown>;
 }
 
@@ -110,6 +111,7 @@ export function useWidgetRows(
       filters: selected,
       timeGrain: queryOverrides?.timeGrain,
       dimension: queryOverrides?.dimension,
+      metric: queryOverrides?.metric,
       templateParams: queryOverrides?.templateParams,
     })
       .then(data => {

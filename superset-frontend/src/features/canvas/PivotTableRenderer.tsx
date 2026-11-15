@@ -108,6 +108,23 @@ const Container = styled.div<{ refreshing?: boolean }>`
       outline: 2px solid ${theme.colorPrimary};
       outline-offset: -2px;
     }
+
+    th.sticky-row-col,
+    td.sticky-row-col {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: ${theme.colorBgContainer};
+    }
+
+    thead th.sticky-row-col {
+      z-index: 3;
+      background: ${theme.colorFillAlter};
+    }
+
+    tr.total-row td.sticky-row-col {
+      background: ${theme.colorFillQuaternary};
+    }
   `}
 `;
 
@@ -332,12 +349,40 @@ export default function PivotTableRenderer(widget: Props) {
     );
   };
 
-  const formatNum = (val: number | undefined) => {
+  const displayMode =
+    props?.displayMode === 'row_percent' ||
+    props?.displayMode === 'col_percent' ||
+    props?.displayMode === 'total_percent'
+      ? props.displayMode
+      : 'value';
+  const compactNumbers = Boolean(props?.compactNumbers);
+  const freezeRowFields = props?.freezeRowFields !== false;
+
+  const formatNum = (val: number | undefined, denom?: number) => {
     if (val === undefined) return '–';
+    if (displayMode !== 'value') {
+      const pct = denom && denom !== 0 ? (val / denom) * 100 : 0;
+      const pctDecimals = decimals > 0 ? decimals : 1;
+      return `${pct.toFixed(pctDecimals)}%`;
+    }
+    if (compactNumbers) {
+      const formatted = new Intl.NumberFormat('en-US', {
+        notation: 'compact',
+        maximumFractionDigits: decimals > 0 ? decimals : 1,
+      }).format(val);
+      return `${prefix}${formatted}${suffix}`;
+    }
     return `${prefix}${val.toLocaleString(undefined, {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     })}${suffix}`;
+  };
+
+  const cellDenom = (rKey: string, cKey: string) => {
+    if (displayMode === 'row_percent') return pivot.rowTotals.get(rKey);
+    if (displayMode === 'col_percent') return pivot.colTotals.get(cKey);
+    if (displayMode === 'total_percent') return pivot.grandTotal;
+    return undefined;
   };
 
   const datasetId = (props?.dataBinding as { datasetId?: unknown } | undefined)
@@ -409,7 +454,15 @@ export default function PivotTableRenderer(widget: Props) {
                 (fieldLabel, idx) => {
                   const target: SortTarget = { kind: 'rowField', index: idx };
                   return (
-                    <th key={fieldLabel} onClick={() => toggleSort(target)}>
+                    <th
+                      key={fieldLabel}
+                      className={
+                        freezeRowFields && idx === 0
+                          ? 'sticky-row-col'
+                          : undefined
+                      }
+                      onClick={() => toggleSort(target)}
+                    >
                       {fieldLabel}
                       {sortIndicator(target)}
                     </th>
@@ -455,10 +508,15 @@ export default function PivotTableRenderer(widget: Props) {
                     const isActive =
                       isFilterable &&
                       activeCrossKey === `row:${fieldName}:${part}`;
-                    const cellClass = isActive
-                      ? 'cross-filterable cross-filter-active'
-                      : isFilterable
-                        ? 'cross-filterable'
+                    const cellClasses: string[] = [];
+                    if (freezeRowFields && cIdx === 0) {
+                      cellClasses.push('sticky-row-col');
+                    }
+                    if (isFilterable) cellClasses.push('cross-filterable');
+                    if (isActive) cellClasses.push('cross-filter-active');
+                    const cellClass =
+                      cellClasses.length > 0
+                        ? cellClasses.join(' ')
                         : undefined;
                     return (
                       <td
@@ -508,13 +566,18 @@ export default function PivotTableRenderer(widget: Props) {
                             : undefined
                         }
                       >
-                        {formatNum(cellVal)}
+                        {formatNum(cellVal, cellDenom(rKey, cKey))}
                       </td>
                     );
                   })}
                   {showRowTotals && (
                     <td className="num total-col">
-                      {formatNum(pivot.rowTotals.get(rKey))}
+                      {formatNum(
+                        pivot.rowTotals.get(rKey),
+                        displayMode === 'row_percent'
+                          ? pivot.rowTotals.get(rKey)
+                          : pivot.grandTotal,
+                      )}
                     </td>
                   )}
                 </tr>
@@ -522,15 +585,25 @@ export default function PivotTableRenderer(widget: Props) {
             })}
             {showColTotals && (
               <tr className="total-row">
-                <td colSpan={Math.max(1, rowFields.length)}>{t('Total')}</td>
+                <td
+                  colSpan={Math.max(1, rowFields.length)}
+                  className={freezeRowFields ? 'sticky-row-col' : undefined}
+                >
+                  {t('Total')}
+                </td>
                 {pivot.colKeys.map(cKey => (
                   <td key={cKey} className="num">
-                    {formatNum(pivot.colTotals.get(cKey))}
+                    {formatNum(
+                      pivot.colTotals.get(cKey),
+                      displayMode === 'col_percent'
+                        ? pivot.colTotals.get(cKey)
+                        : pivot.grandTotal,
+                    )}
                   </td>
                 ))}
                 {showRowTotals && (
                   <td className="num total-col">
-                    {formatNum(pivot.grandTotal)}
+                    {formatNum(pivot.grandTotal, pivot.grandTotal)}
                   </td>
                 )}
               </tr>

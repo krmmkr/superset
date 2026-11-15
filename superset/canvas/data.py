@@ -101,6 +101,7 @@ class PlacementDataRequest(BaseModel):
     runtime_filters: list[RuntimeFilter] = Field(default_factory=list, max_length=100)
     time_grain: str | None = Field(default=None, max_length=32)
     dimension: str | None = Field(default=None, min_length=1, max_length=255)
+    metric: str | None = Field(default=None, min_length=1, max_length=255)
     template_params: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("time_grain")
@@ -131,27 +132,33 @@ def _apply_dimension_and_time_grain(
     *,
     time_grain: str | None,
     dimension: str | None,
-) -> tuple[list[Any], list[list[Any]]]:
-    """Resolve dimensions, time-grain column wrapping, and orderby for a binding."""
+    metric: str | None = None,
+) -> tuple[list[Any], list[Any], list[list[Any]]]:
+    """Resolve metrics, dimensions, time-grain wrapping, and orderby."""
 
-    def label(metric: Any) -> Any:
-        return metric.get("label") if isinstance(metric, dict) else metric
+    def label(item: Any) -> Any:
+        return item.get("label") if isinstance(item, dict) else item
+
+    original_metric = label(metrics[0]) if metrics else None
+    effective_metrics = list(metrics)
+    if metric:
+        matched = next((m for m in metrics if label(m) == metric), metric)
+        effective_metrics = [matched, *metrics[1:]] if metrics else [matched]
 
     columns: list[Any] = [d for d in binding.get("dimensions") or [] if d]
     original_dim = columns[0] if columns and isinstance(columns[0], str) else None
     if dimension:
         columns = [dimension, *columns[1:]] if columns else [dimension]
 
+    def resolve_order_field(field: str) -> Any:
+        if metric and original_metric is not None and field == original_metric:
+            return effective_metrics[0]
+        if dimension and original_dim and field == original_dim:
+            return dimension
+        return next((m for m in effective_metrics if label(m) == field), field)
+
     orderby = [
-        [
-            next(
-                (m for m in metrics if label(m) == key["field"]),
-                dimension
-                if dimension and original_dim and key["field"] == original_dim
-                else key["field"],
-            ),
-            not key.get("descending", False),
-        ]
+        [resolve_order_field(key["field"]), not key.get("descending", False)]
         for key in binding.get("orderBy") or []
     ]
 
@@ -172,7 +179,7 @@ def _apply_dimension_and_time_grain(
                 else col
                 for col in columns
             ]
-    return columns, orderby
+    return effective_metrics, columns, orderby
 
 
 def query_context_payload(
@@ -181,6 +188,7 @@ def query_context_payload(
     *,
     time_grain: str | None = None,
     dimension: str | None = None,
+    metric: str | None = None,
     template_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A chart data query context for ``binding``, narrowed by the runtime
@@ -214,13 +222,17 @@ def query_context_payload(
         elif runtime.values:
             filters.append({"col": runtime.column, "op": "IN", "val": runtime.values})
 
-    columns, orderby = _apply_dimension_and_time_grain(
-        binding, metrics, time_grain=time_grain, dimension=dimension
+    effective_metrics, columns, orderby = _apply_dimension_and_time_grain(
+        binding,
+        metrics,
+        time_grain=time_grain,
+        dimension=dimension,
+        metric=metric,
     )
 
     query_obj: dict[str, Any] = {
         "columns": columns,
-        "metrics": metrics,
+        "metrics": effective_metrics,
         "filters": filters,
         "extras": {"where": " AND ".join(where)} if where else {},
         "orderby": orderby,
@@ -299,6 +311,7 @@ def run_binding(
     *,
     time_grain: str | None = None,
     dimension: str | None = None,
+    metric: str | None = None,
     template_params: dict[str, Any] | None = None,
 ) -> PlacementData:
     """
@@ -319,6 +332,7 @@ def run_binding(
             runtime_filters,
             time_grain=effective_grain,
             dimension=dimension,
+            metric=metric,
             template_params=template_params,
         )
     )

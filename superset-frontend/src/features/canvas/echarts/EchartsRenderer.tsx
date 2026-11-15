@@ -198,14 +198,24 @@ function collectTemplateParams(
   return Object.keys(params).length > 0 ? params : undefined;
 }
 
-function rebindDimensionAlias(
+function metricLabel(metric: unknown): string | undefined {
+  if (typeof metric === 'string' && metric) return metric;
+  if (metric && typeof metric === 'object' && 'label' in metric) {
+    const { label } = metric as { label?: unknown };
+    return typeof label === 'string' && label ? label : undefined;
+  }
+  return undefined;
+}
+
+function rebindAlias(
   value: unknown,
+  source: 'dimension' | 'metric',
   fromAlias: string,
   toAlias: string,
 ): unknown {
   if (fromAlias === toAlias || !fromAlias || !toAlias) return value;
   if (Array.isArray(value)) {
-    return value.map(item => rebindDimensionAlias(item, fromAlias, toAlias));
+    return value.map(item => rebindAlias(item, source, fromAlias, toAlias));
   }
   if (typeof value !== 'object' || value === null) return value;
   const record = value as Record<string, unknown>;
@@ -215,14 +225,14 @@ function rebindDimensionAlias(
     record.$bind !== null
   ) {
     const bind = record.$bind as Record<string, unknown>;
-    if (bind.source === 'dimension' && bind.alias === fromAlias) {
+    if (bind.source === source && bind.alias === fromAlias) {
       return { ...record, $bind: { ...bind, alias: toAlias } };
     }
   }
   return Object.fromEntries(
     Object.entries(record).map(([k, v]) => [
       k,
-      rebindDimensionAlias(v, fromAlias, toAlias),
+      rebindAlias(v, source, fromAlias, toAlias),
     ]),
   );
 }
@@ -260,6 +270,7 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
     customizations,
     chrome?.dimensionParam,
   );
+  const paramMetric = resolveStringParam(customizations, chrome?.metricParam);
   const templateParams = useMemo(
     () => collectTemplateParams(customizations),
     [customizations],
@@ -285,21 +296,33 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
       : dimensions[activeDimIndex];
 
   const effectiveProps = useMemo(() => {
+    const nextMetrics = paramMetric
+      ? [paramMetric, ...(binding?.metrics ?? []).slice(1)]
+      : binding?.metrics;
     if (drillEnabled && drillPath.length > 0 && activeDim) {
       return {
         ...(props as StructuredProps),
         dataBinding: {
           ...binding,
+          ...(nextMetrics ? { metrics: nextMetrics } : {}),
           dimensions: [activeDim],
         },
       };
     }
-    if (paramDimension) {
+    if (paramDimension || paramMetric) {
       return {
         ...(props as StructuredProps),
         dataBinding: {
           ...binding,
-          dimensions: [paramDimension, ...(binding?.dimensions ?? []).slice(1)],
+          ...(nextMetrics ? { metrics: nextMetrics } : {}),
+          ...(paramDimension
+            ? {
+                dimensions: [
+                  paramDimension,
+                  ...(binding?.dimensions ?? []).slice(1),
+                ],
+              }
+            : {}),
         },
       };
     }
@@ -309,6 +332,7 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
     drillPath.length,
     activeDim,
     paramDimension,
+    paramMetric,
     props,
     binding,
   ]);
@@ -329,27 +353,36 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
 
   const queryOverrides = useMemo(
     () =>
-      paramTimeGrain || paramDimension || templateParams
+      paramTimeGrain || paramDimension || paramMetric || templateParams
         ? {
             timeGrain: paramTimeGrain,
             dimension: paramDimension,
+            metric: paramMetric,
             templateParams,
           }
         : undefined,
-    [paramTimeGrain, paramDimension, templateParams],
+    [paramTimeGrain, paramDimension, paramMetric, templateParams],
   );
   const data = useWidgetRows(widget, allFilters, refreshKey, queryOverrides);
   const rawOption = (props?.echartsOptions ?? {}) as Record<string, unknown>;
+  const baseMetric = metricLabel(binding?.metrics?.[0]);
   const option = useMemo(() => {
+    let next = rawOption;
     const baseDim = dimensions[0];
     if (baseDim && activeDim && baseDim !== activeDim) {
-      return rebindDimensionAlias(rawOption, baseDim, activeDim) as Record<
+      next = rebindAlias(next, 'dimension', baseDim, activeDim) as Record<
         string,
         unknown
       >;
     }
-    return rawOption;
-  }, [rawOption, dimensions, activeDim]);
+    if (baseMetric && paramMetric && baseMetric !== paramMetric) {
+      next = rebindAlias(next, 'metric', baseMetric, paramMetric) as Record<
+        string,
+        unknown
+      >;
+    }
+    return next;
+  }, [rawOption, dimensions, activeDim, baseMetric, paramMetric]);
 
   useEffect(() => {
     if (activeCrossRef.current !== undefined) {

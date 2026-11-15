@@ -115,12 +115,30 @@ const Mark = styled(Tag)`
   `}
 `;
 
-const Titled = styled.div<{ $mark?: DraftChange['kind'] }>`
-  ${({ theme, $mark }) => css`
+const Titled = styled.div<{
+  $mark?: DraftChange['kind'];
+  $bg?: string;
+  $borderless?: boolean;
+}>`
+  ${({ theme, $mark, $bg, $borderless }) => css`
     height: 100%;
     display: flex;
     flex-direction: column;
     gap: ${theme.sizeUnit}px;
+    ${
+      $bg &&
+      css`
+        background: ${$bg};
+        border-radius: ${theme.borderRadius}px;
+      `
+    }
+    ${
+      $borderless &&
+      css`
+        border: none;
+        box-shadow: none;
+      `
+    }
     ${
       $mark &&
       OUTLINED.has($mark) &&
@@ -193,6 +211,21 @@ const WidgetTitle = styled.div`
     font-size: ${theme.fontSizeLG}px;
     font-weight: ${theme.fontWeightStrong};
     line-height: ${theme.lineHeightLG};
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `}
+`;
+
+const WidgetSubtitle = styled.div<{ $align: 'left' | 'center' | 'right' }>`
+  ${({ theme, $align }) => css`
+    flex-shrink: 0;
+    padding-left: ${theme.sizeUnit * 12}px;
+    padding-right: ${theme.sizeUnit * 21}px;
+    text-align: ${$align};
+    color: ${theme.colorTextSecondary};
+    font-size: ${theme.fontSizeSM}px;
+    line-height: ${theme.lineHeightSM};
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   `}
@@ -563,22 +596,54 @@ export default function CanvasGrid({
       </ErrorBoundary>
     );
     const mark = marks[nodeId];
-    // A widget with neither a name nor a change has no row to draw.
-    if (!title && !mark) return widget;
+    const cardStyle = display.cardStyles?.[nodeId];
+    const effectiveTitle = cardStyle?.hideTitle ? undefined : title;
+    const subtitle = cardStyle?.subtitle;
+    const titleAlign = cardStyle?.titleAlign ?? display.titleAlign ?? 'left';
+    // A widget with no title, subtitle, mark, or card style needs no wrapper.
+    if (
+      !effectiveTitle &&
+      !subtitle &&
+      !mark &&
+      !cardStyle?.backgroundColor &&
+      !cardStyle?.borderless
+    ) {
+      return widget;
+    }
     return (
-      <Titled $mark={mark}>
-        <TitleRow $align={display.titleAlign ?? 'left'}>
-          {title && (
-            <WidgetTitle title={title} data-test="canvas-widget-title">
-              {title}
-            </WidgetTitle>
-          )}
-          {mark && mark !== 'removed' && (
-            <Mark color={MARKS[mark].color} data-test="canvas-widget-mark">
-              {MARKS[mark].label()}
-            </Mark>
-          )}
-        </TitleRow>
+      <Titled
+        $mark={mark}
+        $bg={cardStyle?.backgroundColor}
+        $borderless={cardStyle?.borderless}
+        data-test="canvas-widget-card"
+        data-borderless={cardStyle?.borderless ? 'true' : undefined}
+      >
+        {(effectiveTitle || (mark && mark !== 'removed')) && (
+          <TitleRow $align={titleAlign}>
+            {effectiveTitle && (
+              <WidgetTitle
+                title={effectiveTitle}
+                data-test="canvas-widget-title"
+              >
+                {effectiveTitle}
+              </WidgetTitle>
+            )}
+            {mark && mark !== 'removed' && (
+              <Mark color={MARKS[mark].color} data-test="canvas-widget-mark">
+                {MARKS[mark].label()}
+              </Mark>
+            )}
+          </TitleRow>
+        )}
+        {subtitle && (
+          <WidgetSubtitle
+            $align={titleAlign}
+            title={subtitle}
+            data-test="canvas-widget-subtitle"
+          >
+            {subtitle}
+          </WidgetSubtitle>
+        )}
         <TitledBody>{widget}</TitledBody>
       </Titled>
     );

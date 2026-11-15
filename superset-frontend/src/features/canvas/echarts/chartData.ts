@@ -117,6 +117,7 @@ export async function fetchPlacementData({
   filters,
   timeGrain,
   dimension,
+  metric,
   templateParams,
 }: {
   canvasId: number;
@@ -127,6 +128,7 @@ export async function fetchPlacementData({
   filters: RuntimeFilterValue[];
   timeGrain?: string;
   dimension?: string;
+  metric?: string;
   templateParams?: Record<string, unknown>;
 }): Promise<PlacementData> {
   const headers = {
@@ -142,6 +144,7 @@ export async function fetchPlacementData({
       runtime_filters: filters,
       ...(timeGrain ? { time_grain: timeGrain } : {}),
       ...(dimension ? { dimension } : {}),
+      ...(metric ? { metric } : {}),
       ...(templateParams && Object.keys(templateParams).length > 0
         ? { template_params: templateParams }
         : {}),

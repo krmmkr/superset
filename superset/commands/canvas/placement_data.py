@@ -51,6 +51,7 @@ class GetPlacementDataCommand(BaseCommand):
         *,
         time_grain: str | None = None,
         dimension: str | None = None,
+        metric: str | None = None,
         template_params: dict[str, Any] | None = None,
     ) -> None:
         self._id_or_uuid = id_or_uuid
@@ -60,6 +61,7 @@ class GetPlacementDataCommand(BaseCommand):
         self._version_uuid = version_uuid
         self._time_grain = time_grain
         self._dimension = dimension
+        self._metric = metric
         self._template_params = template_params
         self._binding: dict[str, Any] = {}
 
@@ -70,6 +72,7 @@ class GetPlacementDataCommand(BaseCommand):
             self._runtime_filters,
             time_grain=self._time_grain,
             dimension=self._dimension,
+            metric=self._metric,
             template_params=self._template_params,
         )
 

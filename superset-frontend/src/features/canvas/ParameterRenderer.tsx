@@ -74,9 +74,22 @@ export default function ParameterRenderer({
       : 'number';
   const min = typeof props?.minValue === 'number' ? props.minValue : 0;
   const max = typeof props?.maxValue === 'number' ? props.maxValue : 1000000;
-  const step = typeof props?.step === 'number' && props.step > 0 ? props.step : 1;
-  const options = Array.isArray(props?.options)
-    ? props.options.map(String)
+  const step =
+    typeof props?.step === 'number' && props.step > 0 ? props.step : 1;
+  const selectOptions: { label: string; value: string }[] = Array.isArray(
+    props?.options,
+  )
+    ? props.options.map(opt => {
+        if (opt && typeof opt === 'object' && 'value' in opt) {
+          const rec = opt as { label?: unknown; value: unknown };
+          const val = String(rec.value);
+          const lbl =
+            typeof rec.label === 'string' && rec.label ? rec.label : val;
+          return { label: lbl, value: val };
+        }
+        const s = String(opt);
+        return { label: s, value: s };
+      })
     : [];
   const onValue: string | number | boolean =
     typeof props?.onValue === 'boolean' ||
@@ -159,7 +172,7 @@ export default function ParameterRenderer({
       {inputType === 'select' && (
         <Select
           ariaLabel={label}
-          options={options.map(opt => ({ label: opt, value: opt }))}
+          options={selectOptions}
           value={String(value)}
           onChange={val => update(String(val ?? ''))}
         />

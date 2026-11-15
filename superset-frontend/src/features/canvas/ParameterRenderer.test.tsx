@@ -300,3 +300,97 @@ test('ParameterRenderer switch inputType publishes onValue and offValue', () => 
     value: 'net',
   });
 });
+
+test('ParameterRenderer select supports {label, value} options and emits value', async () => {
+  const setCustomizationValue = jest.fn();
+  render(
+    <ParameterRenderer
+      {...makeWidgetProps({
+        props: {
+          name: 'breakdownDim',
+          label: 'Breakdown Dimension',
+          inputType: 'select',
+          defaultValue: 'product_line',
+          options: [
+            { label: 'Product Line', value: 'product_line' },
+            { label: 'Territory', value: 'territory' },
+          ],
+        },
+        setCustomizationValue,
+      })}
+    />,
+  );
+
+  expect(setCustomizationValue).toHaveBeenCalledWith({
+    name: 'breakdownDim',
+    value: 'product_line',
+  });
+  expect(screen.getByText('Product Line')).toBeInTheDocument();
+  const combo = screen.getByRole('combobox', { name: 'Breakdown Dimension' });
+  fireEvent.mouseDown(combo);
+  fireEvent.click(await screen.findByText('Territory'));
+  expect(setCustomizationValue).toHaveBeenLastCalledWith({
+    name: 'breakdownDim',
+    value: 'territory',
+  });
+});
+
+test('TableRenderer supports searchable quick filter and row-click crossFilter', async () => {
+  fetchMock.clearHistory();
+  fetchMock.removeRoutes();
+  fetchMock.post('glob:*/api/v1/canvas/1/placement/tbl2/data', {
+    result: {
+      datasets: [
+        {
+          name: 'main',
+          row_count: 2,
+          inline_data: [
+            { country: 'USA', sales: 100 },
+            { country: 'Canada', sales: 50 },
+          ],
+          query: 'SELECT country, sales FROM orders',
+          language: 'sql',
+        },
+      ],
+    },
+  });
+
+  const setCrossFilter = jest.fn();
+  render(
+    <TableRenderer
+      {...makeWidgetProps({
+        nodeId: 'tbl2',
+        widgetType: 'ag-grid-table',
+        props: {
+          searchable: true,
+          crossFilter: true,
+          density: 'comfortable',
+          wrapText: true,
+          dataBinding: {
+            datasetId: 13,
+            metrics: [{ label: 'sales' }],
+            dimensions: ['country'],
+          },
+        },
+        setCrossFilter,
+      })}
+    />,
+    { useRedux: true, useRouter: true },
+  );
+
+  expect(await screen.findByText('USA')).toBeInTheDocument();
+  const search = screen.getByPlaceholderText('Search rows...');
+  fireEvent.change(search, { target: { value: 'Can' } });
+  expect(screen.queryByText('USA')).not.toBeInTheDocument();
+  expect(screen.getByText('Canada')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByText('Canada'));
+  expect(setCrossFilter).toHaveBeenCalledWith({
+    datasetId: 13,
+    column: 'country',
+    values: ['Canada'],
+  });
+  fireEvent.click(screen.getByText('Canada'));
+  expect(setCrossFilter).toHaveBeenLastCalledWith(undefined);
+  fetchMock.removeRoutes();
+});

@@ -1111,6 +1111,7 @@ class CanvasRestApi(BaseSupersetModelRestApi):
                 version,
                 time_grain=body.time_grain,
                 dimension=body.dimension,
+                metric=body.metric,
                 template_params=body.template_params or None,
             ).run()
         except DatasourceNotFound:

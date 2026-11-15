@@ -227,3 +227,84 @@ test('emits and toggles cross-filter on row dimension click when crossFilter is 
   expect(setCrossFilter).toHaveBeenLastCalledWith(undefined);
   expect(dataCell.closest('td')).not.toHaveClass('cross-filter-active');
 });
+
+test('supports row_percent displayMode, compactNumbers, and sticky-row-col', async () => {
+  fetchMock.clearHistory();
+  fetchMock.removeRoutes();
+  fetchMock.post('glob:*/api/v1/canvas/2/placement/pivot4/data', {
+    result: {
+      datasets: [
+        {
+          name: 'main',
+          row_count: 2,
+          inline_data: [
+            { territory: 'NA', deal_size: 'Large', sales: 1500000 },
+            { territory: 'NA', deal_size: 'Small', sales: 500000 },
+          ],
+          query: 'SELECT 1',
+          language: 'sql',
+        },
+      ],
+    },
+  });
+
+  const { rerender } = render(
+    <PivotTableRenderer
+      canvasId={2}
+      nodeId="pivot4"
+      widgetType="pivot-table"
+      props={{
+        dataBinding: { datasetId: 13, metrics: ['sales'] },
+        rowFields: ['territory'],
+        columnFields: ['deal_size'],
+        metric: 'sales',
+        prefix: '$',
+        compactNumbers: true,
+        freezeRowFields: true,
+      }}
+      filters={[]}
+      crossFilters={[]}
+      events={[]}
+      refreshKey={0}
+      setFilterValue={jest.fn()}
+      setCrossFilter={jest.fn()}
+      emitEvent={jest.fn()}
+      childNodes={[]}
+      renderGrid={jest.fn()}
+    />,
+    { useRedux: true, useRouter: true },
+  );
+
+  const naCell = await screen.findByText('NA');
+  expect(naCell.closest('td')).toHaveClass('sticky-row-col');
+  expect(screen.getAllByText('$1.5M').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('$500K').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('$2M').length).toBeGreaterThan(0);
+
+  rerender(
+    <PivotTableRenderer
+      canvasId={2}
+      nodeId="pivot4"
+      widgetType="pivot-table"
+      props={{
+        dataBinding: { datasetId: 13, metrics: ['sales'] },
+        rowFields: ['territory'],
+        columnFields: ['deal_size'],
+        metric: 'sales',
+        displayMode: 'row_percent',
+      }}
+      filters={[]}
+      crossFilters={[]}
+      events={[]}
+      refreshKey={0}
+      setFilterValue={jest.fn()}
+      setCrossFilter={jest.fn()}
+      emitEvent={jest.fn()}
+      childNodes={[]}
+      renderGrid={jest.fn()}
+    />,
+  );
+
+  expect(screen.getAllByText('75.0%').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('25.0%').length).toBeGreaterThan(0);
+});

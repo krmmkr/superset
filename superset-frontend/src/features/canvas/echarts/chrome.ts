@@ -51,6 +51,16 @@ export interface EchartsChromeValue {
   visibleBars?: number | null;
   timeGrainParam?: string;
   dimensionParam?: string;
+  metricParam?: string;
+  numberFormat?: 'none' | 'compact' | 'currency' | 'percent' | null;
+  currencySymbol?: string;
+  aboveTargetColor?: string;
+  belowTargetColor?: string;
+  stack?: boolean;
+  horizontal?: boolean;
+  yAxisMin?: number | null;
+  yAxisMax?: number | null;
+  showGridLines?: boolean;
 }
 
 // ECharts has no single "position" property on `legend` — placement comes
@@ -103,6 +113,29 @@ function applyLegend(existing: unknown, chrome: EchartsChromeValue): unknown {
   return mergeSection(existing, override);
 }
 
+function formatCompactNumber(
+  raw: unknown,
+  mode: 'compact' | 'currency' | 'percent',
+  currencySymbol = '$',
+  decimals?: number | null,
+): string {
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return raw === undefined ? '' : String(raw);
+  const maxFrac = typeof decimals === 'number' ? decimals : 1;
+  if (mode === 'percent') {
+    return new Intl.NumberFormat('en-US', {
+      style: 'percent',
+      minimumFractionDigits: typeof decimals === 'number' ? decimals : 0,
+      maximumFractionDigits: maxFrac,
+    }).format(num);
+  }
+  const formatted = new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: maxFrac,
+  }).format(num);
+  return mode === 'currency' ? `${currencySymbol}${formatted}` : formatted;
+}
+
 function applyTitle(existing: unknown, chrome: EchartsChromeValue): unknown {
   if (!chrome.titleText) return existing;
   return mergeSection(existing, { text: chrome.titleText });
@@ -112,7 +145,15 @@ function applyTooltip(existing: unknown, chrome: EchartsChromeValue): unknown {
   const override: Record<string, unknown> = {};
   if (chrome.tooltipTrigger) override.trigger = chrome.tooltipTrigger;
   if (chrome.tooltipShow === false) override.show = false;
-  if (chrome.tooltipFormat) override.formatter = chrome.tooltipFormat;
+  if (chrome.tooltipFormat) {
+    override.formatter = chrome.tooltipFormat;
+  } else if (chrome.numberFormat && chrome.numberFormat !== 'none') {
+    const mode = chrome.numberFormat;
+    const symbol = chrome.currencySymbol || '$';
+    const decimals = chrome.labelDecimals;
+    override.valueFormatter = (value: unknown) =>
+      formatCompactNumber(value, mode, symbol, decimals);
+  }
   if (Object.keys(override).length === 0) return existing;
   return mergeSection(existing, override);
 }
@@ -126,6 +167,16 @@ function applySeriesLabels(
   if (chrome.labelPosition) labelOverride.position = chrome.labelPosition;
   if (chrome.labelFormat) {
     labelOverride.formatter = chrome.labelFormat;
+  } else if (chrome.numberFormat && chrome.numberFormat !== 'none') {
+    const mode = chrome.numberFormat;
+    const symbol = chrome.currencySymbol || '$';
+    const decimals = chrome.labelDecimals;
+    labelOverride.formatter = (params: { value?: unknown }) => {
+      const raw = Array.isArray(params?.value)
+        ? params.value[params.value.length - 1]
+        : params?.value;
+      return formatCompactNumber(raw, mode, symbol, decimals);
+    };
   } else if (typeof chrome.labelDecimals === 'number') {
     const decimals = chrome.labelDecimals;
     labelOverride.formatter = (params: { value?: unknown }) => {
@@ -147,16 +198,27 @@ function applySeriesLabels(
   if (chrome.labelRotate) {
     labelOverride.rotate = chrome.labelRotate;
   }
-  if (Object.keys(labelOverride).length === 0) return existing;
+  const shouldStack = Boolean(chrome.stack);
+  if (Object.keys(labelOverride).length === 0 && !shouldStack) return existing;
+  const patchSeries = (rec: Record<string, unknown>) => {
+    const next = { ...rec };
+    if (Object.keys(labelOverride).length > 0) {
+      next.label = { ...asRecord(rec.label), ...labelOverride };
+    }
+    if (
+      shouldStack &&
+      (rec.type === 'bar' || rec.type === 'line' || rec.type === 'area')
+    ) {
+      next.stack = rec.stack ?? 'total';
+    }
+    return next;
+  };
   if (!Array.isArray(existing)) {
     const rec = asRecord(existing);
     if (Object.keys(rec).length === 0) return existing;
-    return { ...rec, label: { ...asRecord(rec.label), ...labelOverride } };
+    return patchSeries(rec);
   }
-  return existing.map(item => {
-    const rec = asRecord(item);
-    return { ...rec, label: { ...asRecord(rec.label), ...labelOverride } };
-  });
+  return existing.map(item => patchSeries(asRecord(item)));
 }
 
 function applyAxis(
@@ -165,10 +227,27 @@ function applyAxis(
   rotate: number | undefined,
   format: string | undefined,
   dateFormat?: string,
+  extra?: {
+    numberFormat?: 'none' | 'compact' | 'currency' | 'percent' | null;
+    currencySymbol?: string;
+    decimals?: number | null;
+    min?: number | null;
+    max?: number | null;
+    showGridLines?: boolean;
+  },
 ): unknown {
   const existingRecord = asRecord(firstEntry(existing));
   const override: Record<string, unknown> = {};
   if (name) override.name = name;
+  if (typeof extra?.min === 'number' && Number.isFinite(extra.min)) {
+    override.min = extra.min;
+  }
+  if (typeof extra?.max === 'number' && Number.isFinite(extra.max)) {
+    override.max = extra.max;
+  }
+  if (extra?.showGridLines === false) {
+    override.splitLine = { ...asRecord(existingRecord.splitLine), show: false };
+  }
   const axisLabelOverride: Record<string, unknown> = {};
   if (rotate) axisLabelOverride.rotate = rotate;
   if (format) {
@@ -176,6 +255,12 @@ function applyAxis(
   } else if (dateFormat) {
     axisLabelOverride.formatter = (value: unknown) =>
       formatDatePattern(value, dateFormat);
+  } else if (extra?.numberFormat && extra.numberFormat !== 'none') {
+    const mode = extra.numberFormat;
+    const symbol = extra.currencySymbol || '$';
+    const { decimals } = extra;
+    axisLabelOverride.formatter = (value: unknown) =>
+      formatCompactNumber(value, mode, symbol, decimals);
   }
   if (Object.keys(axisLabelOverride).length > 0) {
     override.axisLabel = {
@@ -191,6 +276,7 @@ function applyTargetMarkLine(
   series: unknown,
   targetValue: number | undefined,
   targetName: string,
+  horizontal = false,
 ): unknown {
   if (
     targetValue === undefined ||
@@ -205,16 +291,59 @@ function applyTargetMarkLine(
     return series;
   const firstRecord = first as Record<string, unknown>;
   const existingMarkLine = asRecord(firstRecord.markLine);
+  const axisKey = horizontal ? 'xAxis' : 'yAxis';
   const nextFirst = {
     ...firstRecord,
     markLine: {
       silent: true,
       ...existingMarkLine,
       label: { formatter: '{b}: {c}', ...asRecord(existingMarkLine.label) },
-      data: [{ yAxis: targetValue, name: targetName }],
+      data: [{ [axisKey]: targetValue, name: targetName }],
     },
   };
   return [nextFirst, ...rest];
+}
+
+function applyTargetColors(
+  series: unknown,
+  targetValue: number | undefined,
+  chrome: EchartsChromeValue,
+): unknown {
+  const above = chrome.aboveTargetColor;
+  const below = chrome.belowTargetColor;
+  if (
+    targetValue === undefined ||
+    !Number.isFinite(targetValue) ||
+    (!above && !below) ||
+    !Array.isArray(series) ||
+    series.length === 0
+  ) {
+    return series;
+  }
+  const [first, ...rest] = series;
+  const firstRecord = asRecord(first);
+  if (!Array.isArray(firstRecord.data)) return series;
+  const nextData = firstRecord.data.map(item => {
+    const itemObj =
+      item && typeof item === 'object' && !Array.isArray(item)
+        ? (item as Record<string, unknown>)
+        : null;
+    const rawVal = itemObj ? itemObj.value : item;
+    const num = Number(
+      Array.isArray(rawVal) ? rawVal[rawVal.length - 1] : rawVal,
+    );
+    if (!Number.isFinite(num)) return item;
+    const color = num >= targetValue ? above : below;
+    if (!color) return item;
+    return {
+      ...(itemObj ?? { value: item }),
+      itemStyle: {
+        ...(itemObj ? asRecord(itemObj.itemStyle) : {}),
+        color,
+      },
+    };
+  });
+  return [{ ...firstRecord, data: nextData }, ...rest];
 }
 
 function applyDataZoom(
@@ -306,28 +435,42 @@ export function applyStructuredChrome(
 ): Record<string, unknown> {
   if (!chrome && targetValue === undefined) return resolved;
   const effectiveChrome = chrome ?? {};
+  const isHorizontal = Boolean(effectiveChrome.horizontal);
   const title = applyTitle(resolved.title, effectiveChrome);
   const legend = applyLegend(resolved.legend, effectiveChrome);
   const tooltip = applyTooltip(resolved.tooltip, effectiveChrome);
   const labeledSeries = applySeriesLabels(resolved.series, effectiveChrome);
-  const series = applyTargetMarkLine(
+  const markedSeries = applyTargetMarkLine(
     labeledSeries,
     targetValue,
     effectiveChrome.targetParam || 'Target',
+    isHorizontal,
   );
-  const xAxis = applyAxis(
+  const series = applyTargetColors(markedSeries, targetValue, effectiveChrome);
+  const baseXAxis = applyAxis(
     resolved.xAxis,
     effectiveChrome.xAxisName,
     effectiveChrome.xAxisRotate,
     effectiveChrome.xAxisFormat,
     effectiveChrome.xAxisDateFormat,
   );
-  const yAxis = applyAxis(
+  const baseYAxis = applyAxis(
     resolved.yAxis,
     effectiveChrome.yAxisName,
     effectiveChrome.yAxisRotate,
     effectiveChrome.yAxisFormat,
+    undefined,
+    {
+      numberFormat: effectiveChrome.numberFormat,
+      currencySymbol: effectiveChrome.currencySymbol,
+      decimals: effectiveChrome.labelDecimals,
+      min: effectiveChrome.yAxisMin,
+      max: effectiveChrome.yAxisMax,
+      showGridLines: effectiveChrome.showGridLines,
+    },
   );
+  const xAxis = isHorizontal ? baseYAxis : baseXAxis;
+  const yAxis = isHorizontal ? baseXAxis : baseYAxis;
   const { dataZoom, grid } = applyDataZoom(
     resolved.dataZoom,
     resolved,

@@ -161,6 +161,19 @@ class ColorSettings(_Model):
     label_colors: dict[str, str] = Field(default_factory=dict)
 
 
+class CardStyle(_Model):
+    # Optional card background color (CSS color or token).
+    background_color: str | None = Field(default=None, max_length=64)
+    # Render the card without its outer border/padding chrome.
+    borderless: bool = False
+    # Hide the title for this node.
+    hide_title: bool = False
+    # Per-node title alignment override.
+    title_align: Literal["left", "center", "right"] | None = None
+    # Optional subtitle shown under the widget title.
+    subtitle: str | None = Field(default=None, max_length=250)
+
+
 class DisplaySettings(_Model):
     # Show when each widget's data was last refreshed.
     show_timestamps: bool = False
@@ -168,6 +181,8 @@ class DisplaySettings(_Model):
     title_align: Literal["left", "center", "right"] = "left"
     # Nodes shown without the title above them.
     hidden_titles: list[str] = Field(default_factory=list)
+    # Per-node visual styling overrides keyed by nodeId.
+    card_styles: dict[str, CardStyle] = Field(default_factory=dict)
 
 
 class CrossFilterSettings(_Model):

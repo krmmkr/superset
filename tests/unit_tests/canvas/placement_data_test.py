@@ -617,3 +617,18 @@ def test_normalize_time_grain_and_format_temporal_rows() -> None:
         "2004-01-01",
         "2004-04-01 14:30",
     ]
+
+
+def test_query_context_payload_metric_override_rewrites_orderby() -> None:
+    from superset.canvas.data import query_context_payload
+
+    binding = {
+        "datasetId": 13,
+        "metrics": ["total_sales", "order_count"],
+        "dimensions": ["product_line"],
+        "orderBy": [{"field": "total_sales", "descending": True}],
+    }
+    payload = query_context_payload(binding, metric="units_sold")
+    query = payload["queries"][0]
+    assert query["metrics"] == ["units_sold", "order_count"]
+    assert query["orderby"] == [["units_sold", False]]

@@ -102,6 +102,14 @@ export interface CanvasDefinition {
   settings: CanvasSettings;
 }
 
+export interface CardStyle {
+  backgroundColor?: string;
+  borderless?: boolean;
+  hideTitle?: boolean;
+  titleAlign?: 'left' | 'center' | 'right';
+  subtitle?: string;
+}
+
 export interface CanvasSettings {
   refresh: { interval: number; stagger: number; exempt: string[] };
   colors: { scheme?: string; labelColors: Record<string, string> };
@@ -109,6 +117,7 @@ export interface CanvasSettings {
     showTimestamps: boolean;
     titleAlign?: 'left' | 'center' | 'right';
     hiddenTitles?: string[];
+    cardStyles?: Record<string, CardStyle>;
   };
   crossFilters: { enabled: boolean };
 }

@@ -393,3 +393,37 @@ def test_canvas_settings_can_hide_a_title() -> None:
     )
 
     assert render_context(definition, rules, resolver)["titles"] == {"j": "chart-2"}
+
+
+def test_canvas_card_styles_hide_title_and_preserve_options() -> None:
+    rules = canvas_widget_types()
+    resolver = FakeResolver()
+    definition = normalize_definition(
+        {
+            **canvas({"k": node("chart-1"), "j": node("chart-2")}),
+            "settings": {
+                "display": {
+                    "cardStyles": {
+                        "k": {
+                            "hideTitle": True,
+                            "backgroundColor": "#f5f7fa",
+                            "borderless": True,
+                            "titleAlign": "center",
+                            "subtitle": "FY26",
+                        }
+                    }
+                }
+            },
+        },
+        rules,
+        resolver,
+    )
+
+    assert render_context(definition, rules, resolver)["titles"] == {"j": "chart-2"}
+    assert definition["settings"]["display"]["cardStyles"]["k"] == {
+        "backgroundColor": "#f5f7fa",
+        "borderless": True,
+        "hideTitle": True,
+        "titleAlign": "center",
+        "subtitle": "FY26",
+    }

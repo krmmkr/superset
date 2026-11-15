@@ -314,6 +314,34 @@ class AgGridTableControls(BaseModel):
         title="Sortable columns",
         description="Allow clicking column headers to sort rows.",
     )
+    cross_filter: bool = Field(
+        default=False,
+        alias="crossFilter",
+        title="Emit cross-filter",
+        description=(
+            "Click a table row to filter other widgets in scope by the first dimension."
+        ),
+    )
+    searchable: bool = Field(
+        default=False,
+        title="Show search box",
+        description="Display a quick-filter search input above the table.",
+    )
+    density: Literal["compact", "normal", "comfortable"] = Field(
+        default="compact",
+        title="Row density",
+        description="Vertical spacing for table rows.",
+        json_schema_extra={
+            "x-control": "select",
+            "x-options": ["compact", "normal", "comfortable"],
+        },
+    )
+    wrap_text: bool = Field(
+        default=False,
+        alias="wrapText",
+        title="Wrap cell text",
+        description="Wrap long cell values across multiple lines instead of clipping.",
+    )
 
 
 class SeriesStyle(BaseModel):
@@ -722,6 +750,77 @@ class EchartsChrome(BaseModel):
             "Optional Parameter widget name whose value overrides the first "
             "grouping dimension."
         ),
+    )
+    metric_param: str = Field(
+        default="",
+        alias="metricParam",
+        title="Metric parameter",
+        description=(
+            "Optional Parameter widget name whose value overrides the first metric."
+        ),
+    )
+    number_format: Literal["none", "compact", "currency", "percent"] = Field(
+        default="none",
+        alias="numberFormat",
+        title="Number format",
+        description=(
+            "Compact number formatting applied to value axis ticks, data "
+            "labels, and tooltips."
+        ),
+        json_schema_extra={
+            "x-control": "select",
+            "x-options": ["none", "compact", "currency", "percent"],
+        },
+    )
+    currency_symbol: str = Field(
+        default="$",
+        alias="currencySymbol",
+        title="Currency symbol",
+        description="Prefix symbol used when `numberFormat` is 'currency'.",
+    )
+    above_target_color: str = Field(
+        default="",
+        alias="aboveTargetColor",
+        title="Above-target color",
+        description="Color for bars/points at or above `targetParam`.",
+        json_schema_extra={"x-control": "color"},
+    )
+    below_target_color: str = Field(
+        default="",
+        alias="belowTargetColor",
+        title="Below-target color",
+        description="Color for bars/points below `targetParam`.",
+        json_schema_extra={"x-control": "color"},
+    )
+    stack: bool = Field(
+        default=False,
+        title="Stack series",
+        description="Stack Cartesian bar/line/area series on the same stack group.",
+    )
+    horizontal: bool = Field(
+        default=False,
+        title="Horizontal bars",
+        description=(
+            "Swap X and Y axes on Cartesian charts so bars render horizontally."
+        ),
+    )
+    y_axis_min: float | None = Field(
+        default=None,
+        alias="yAxisMin",
+        title="Y axis minimum",
+        description="Optional fixed lower bound for the value axis.",
+    )
+    y_axis_max: float | None = Field(
+        default=None,
+        alias="yAxisMax",
+        title="Y axis maximum",
+        description="Optional fixed upper bound for the value axis.",
+    )
+    show_grid_lines: bool = Field(
+        default=True,
+        alias="showGridLines",
+        title="Show grid lines",
+        description="Uncheck to hide value-axis split grid lines.",
     )
 
 
@@ -1146,10 +1245,45 @@ class PivotTableControls(BaseModel):
         alias="crossFilter",
         title="Cross-filter on click",
         description=(
-            "Emit a cross-filter when a row dimension cell is clicked. "
-            "Clicking the same value again clears it."
+            "Emit a cross-filter when a row dimension cell or data cell is clicked. "
+            "Clicking the same cell again clears it."
         ),
     )
+    display_mode: Literal["value", "row_percent", "col_percent", "total_percent"] = (
+        Field(
+            default="value",
+            alias="displayMode",
+            title="Display mode",
+            description=(
+                "Show raw values or percentages of row, column, or grand total."
+            ),
+            json_schema_extra={
+                "x-control": "select",
+                "x-options": ["value", "row_percent", "col_percent", "total_percent"],
+            },
+        )
+    )
+    compact_numbers: bool = Field(
+        default=False,
+        alias="compactNumbers",
+        title="Compact numbers",
+        description="Abbreviate large numbers (e.g. 1.2M, 450K).",
+    )
+    freeze_row_fields: bool = Field(
+        default=True,
+        alias="freezeRowFields",
+        title="Freeze row columns",
+        description=(
+            "Pin row dimension columns on the left when scrolling horizontally."
+        ),
+    )
+
+
+class ParameterOption(BaseModel):
+    """Display label and emitted value for a ``parameter`` select option."""
+
+    label: str = Field(min_length=1, title="Label")
+    value: bool | str | int | float = Field(title="Value")
 
 
 class ParameterControls(BaseModel):
@@ -1202,8 +1336,10 @@ class ParameterControls(BaseModel):
         title="Maximum value",
     )
     step: float = Field(default=1, gt=0, title="Step")
-    options: list[str] = Field(
+    options: list[str | ParameterOption] = Field(
         default_factory=list,
         title="Options",
-        description="Selectable values when inputType is 'select'.",
+        description=(
+            "Selectable values (or `{label, value}` pairs) when inputType is 'select'."
+        ),
     )

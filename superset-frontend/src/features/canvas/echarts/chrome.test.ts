@@ -300,3 +300,59 @@ test('scrollMode none leaves option unchanged, zoombar and scrollbar configure d
   ]);
   expect(scrollbar.grid).toEqual({ containLabel: true, bottom: 32 });
 });
+
+test('numberFormat, stack, horizontal, axis bounds, gridLines, and target colors apply cleanly', () => {
+  const raw = {
+    xAxis: { type: 'category', data: ['Q1', 'Q2', 'Q3'] },
+    yAxis: { type: 'value' },
+    series: [{ type: 'bar', data: [800_000, 1_500_000, 2_200_000] }],
+  };
+
+  const out = applyStructuredChrome(
+    raw,
+    {
+      numberFormat: 'currency',
+      currencySymbol: '$',
+      labelShow: true,
+      stack: true,
+      horizontal: true,
+      yAxisMin: 0,
+      yAxisMax: 3_000_000,
+      showGridLines: false,
+      aboveTargetColor: '#2e7d32',
+      belowTargetColor: '#d32f2f',
+      targetParam: 'Goal',
+    },
+    1_000_000,
+  );
+
+  // Horizontal swaps category/value axes; value bounds & gridlines land on xAxis.
+  const xAxis = out.xAxis as {
+    type: string;
+    min: number;
+    max: number;
+    splitLine: { show: boolean };
+    axisLabel: { formatter: (v: unknown) => string };
+  };
+  const yAxis = out.yAxis as { type: string };
+  expect(xAxis.type).toBe('value');
+  expect(yAxis.type).toBe('category');
+  expect(xAxis.min).toBe(0);
+  expect(xAxis.max).toBe(3_000_000);
+  expect(xAxis.splitLine).toEqual({ show: false });
+  expect(xAxis.axisLabel.formatter(1_500_000)).toBe('$1.5M');
+
+  const tooltip = out.tooltip as { valueFormatter: (v: unknown) => string };
+  expect(tooltip.valueFormatter(450_000)).toBe('$450K');
+
+  const series = (out.series as Record<string, unknown>[])[0];
+  expect(series.stack).toBe('total');
+  expect(series.markLine).toMatchObject({
+    data: [{ xAxis: 1_000_000, name: 'Goal' }],
+  });
+  expect(series.data).toEqual([
+    { value: 800_000, itemStyle: { color: '#d32f2f' } },
+    { value: 1_500_000, itemStyle: { color: '#2e7d32' } },
+    { value: 2_200_000, itemStyle: { color: '#2e7d32' } },
+  ]);
+});

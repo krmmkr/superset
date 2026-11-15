@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { canvas as canvasApi } from '@apache-superset/core';
 import { t } from '@apache-superset/core/translation';
 import { css, styled, useTheme } from '@apache-superset/core/theme';
 import {
   Button,
   Empty,
+  Input,
   Loading,
   Table,
   TableSize,
@@ -64,12 +65,14 @@ const Tile = styled.div<{
     gap: ${theme.sizeUnit}px;
     opacity: ${$refreshing ? 0.55 : 1};
     transition: opacity 0.15s ease;
-    ${$accentColor
-      ? css`
-          border-left: 3px solid ${$accentColor};
-          padding-left: ${theme.sizeUnit * 2.5}px;
-        `
-      : ''}
+    ${
+      $accentColor
+        ? css`
+            border-left: 3px solid ${$accentColor};
+            padding-left: ${theme.sizeUnit * 2.5}px;
+          `
+        : ''
+    }
   `}
 `;
 
@@ -256,7 +259,8 @@ export function MetricTileRenderer(widget: Props) {
   const { props, filters, refreshKey } = widget;
   const { rows, loading, error, query, language, datasource, retry } =
     useWidgetRows(widget, filters, refreshKey);
-  if (loading && rows.length === 0) return <Loading position="inline-centered" />;
+  if (loading && rows.length === 0)
+    return <Loading position="inline-centered" />;
   if (error) return <WidgetError message={error} onRetry={retry} />;
   const row = rows[0] ?? {};
   const binding = props?.dataBinding as
@@ -273,7 +277,9 @@ export function MetricTileRenderer(widget: Props) {
         ? (firstMetric as { label: string }).label
         : undefined;
   const dimensionSet = new Set(
-    (binding?.dimensions ?? []).filter((d): d is string => typeof d === 'string'),
+    (binding?.dimensions ?? []).filter(
+      (d): d is string => typeof d === 'string',
+    ),
   );
   const column =
     (metricLabel && typeof row[metricLabel] === 'number'
@@ -286,9 +292,7 @@ export function MetricTileRenderer(widget: Props) {
   const value = column ? (row[column] as number) : undefined;
   const decimals = typeof props?.decimals === 'number' ? props.decimals : 0;
   const series = column
-    ? rows
-        .map(r => r[column])
-        .filter((v): v is number => typeof v === 'number')
+    ? rows.map(r => r[column]).filter((v): v is number => typeof v === 'number')
     : [];
   const prevValue = series.length >= 2 ? series[1] : undefined;
   const showDelta =
@@ -391,7 +395,10 @@ export function MetricTileRenderer(widget: Props) {
             aria-valuemax={100}
             aria-label={t('Target progress')}
           >
-            <ProgressFill $pct={progressPct} $color={accentColor || undefined} />
+            <ProgressFill
+              $pct={progressPct}
+              $color={accentColor || undefined}
+            />
           </ProgressTrack>
         )}
         {showSparkline && (
@@ -430,22 +437,73 @@ const StyledTableWrap = styled.div<{
   $headerBgColor?: string;
   $headerTextColor?: string;
   $striped?: boolean;
+  $density?: 'compact' | 'normal' | 'comfortable';
+  $wrapText?: boolean;
+  $crossFilter?: boolean;
 }>`
-  ${({ theme, $headerBgColor, $headerTextColor, $striped }) => css`
-    ${($headerBgColor || $headerTextColor) &&
-    css`
-      && .ant-table-thead > tr > th,
-      && .ant-table-thead > tr > td {
-        ${$headerBgColor ? `background: ${$headerBgColor};` : ''}
-        ${$headerTextColor ? `color: ${$headerTextColor};` : ''}
-      }
-    `}
-    ${$striped &&
-    css`
-      && .ant-table-tbody > tr:nth-of-type(even) > td {
-        background: ${theme.colorFillAlter};
-      }
-    `}
+  ${({
+    theme,
+    $headerBgColor,
+    $headerTextColor,
+    $striped,
+    $density,
+    $wrapText,
+    $crossFilter,
+  }) => css`
+    ${
+      ($headerBgColor || $headerTextColor) &&
+      css`
+        && .ant-table-thead > tr > th,
+        && .ant-table-thead > tr > td {
+          ${$headerBgColor ? `background: ${$headerBgColor};` : ''}
+          ${$headerTextColor ? `color: ${$headerTextColor};` : ''}
+        }
+      `
+    }
+    ${
+      $striped &&
+      css`
+        && .ant-table-tbody > tr:nth-of-type(even) > td {
+          background: ${theme.colorFillAlter};
+        }
+      `
+    }
+    ${
+      $density === 'comfortable' &&
+      css`
+        && .ant-table-tbody > tr > td {
+          padding-top: ${theme.sizeUnit * 3.5}px;
+          padding-bottom: ${theme.sizeUnit * 3.5}px;
+        }
+      `
+    }
+    ${
+      $wrapText &&
+      css`
+        && .ant-table-cell {
+          white-space: normal;
+          word-break: break-word;
+        }
+      `
+    }
+    ${
+      $crossFilter &&
+      css`
+        && .ant-table-tbody > tr {
+          cursor: pointer;
+        }
+        && .ant-table-tbody > tr.canvas-row-cross-active > td {
+          background: ${theme.colorPrimaryBg};
+          font-weight: ${theme.fontWeightStrong};
+        }
+      `
+    }
+  `}
+`;
+
+const TableSearchWrap = styled.div`
+  ${({ theme }) => css`
+    margin-bottom: ${theme.sizeUnit * 2}px;
   `}
 `;
 
@@ -459,10 +517,16 @@ const ConditionalCell = styled.span`
 
 /** The query's rows as a table; `columnDefs` picks and names the columns. */
 export function TableRenderer(widget: Props) {
-  const { props, filters, refreshKey } = widget;
+  const { props, filters, crossFilters, refreshKey, setCrossFilter } = widget;
   const theme = useTheme();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeCrossVal, setActiveCrossVal] = useState<string | null>(null);
+  const effectiveFilters = useMemo(
+    () => [...filters, ...(crossFilters ?? [])],
+    [filters, crossFilters],
+  );
   const { rows, loading, error, query, language, datasource, retry } =
-    useWidgetRows(widget, filters, refreshKey);
+    useWidgetRows(widget, effectiveFilters, refreshKey);
   const defs = (props?.columnDefs ?? []) as ColumnFormatDef[];
   const baseRules = Array.isArray(props?.conditionalFormatting)
     ? (props.conditionalFormatting as ConditionalFormatRule[])
@@ -482,8 +546,18 @@ export function TableRenderer(widget: Props) {
     const rules: ConditionalFormatRule[] =
       Number.isFinite(thresholdNum) && firstNumCol
         ? [
-            { column: firstNumCol, operator: 'gte', value: thresholdNum, tone: 'success' },
-            { column: firstNumCol, operator: 'lt', value: thresholdNum, tone: 'warning' },
+            {
+              column: firstNumCol,
+              operator: 'gte',
+              value: thresholdNum,
+              tone: 'success',
+            },
+            {
+              column: firstNumCol,
+              operator: 'lt',
+              value: thresholdNum,
+              tone: 'warning',
+            },
             ...baseRules,
           ]
         : baseRules;
@@ -538,6 +612,56 @@ export function TableRenderer(widget: Props) {
   const headerBgColor = text(props?.headerBgColor);
   const headerTextColor = text(props?.headerTextColor);
   const striped = Boolean(props?.striped);
+  const searchable = Boolean(props?.searchable);
+  const wrapText = Boolean(props?.wrapText);
+  const density =
+    props?.density === 'normal' || props?.density === 'comfortable'
+      ? props.density
+      : 'compact';
+  const crossFilterEnabled = Boolean(props?.crossFilter);
+  const binding = props?.dataBinding as
+    | { datasetId?: unknown; dimensions?: unknown[] }
+    | undefined;
+  const firstDim =
+    (Array.isArray(binding?.dimensions) &&
+    typeof binding.dimensions[0] === 'string'
+      ? binding.dimensions[0]
+      : undefined) || (columns[0]?.key as string | undefined);
+  const datasetId = binding?.datasetId;
+
+  const visibleRows = useMemo(() => {
+    const trimmed = searchTerm.trim().toLowerCase();
+    if (!searchable || !trimmed) return rows;
+    return rows.filter(row =>
+      columns.some(col => {
+        const val = row[col.key];
+        return (
+          val !== null &&
+          val !== undefined &&
+          String(val).toLowerCase().includes(trimmed)
+        );
+      }),
+    );
+  }, [rows, columns, searchable, searchTerm]);
+
+  const handleRowClick = (record: Record<string, unknown>) => {
+    if (!crossFilterEnabled || !firstDim || !setCrossFilter) return;
+    const rawVal = record[firstDim];
+    if (rawVal === null || rawVal === undefined) return;
+    const val = String(rawVal);
+    if (activeCrossVal === val) {
+      setActiveCrossVal(null);
+      setCrossFilter(undefined);
+    } else {
+      setActiveCrossVal(val);
+      setCrossFilter({
+        ...(typeof datasetId === 'number' ? { datasetId } : {}),
+        column: firstDim,
+        values: [val],
+      });
+    }
+  };
+
   return (
     <WithQuery
       query={query}
@@ -546,20 +670,47 @@ export function TableRenderer(widget: Props) {
       rows={rows}
       title={text(props?.label) || undefined}
     >
+      {searchable && (
+        <TableSearchWrap>
+          <Input.Search
+            allowClear
+            size="small"
+            placeholder={t('Search rows...')}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </TableSearchWrap>
+      )}
       <StyledTableWrap
         $headerBgColor={headerBgColor || undefined}
         $headerTextColor={headerTextColor || undefined}
         $striped={striped}
+        $density={density}
+        $wrapText={wrapText}
+        $crossFilter={crossFilterEnabled}
         data-striped={striped ? 'true' : undefined}
       >
         <Table
-          data={rows.map((row, index) => ({ key: index, ...row }))}
+          data={visibleRows.map((row, index) => ({ key: index, ...row }))}
           columns={columns}
           loading={loading}
-          size={TableSize.Small}
+          size={density === 'compact' ? TableSize.Small : TableSize.Middle}
           usePagination={pageSize > 0}
           defaultPageSize={pageSize > 0 ? pageSize : undefined}
           sticky
+          onRow={
+            crossFilterEnabled
+              ? (record: Record<string, unknown>) => ({
+                  onClick: () => handleRowClick(record),
+                  className:
+                    firstDim &&
+                    activeCrossVal !== null &&
+                    String(record[firstDim] ?? '') === activeCrossVal
+                      ? 'canvas-row-cross-active'
+                      : undefined,
+                })
+              : undefined
+          }
         />
       </StyledTableWrap>
     </WithQuery>
