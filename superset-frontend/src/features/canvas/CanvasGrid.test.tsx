@@ -1311,3 +1311,29 @@ test('quick widget settings popover dispatches set_props preserving existing pro
     },
   ]);
 });
+
+test('scope source filter icon tooltip lists target widget names', async () => {
+  const titledResult: CanvasDefinitionResult = {
+    ...result,
+    titles: { ...result.titles, c1: 'Revenue Chart' },
+  };
+  const { container } = render(
+    <CanvasGrid
+      canvasId={7}
+      result={titledResult}
+      values={emptyScopeValues()}
+      onValueChange={jest.fn()}
+      layout={layoutOf(titledResult)}
+    />,
+  );
+  const filterNode = container.querySelector(
+    '[data-node-id="f"]',
+  ) as HTMLElement;
+  const icon = filterNode.querySelector(
+    '[data-test="canvas-scope-source-icon"]',
+  ) as HTMLElement;
+  fireEvent.mouseOver(icon);
+
+  expect(await screen.findByText('Affects 1 widget(s):')).toBeInTheDocument();
+  expect(await screen.findByText('• Revenue Chart')).toBeInTheDocument();
+});

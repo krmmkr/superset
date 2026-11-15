@@ -1040,7 +1040,10 @@ export default function CanvasGrid({
             : undefined
         }
       >
-        {(effectiveTitle || (mark && mark !== 'removed') || canQuickEdit) && (
+        {(effectiveTitle ||
+          (mark && mark !== 'removed') ||
+          canQuickEdit ||
+          isScopeSource) && (
           <TitleRow $align={titleAlign}>
             {isEditingTitle ? (
               <Input
@@ -1213,7 +1216,18 @@ export default function CanvasGrid({
             )}
             {isScopeSource && (
               <Tooltip
-                title={t('Affects %s widget(s)', sourceTargets?.length ?? 0)}
+                title={
+                  <div>
+                    <div>
+                      {t('Affects %s widget(s):', sourceTargets?.length ?? 0)}
+                    </div>
+                    {(sourceTargets ?? []).map(targetId => (
+                      <div key={targetId}>
+                        {`• ${titles[targetId] || widgetTypes[targetId] || targetId}`}
+                      </div>
+                    ))}
+                  </div>
+                }
               >
                 <span
                   data-test="canvas-scope-source-icon"
