@@ -308,6 +308,12 @@ class _Validator:
                         pointer("settings", section, key, index),
                         f"unknown node {node_id!r}",
                     )
+        for node_id in doc["settings"]["display"].get("cardStyles", {}):
+            if node_id not in doc["nodes"]:
+                self.fail(
+                    pointer("settings", "display", "cardStyles", node_id),
+                    f"unknown node {node_id!r}",
+                )
 
     def _resolve_layouts(self, doc: dict[str, Any]) -> None:
         # Deepest containers first: each grows to fit its children before its

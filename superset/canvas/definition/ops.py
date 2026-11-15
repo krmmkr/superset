@@ -554,6 +554,13 @@ class _Applier:
             if len(kept) != len(listed):
                 values[key] = kept
                 touched.append(Touch(SETTINGS_ID, group))
+        card_styles = settings.get("display", {}).get("cardStyles")
+        if isinstance(card_styles, dict):
+            stale = [node_id for node_id in card_styles if node_id in removed]
+            for node_id in stale:
+                del card_styles[node_id]
+            if stale:
+                touched.append(Touch(SETTINGS_ID, FieldGroup.DISPLAY))
         return touched
 
     def move(self, op: MoveOp, logged: dict[str, Any]) -> AppliedOperation:

@@ -296,8 +296,16 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
       : dimensions[activeDimIndex];
 
   const effectiveProps = useMemo(() => {
+    const baseMetrics = binding?.metrics ?? [];
     const nextMetrics = paramMetric
-      ? [paramMetric, ...(binding?.metrics ?? []).slice(1)]
+      ? [
+          ...(baseMetrics.some(m => metricLabel(m) === paramMetric)
+            ? baseMetrics
+                .filter(m => metricLabel(m) === paramMetric)
+                .slice(0, 1)
+            : [paramMetric]),
+          ...baseMetrics.slice(1).filter(m => metricLabel(m) !== paramMetric),
+        ]
       : binding?.metrics;
     if (drillEnabled && drillPath.length > 0 && activeDim) {
       return {

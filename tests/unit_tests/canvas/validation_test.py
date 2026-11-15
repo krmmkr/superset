@@ -311,6 +311,17 @@ def test_hidden_titles_must_be_nodes() -> None:
     assert found == [("/settings/display/hiddenTitles/0", "unknown node 'b'")]
 
 
+def test_card_styles_keys_must_be_nodes() -> None:
+    found = issues(
+        {
+            **canvas({"a": node("chart")}),
+            "settings": {"display": {"cardStyles": {"b": {"borderless": True}}}},
+        }
+    )
+
+    assert found == [("/settings/display/cardStyles/b", "unknown node 'b'")]
+
+
 def test_settings_are_validated() -> None:
     found = issues(
         {

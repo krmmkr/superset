@@ -21,6 +21,7 @@ import {
   computeColumnBounds,
   evaluateConditionalStyle,
   formatCellValue,
+  formatDatePattern,
 } from './conditionalFormatting';
 
 const mockTheme = {
@@ -46,28 +47,57 @@ test('evaluateConditionalStyle applies threshold tones, contains, and colorScale
   const bounds = computeColumnBounds(rows, ['sales']);
 
   const rules = [
-    { column: 'sales', operator: 'gte' as const, value: 800, tone: 'success' as const },
-    { column: 'sales', operator: 'between' as const, value: 300, valueTo: 799, tone: 'info' as const },
-    { column: 'sales', operator: 'lt' as const, value: 300, tone: 'warning' as const },
-    { column: 'status', operator: 'contains' as const, value: 'Cancel', tone: 'error' as const },
+    {
+      column: 'sales',
+      operator: 'gte' as const,
+      value: 800,
+      tone: 'success' as const,
+    },
+    {
+      column: 'sales',
+      operator: 'between' as const,
+      value: 300,
+      valueTo: 799,
+      tone: 'info' as const,
+    },
+    {
+      column: 'sales',
+      operator: 'lt' as const,
+      value: 300,
+      tone: 'warning' as const,
+    },
+    {
+      column: 'status',
+      operator: 'contains' as const,
+      value: 'Cancel',
+      tone: 'error' as const,
+    },
   ];
 
-  expect(evaluateConditionalStyle(950, rules, 'sales', bounds, mockTheme)).toEqual({
+  expect(
+    evaluateConditionalStyle(950, rules, 'sales', bounds, mockTheme),
+  ).toEqual({
     color: '#135200',
     backgroundColor: '#f6ffed',
     fontWeight: 500,
   });
-  expect(evaluateConditionalStyle(500, rules, 'sales', bounds, mockTheme)).toEqual({
+  expect(
+    evaluateConditionalStyle(500, rules, 'sales', bounds, mockTheme),
+  ).toEqual({
     color: '#0050b3',
     backgroundColor: '#e6f4ff',
     fontWeight: 500,
   });
-  expect(evaluateConditionalStyle(100, rules, 'sales', bounds, mockTheme)).toEqual({
+  expect(
+    evaluateConditionalStyle(100, rules, 'sales', bounds, mockTheme),
+  ).toEqual({
     color: '#ad6800',
     backgroundColor: '#fffbe6',
     fontWeight: 500,
   });
-  expect(evaluateConditionalStyle('Cancelled', rules, 'status', bounds, mockTheme)).toEqual({
+  expect(
+    evaluateConditionalStyle('Cancelled', rules, 'status', bounds, mockTheme),
+  ).toEqual({
     color: '#a8071a',
     backgroundColor: '#fff1f0',
     fontWeight: 500,
@@ -81,4 +111,13 @@ test('evaluateConditionalStyle applies threshold tones, contains, and colorScale
     mockTheme,
   );
   expect(heatStyle?.backgroundColor).toBe('rgba(24, 144, 255, 0.40)');
+});
+
+test('formatDatePattern handles epoch ms numbers and stringified epoch ms', () => {
+  expect(formatDatePattern(1041379200000, 'YYYY-MM-DD')).toBe('2003-01-01');
+  expect(formatDatePattern('1041379200000', 'YYYY-MM-DD')).toBe('2003-01-01');
+  expect(formatDatePattern('2003-01-01T00:00:00', 'YYYY-MM-DD')).toBe(
+    '2003-01-01',
+  );
+  expect(formatDatePattern('not-a-date', 'YYYY-MM-DD')).toBe('not-a-date');
 });

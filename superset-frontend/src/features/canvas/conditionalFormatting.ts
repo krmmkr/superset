@@ -74,11 +74,15 @@ export function formatDatePattern(value: unknown, pattern: string): string {
   if (value === null || value === undefined || !pattern) {
     return value === null || value === undefined ? '' : String(value);
   }
+  const normalized =
+    typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value.trim())
+      ? Number(value.trim())
+      : value;
   const date =
-    value instanceof Date
-      ? value
-      : typeof value === 'number' || typeof value === 'string'
-        ? new Date(value)
+    normalized instanceof Date
+      ? normalized
+      : typeof normalized === 'number' || typeof normalized === 'string'
+        ? new Date(normalized)
         : null;
   if (!date || Number.isNaN(date.getTime())) return String(value);
   const yyyy = String(date.getUTCFullYear());
@@ -156,11 +160,20 @@ function toneColors(
 ): { color?: string; backgroundColor?: string } {
   switch (tone) {
     case 'success':
-      return { color: theme.colorSuccessText, backgroundColor: theme.colorSuccessBg };
+      return {
+        color: theme.colorSuccessText,
+        backgroundColor: theme.colorSuccessBg,
+      };
     case 'warning':
-      return { color: theme.colorWarningText, backgroundColor: theme.colorWarningBg };
+      return {
+        color: theme.colorWarningText,
+        backgroundColor: theme.colorWarningBg,
+      };
     case 'error':
-      return { color: theme.colorErrorText, backgroundColor: theme.colorErrorBg };
+      return {
+        color: theme.colorErrorText,
+        backgroundColor: theme.colorErrorBg,
+      };
     case 'info':
       return { color: theme.colorInfoText, backgroundColor: theme.colorInfoBg };
     default:
@@ -222,7 +235,8 @@ export function evaluateConditionalStyle(
       const range = bounds[column];
       if (!Number.isFinite(num) || !range) continue;
       const span = range.max - range.min;
-      const ratio = span > 0 ? Math.max(0, Math.min(1, (num - range.min) / span)) : 0.5;
+      const ratio =
+        span > 0 ? Math.max(0, Math.min(1, (num - range.min) / span)) : 0.5;
       const alpha = (0.08 + ratio * 0.32).toFixed(2);
       return {
         backgroundColor: rule.backgroundColor || `rgba(24, 144, 255, ${alpha})`,

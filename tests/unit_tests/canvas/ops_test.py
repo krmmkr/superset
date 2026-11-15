@@ -921,3 +921,20 @@ def test_removing_a_node_drops_its_hidden_title() -> None:
 
     assert result["settings"]["display"]["hiddenTitles"] == []
     assert Touch(SETTINGS_ID, FieldGroup.DISPLAY) in applied[0].touched
+
+
+def test_removing_a_node_drops_its_card_style() -> None:
+    doc = build(
+        add("chart-1"),
+        add("chart-2"),
+        {
+            "op": "set_settings",
+            "key": "display",
+            "value": {"cardStyles": {"n0": {"borderless": True}}},
+        },
+    )
+
+    result, applied = apply(doc, {"op": "remove", "id": "n0"})
+
+    assert result["settings"]["display"]["cardStyles"] == {}
+    assert Touch(SETTINGS_ID, FieldGroup.DISPLAY) in applied[0].touched

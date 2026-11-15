@@ -356,11 +356,18 @@ function applyDataZoom(
     return { dataZoom: existing, grid: resolved.grid };
   }
 
+  const isHorizontal = Boolean(chrome.horizontal);
+  const axisIndexKey = isHorizontal ? 'yAxisIndex' : 'xAxisIndex';
   const xAxisRecord = asRecord(firstEntry(resolved.xAxis));
+  const yAxisRecord = asRecord(firstEntry(resolved.yAxis));
   const xData = Array.isArray(xAxisRecord.data) ? xAxisRecord.data : undefined;
+  const yData = Array.isArray(yAxisRecord.data) ? yAxisRecord.data : undefined;
   const firstSeries = asRecord(firstEntry(resolved.series));
   const sData = Array.isArray(firstSeries.data) ? firstSeries.data : undefined;
-  const categoryCount = xData?.length ?? sData?.length ?? 0;
+  const categoryCount =
+    (isHorizontal ? (yData?.length ?? xData?.length) : xData?.length) ??
+    sData?.length ??
+    0;
 
   const hasVisibleBars =
     typeof chrome.visibleBars === 'number' && chrome.visibleBars >= 1;
@@ -371,24 +378,26 @@ function applyDataZoom(
       ? { startValue: 0, endValue: windowSize - 1 }
       : {};
 
+  const placement = isHorizontal ? { right: 6 } : { bottom: 8 };
+  const thickness = isHorizontal ? { width: 10 } : { height: 10 };
   const slider: Record<string, unknown> =
     mode === 'scrollbar'
       ? {
           type: 'slider',
-          xAxisIndex: 0,
+          [axisIndexKey]: 0,
           zoomLock: true,
           showDetail: false,
           showDataShadow: false,
           brushSelect: false,
-          height: 10,
-          bottom: 8,
+          ...thickness,
+          ...placement,
           filterMode: 'none',
           ...windowBounds,
         }
       : {
           type: 'slider',
-          xAxisIndex: 0,
-          bottom: 8,
+          [axisIndexKey]: 0,
+          ...placement,
           filterMode: 'none',
           ...windowBounds,
         };
@@ -397,7 +406,7 @@ function applyDataZoom(
     mode === 'scrollbar'
       ? {
           type: 'inside',
-          xAxisIndex: 0,
+          [axisIndexKey]: 0,
           zoomOnMouseWheel: false,
           moveOnMouseMove: true,
           moveOnMouseWheel: true,
@@ -405,17 +414,18 @@ function applyDataZoom(
         }
       : {
           type: 'inside',
-          xAxisIndex: 0,
+          [axisIndexKey]: 0,
           filterMode: 'none',
         };
 
   const existingGrid = asRecord(resolved.grid);
+  const gridEdge = isHorizontal ? 'right' : 'bottom';
   const nextGrid =
-    existingGrid.bottom === undefined
+    existingGrid[gridEdge] === undefined
       ? {
           ...existingGrid,
           containLabel: existingGrid.containLabel ?? true,
-          bottom: mode === 'scrollbar' ? 32 : 44,
+          [gridEdge]: mode === 'scrollbar' ? 32 : 44,
         }
       : resolved.grid;
 

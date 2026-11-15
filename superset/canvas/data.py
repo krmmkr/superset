@@ -143,7 +143,11 @@ def _apply_dimension_and_time_grain(
     effective_metrics = list(metrics)
     if metric:
         matched = next((m for m in metrics if label(m) == metric), metric)
-        effective_metrics = [matched, *metrics[1:]] if metrics else [matched]
+        matched_label = label(matched)
+        effective_metrics = [
+            matched,
+            *(m for m in metrics[1:] if label(m) != matched_label),
+        ]
 
     columns: list[Any] = [d for d in binding.get("dimensions") or [] if d]
     original_dim = columns[0] if columns and isinstance(columns[0], str) else None

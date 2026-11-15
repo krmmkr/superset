@@ -356,3 +356,30 @@ test('numberFormat, stack, horizontal, axis bounds, gridLines, and target colors
     { value: 2_200_000, itemStyle: { color: '#2e7d32' } },
   ]);
 });
+
+test('scrollMode targets yAxisIndex when horizontal is enabled', () => {
+  const out = applyStructuredChrome(
+    {
+      xAxis: { type: 'category', data: ['A', 'B', 'C', 'D', 'E'] },
+      yAxis: { type: 'value' },
+      series: [{ type: 'bar', data: [1, 2, 3, 4, 5] }],
+    },
+    {
+      horizontal: true,
+      scrollMode: 'scrollbar',
+      visibleBars: 3,
+    },
+  );
+  const dataZoom = out.dataZoom as Record<string, unknown>[];
+  expect(dataZoom[0]).toMatchObject({
+    type: 'slider',
+    yAxisIndex: 0,
+    startValue: 0,
+    endValue: 2,
+  });
+  expect(dataZoom[1]).toMatchObject({
+    type: 'inside',
+    yAxisIndex: 0,
+  });
+  expect((out.grid as Record<string, unknown>).right).toBe(32);
+});

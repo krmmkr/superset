@@ -632,3 +632,40 @@ def test_query_context_payload_metric_override_rewrites_orderby() -> None:
     query = payload["queries"][0]
     assert query["metrics"] == ["units_sold", "order_count"]
     assert query["orderby"] == [["units_sold", False]]
+
+
+def test_query_context_payload_metric_override_deduplicates_matched_metric() -> None:
+    from superset.canvas.data import query_context_payload
+
+    binding = {
+        "datasetId": 13,
+        "metrics": [
+            {
+                "expressionType": "SIMPLE",
+                "column": {"column_name": "sales"},
+                "aggregate": "SUM",
+                "label": "total_sales",
+            },
+            {
+                "expressionType": "SIMPLE",
+                "column": {"column_name": "quantity_ordered"},
+                "aggregate": "SUM",
+                "label": "units_sold",
+            },
+            {
+                "expressionType": "SIMPLE",
+                "column": {"column_name": "order_number"},
+                "aggregate": "COUNT_DISTINCT",
+                "label": "orders",
+            },
+        ],
+        "dimensions": ["product_line"],
+        "orderBy": [{"field": "total_sales", "descending": False}],
+    }
+    payload = query_context_payload(binding, metric="units_sold")
+    query = payload["queries"][0]
+    assert [m["label"] for m in query["metrics"]] == [
+        "units_sold",
+        "orders",
+    ]
+    assert query["orderby"][0][0]["label"] == "units_sold"
