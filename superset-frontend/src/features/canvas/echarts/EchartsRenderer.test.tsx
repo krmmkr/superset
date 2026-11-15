@@ -17,8 +17,10 @@
  * under the License.
  */
 import type { canvas as canvasApi } from '@apache-superset/core';
-import { render, screen } from 'spec/helpers/testing-library';
+import { render, screen, waitFor } from 'spec/helpers/testing-library';
 import EchartsRenderer from './EchartsRenderer';
+
+const mockOnHandlers: Record<string, (params: { name?: unknown }) => void> = {};
 
 jest.mock('../useWidgetRows', () => ({
   ...jest.requireActual('../useWidgetRows'),
@@ -36,7 +38,11 @@ jest.mock('echarts', () => ({
     setOption: jest.fn(),
     dispose: jest.fn(),
     resize: jest.fn(),
-    on: jest.fn(),
+    on: jest.fn(
+      (event: string, handler: (params: { name?: unknown }) => void) => {
+        mockOnHandlers[event] = handler;
+      },
+    ),
     off: jest.fn(),
   }),
 }));
@@ -64,4 +70,36 @@ test('the chart opts its canvas out of the widget drag', () => {
   expect(screen.getByTestId('canvas-echarts')).toHaveAttribute(
     'data-canvas-no-drag',
   );
+});
+
+test('clicking a bar toggles cross-filter via setCrossFilter with datasetId and values', async () => {
+  delete mockOnHandlers.click;
+  const setCrossFilter = jest.fn();
+  render(
+    <EchartsRenderer
+      {...widget}
+      props={{
+        crossFilter: true,
+        dataBinding: {
+          datasetId: 13,
+          dimensions: ['territory'],
+          metrics: ['sales'],
+        },
+        echartsOptions: {},
+      }}
+      setCrossFilter={setCrossFilter}
+    />,
+    { useRedux: true, useRouter: true },
+  );
+
+  await waitFor(() => expect(mockOnHandlers.click).toBeDefined());
+  mockOnHandlers.click({ name: 'EMEA' });
+  expect(setCrossFilter).toHaveBeenCalledWith({
+    datasetId: 13,
+    column: 'territory',
+    values: ['EMEA'],
+  });
+
+  mockOnHandlers.click({ name: 'EMEA' });
+  expect(setCrossFilter).toHaveBeenLastCalledWith(undefined);
 });

@@ -37,7 +37,7 @@ interface FilterChip {
   summary: string;
 }
 
-const Bar = styled.div`
+const Bar = styled.section`
   ${({ theme }) => css`
     display: flex;
     flex-wrap: wrap;
@@ -63,11 +63,20 @@ const KINDS: readonly ('filter' | 'crossFilter')[] = ['filter', 'crossFilter'];
 function formatValue(raw: unknown): { column?: string; text: string } | null {
   if (raw === undefined || raw === null) return null;
   if (Array.isArray(raw)) {
-    return raw.length > 0 ? { text: raw.map(String).join(', ') } : null;
+    if (raw.length === 0) return null;
+    if (raw.some(item => typeof item === 'object' && item !== null)) {
+      const parts = raw
+        .map(item => formatValue(item))
+        .filter((v): v is { column?: string; text: string } => v !== null)
+        .map(v => (v.column ? `${v.column}: ${v.text}` : v.text));
+      return parts.length > 0 ? { text: parts.join(' · ') } : null;
+    }
+    return { text: raw.map(String).join(', ') };
   }
   if (typeof raw === 'object') {
     const record = raw as Record<string, unknown>;
-    const column = typeof record.column === 'string' ? record.column : undefined;
+    const column =
+      typeof record.column === 'string' ? record.column : undefined;
     if (typeof record.timeRange === 'string') {
       return record.timeRange ? { column, text: record.timeRange } : null;
     }
@@ -75,7 +84,11 @@ function formatValue(raw: unknown): { column?: string; text: string } | null {
       if (record.values.length === 0) return null;
       return { column, text: record.values.map(String).join(', ') };
     }
-    if ('value' in record && record.value !== undefined && record.value !== null) {
+    if (
+      'value' in record &&
+      record.value !== undefined &&
+      record.value !== null
+    ) {
       return { column, text: String(record.value) };
     }
     const keys = Object.keys(record);
@@ -115,7 +128,7 @@ export default function ActiveFiltersBar({
   if (chips.length === 0) return null;
 
   return (
-    <Bar role="region" aria-label={t('Active filters')}>
+    <Bar aria-label={t('Active filters')}>
       <Label type="secondary">
         <Icons.FilterOutlined iconSize="s" />
         {t('Active filters')}

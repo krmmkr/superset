@@ -85,3 +85,19 @@ test('reads the placement data route, with the draft token in a header', async (
   });
   fetchMock.removeRoutes();
 });
+
+test('runtimeFilters flattens array cross-filter payloads (e.g. pivot cell)', () => {
+  expect(
+    runtimeFilters([
+      {
+        value: [
+          { datasetId: 13, column: 'territory', values: ['NA'] },
+          { datasetId: 13, column: 'product_line', values: ['Classic Cars'] },
+        ],
+      },
+    ]),
+  ).toEqual([
+    { datasetId: 13, column: 'territory', values: ['NA'] },
+    { datasetId: 13, column: 'product_line', values: ['Classic Cars'] },
+  ]);
+});

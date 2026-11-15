@@ -163,7 +163,10 @@ test('tooltipShow, tooltipFormat, and series data label customizations merge cle
   ]);
 
   const hiddenTooltip = applyStructuredChrome(raw, { tooltipShow: false });
-  expect(hiddenTooltip.tooltip).toEqual({ backgroundColor: '#111', show: false });
+  expect(hiddenTooltip.tooltip).toEqual({
+    backgroundColor: '#111',
+    show: false,
+  });
 });
 
 test('labelColor and labelFontSize apply across series labels', () => {
@@ -220,12 +223,80 @@ test('labelRotate, labelDecimals, and xAxisDateFormat apply cleanly', () => {
     labelDecimals: 1,
     xAxisDateFormat: 'MMM D, YYYY',
   });
-  const seriesEntry = (merged.series as Array<{ label: Record<string, unknown> }>)[0];
+  const seriesEntry = (
+    merged.series as Array<{ label: Record<string, unknown> }>
+  )[0];
   expect(seriesEntry.label.rotate).toBe(45);
   expect(typeof seriesEntry.label.formatter).toBe('function');
-  const fmtLabel = seriesEntry.label.formatter as (p: { value: unknown }) => string;
+  const fmtLabel = seriesEntry.label.formatter as (p: {
+    value: unknown;
+  }) => string;
   expect(fmtLabel({ value: 1234.567 })).toBe('1,234.6');
 
-  const xAxis = merged.xAxis as { axisLabel: { formatter: (v: unknown) => string } };
-  expect(xAxis.axisLabel.formatter('2026-01-15T00:00:00Z')).toBe('Jan 15, 2026');
+  const xAxis = merged.xAxis as {
+    axisLabel: { formatter: (v: unknown) => string };
+  };
+  expect(xAxis.axisLabel.formatter('2026-01-15T00:00:00Z')).toBe(
+    'Jan 15, 2026',
+  );
+});
+
+test('scrollMode none leaves option unchanged, zoombar and scrollbar configure dataZoom', () => {
+  const categories = Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`);
+  const raw = {
+    xAxis: { type: 'category', data: categories },
+    series: [{ type: 'bar', data: categories.map((_, i) => i) }],
+  };
+
+  expect(applyStructuredChrome(raw, { scrollMode: 'none' })).toBe(raw);
+
+  const zoombar = applyStructuredChrome(raw, {
+    scrollMode: 'zoombar',
+    visibleBars: 10,
+  });
+  expect(zoombar.dataZoom).toEqual([
+    {
+      type: 'slider',
+      xAxisIndex: 0,
+      bottom: 8,
+      filterMode: 'none',
+      startValue: 0,
+      endValue: 9,
+    },
+    {
+      type: 'inside',
+      xAxisIndex: 0,
+      filterMode: 'none',
+    },
+  ]);
+  expect(zoombar.grid).toEqual({ containLabel: true, bottom: 44 });
+
+  const scrollbar = applyStructuredChrome(raw, {
+    scrollMode: 'scrollbar',
+    visibleBars: 12,
+  });
+  expect(scrollbar.dataZoom).toEqual([
+    {
+      type: 'slider',
+      xAxisIndex: 0,
+      zoomLock: true,
+      showDetail: false,
+      showDataShadow: false,
+      brushSelect: false,
+      height: 10,
+      bottom: 8,
+      filterMode: 'none',
+      startValue: 0,
+      endValue: 11,
+    },
+    {
+      type: 'inside',
+      xAxisIndex: 0,
+      zoomOnMouseWheel: false,
+      moveOnMouseMove: true,
+      moveOnMouseWheel: true,
+      filterMode: 'none',
+    },
+  ]);
+  expect(scrollbar.grid).toEqual({ containLabel: true, bottom: 32 });
 });

@@ -143,3 +143,87 @@ test('groups multi-level rowFields with rowSpan and supports sorting by header c
   expect(rowsDesc[1]).toContain('UK');
   expect(rowsDesc[2]).toContain('Canada');
 });
+
+test('emits and toggles cross-filter on row dimension click when crossFilter is enabled', async () => {
+  fetchMock.post('glob:*/api/v1/canvas/2/placement/pivot3/data', {
+    result: {
+      datasets: [
+        {
+          name: 'main',
+          row_count: 2,
+          inline_data: [
+            { territory: 'NA', deal_size: 'Large', sales: 500 },
+            { territory: 'EMEA', deal_size: 'Large', sales: 300 },
+          ],
+          query: 'SELECT territory, deal_size, SUM(sales) FROM sales',
+          language: 'sql',
+        },
+      ],
+    },
+  });
+
+  const setCrossFilter = jest.fn();
+  render(
+    <PivotTableRenderer
+      canvasId={2}
+      nodeId="pivot3"
+      widgetType="pivot-table"
+      props={{
+        dataBinding: { datasetId: 13, metrics: ['sales'] },
+        rowFields: ['territory'],
+        columnFields: ['deal_size'],
+        metric: 'sales',
+        crossFilter: true,
+      }}
+      filters={[]}
+      crossFilters={[
+        {
+          nodeId: 'chart1',
+          value: { datasetId: 13, column: 'year', values: [2025] },
+        },
+      ]}
+      events={[]}
+      refreshKey={0}
+      setFilterValue={jest.fn()}
+      setCrossFilter={setCrossFilter}
+      emitEvent={jest.fn()}
+      childNodes={[]}
+      renderGrid={jest.fn()}
+    />,
+    { useRedux: true, useRouter: true },
+  );
+
+  const naCell = await screen.findByText('NA');
+  const call = fetchMock.callHistory.lastCall(
+    'glob:*/api/v1/canvas/2/placement/pivot3/data',
+  );
+  const body = JSON.parse(String(call?.options?.body ?? '{}'));
+  expect(body.runtime_filters).toEqual([
+    { datasetId: 13, column: 'year', values: [2025] },
+  ]);
+
+  fireEvent.click(naCell);
+  expect(setCrossFilter).toHaveBeenCalledWith({
+    datasetId: 13,
+    column: 'territory',
+    values: ['NA'],
+  });
+  expect(naCell.closest('td')).toHaveClass('cross-filter-active');
+
+  fireEvent.click(naCell);
+  expect(setCrossFilter).toHaveBeenLastCalledWith(undefined);
+  expect(naCell.closest('td')).not.toHaveClass('cross-filter-active');
+
+  // Clicking a data cell emits both row and column dimension filters.
+  const dataCell = screen.getAllByText('500')[0];
+  fireEvent.click(dataCell);
+  expect(setCrossFilter).toHaveBeenLastCalledWith([
+    { datasetId: 13, column: 'territory', values: ['NA'] },
+    { datasetId: 13, column: 'deal_size', values: ['Large'] },
+  ]);
+  expect(dataCell.closest('td')).toHaveClass('cross-filter-active');
+
+  fireEvent.click(dataCell);
+  expect(setCrossFilter).toHaveBeenLastCalledWith(undefined);
+  expect(dataCell.closest('td')).not.toHaveClass('cross-filter-active');
+});

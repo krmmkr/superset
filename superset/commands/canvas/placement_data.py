@@ -48,17 +48,30 @@ class GetPlacementDataCommand(BaseCommand):
         runtime_filters: list[RuntimeFilter],
         draft_token: str | None = None,
         version_uuid: UUID | None = None,
+        *,
+        time_grain: str | None = None,
+        dimension: str | None = None,
+        template_params: dict[str, Any] | None = None,
     ) -> None:
         self._id_or_uuid = id_or_uuid
         self._placement_id = placement_id
         self._runtime_filters = runtime_filters
         self._draft_token = draft_token
         self._version_uuid = version_uuid
+        self._time_grain = time_grain
+        self._dimension = dimension
+        self._template_params = template_params
         self._binding: dict[str, Any] = {}
 
     def run(self) -> PlacementData:
         self.validate()
-        return run_binding(self._binding, self._runtime_filters)
+        return run_binding(
+            self._binding,
+            self._runtime_filters,
+            time_grain=self._time_grain,
+            dimension=self._dimension,
+            template_params=self._template_params,
+        )
 
     def validate(self) -> None:
         canvas = CanvasDAO.find_by_id_or_uuid(self._id_or_uuid)

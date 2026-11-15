@@ -1104,7 +1104,14 @@ class CanvasRestApi(BaseSupersetModelRestApi):
             return self.response_400(message="Invalid version UUID")
         try:
             data = GetPlacementDataCommand(
-                id_or_uuid, placement_id, body.runtime_filters, token, version
+                id_or_uuid,
+                placement_id,
+                body.runtime_filters,
+                token,
+                version,
+                time_grain=body.time_grain,
+                dimension=body.dimension,
+                template_params=body.template_params or None,
             ).run()
         except DatasourceNotFound:
             return self.response_404()

@@ -53,6 +53,12 @@ export interface WidgetRows extends PlacementData {
   retry: () => void;
 }
 
+export interface WidgetQueryOverrides {
+  timeGrain?: string;
+  dimension?: string;
+  templateParams?: Record<string, unknown>;
+}
+
 /**
  * A placement's rows, queried on the server from its stored `dataBinding`,
  * narrowed by the filter values that reach it and refetched on refresh. A
@@ -66,6 +72,7 @@ export function useWidgetRows(
   }: Pick<canvasApi.CanvasWidgetProps, 'canvasId' | 'nodeId' | 'props'>,
   filters: canvasApi.FilterValue[],
   refreshKey: number,
+  queryOverrides?: WidgetQueryOverrides,
 ): WidgetRows {
   const draftToken = useContext(CanvasDraftContext);
   const versionUuid = useContext(CanvasVersionContext);
@@ -79,6 +86,7 @@ export function useWidgetRows(
     selected,
     draftToken ?? null,
     versionUuid ?? null,
+    queryOverrides ?? null,
   ]);
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt(count => count + 1), []);
@@ -100,6 +108,9 @@ export function useWidgetRows(
       draftToken,
       versionUuid,
       filters: selected,
+      timeGrain: queryOverrides?.timeGrain,
+      dimension: queryOverrides?.dimension,
+      templateParams: queryOverrides?.templateParams,
     })
       .then(data => {
         if (!cancelled) setState({ ...data, loading: false });

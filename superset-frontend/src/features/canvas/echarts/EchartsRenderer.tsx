@@ -90,7 +90,7 @@ function calendarScrollDimensions(option: Record<string, unknown>): {
   let totalH = 0;
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') continue;
-    const cellSize = (entry as { cellSize?: unknown }).cellSize;
+    const { cellSize } = entry as { cellSize?: unknown };
     let cw = 0;
     let ch = 0;
     if (typeof cellSize === 'number') {
@@ -145,12 +145,86 @@ function resolveNumericParam(
   if (!name || !Array.isArray(customizations)) return undefined;
   for (const item of customizations) {
     const val = item?.value as { name?: unknown; value?: unknown } | undefined;
-    if (val && val.name === name && val.value !== undefined && val.value !== '') {
+    if (
+      val &&
+      val.name === name &&
+      val.value !== undefined &&
+      val.value !== ''
+    ) {
       const num = Number(val.value);
       if (Number.isFinite(num)) return num;
     }
   }
   return undefined;
+}
+
+function resolveStringParam(
+  customizations: canvasApi.CanvasWidgetProps['customizations'],
+  name: string | undefined,
+): string | undefined {
+  if (!name || !Array.isArray(customizations)) return undefined;
+  for (const item of customizations) {
+    const val = item?.value as { name?: unknown; value?: unknown } | undefined;
+    if (
+      val &&
+      val.name === name &&
+      typeof val.value === 'string' &&
+      val.value.trim() !== ''
+    ) {
+      return val.value.trim();
+    }
+  }
+  return undefined;
+}
+
+function collectTemplateParams(
+  customizations: canvasApi.CanvasWidgetProps['customizations'],
+): Record<string, unknown> | undefined {
+  if (!Array.isArray(customizations) || customizations.length === 0) {
+    return undefined;
+  }
+  const params: Record<string, unknown> = {};
+  for (const item of customizations) {
+    const val = item?.value as { name?: unknown; value?: unknown } | undefined;
+    if (
+      val &&
+      typeof val.name === 'string' &&
+      val.name.trim() !== '' &&
+      val.value !== undefined
+    ) {
+      params[val.name.trim()] = val.value;
+    }
+  }
+  return Object.keys(params).length > 0 ? params : undefined;
+}
+
+function rebindDimensionAlias(
+  value: unknown,
+  fromAlias: string,
+  toAlias: string,
+): unknown {
+  if (fromAlias === toAlias || !fromAlias || !toAlias) return value;
+  if (Array.isArray(value)) {
+    return value.map(item => rebindDimensionAlias(item, fromAlias, toAlias));
+  }
+  if (typeof value !== 'object' || value === null) return value;
+  const record = value as Record<string, unknown>;
+  if (
+    '$bind' in record &&
+    typeof record.$bind === 'object' &&
+    record.$bind !== null
+  ) {
+    const bind = record.$bind as Record<string, unknown>;
+    if (bind.source === 'dimension' && bind.alias === fromAlias) {
+      return { ...record, $bind: { ...bind, alias: toAlias } };
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(record).map(([k, v]) => [
+      k,
+      rebindDimensionAlias(v, fromAlias, toAlias),
+    ]),
+  );
 }
 
 /**
@@ -166,17 +240,33 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
     filters,
     crossFilters,
     customizations,
-    setCrossFilterValue,
+    setCrossFilter,
     title,
   } = widget;
   const theme = useTheme();
   const container = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string>();
-  const [drillPath, setDrillPath] = useState<{ column: string; value: string }[]>([]);
+  const [drillPath, setDrillPath] = useState<
+    { column: string; value: string }[]
+  >([]);
   const activeCrossRef = useRef<string | undefined>(undefined);
 
+  const chrome = props?.chrome as EchartsChromeValue | undefined;
+  const paramTimeGrain = resolveStringParam(
+    customizations,
+    chrome?.timeGrainParam,
+  );
+  const paramDimension = resolveStringParam(
+    customizations,
+    chrome?.dimensionParam,
+  );
+  const templateParams = useMemo(
+    () => collectTemplateParams(customizations),
+    [customizations],
+  );
+
   const binding = props?.dataBinding as
-    | { metrics?: unknown[]; dimensions?: unknown[] }
+    | { datasetId?: number; metrics?: unknown[]; dimensions?: unknown[] }
     | undefined;
   const dimensions = useMemo(
     () =>
@@ -189,20 +279,39 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
   const activeDimIndex = drillEnabled
     ? Math.min(drillPath.length, dimensions.length - 1)
     : 0;
-  const activeDim = dimensions[activeDimIndex];
+  const activeDim =
+    (!drillEnabled || drillPath.length === 0) && paramDimension
+      ? paramDimension
+      : dimensions[activeDimIndex];
 
   const effectiveProps = useMemo(() => {
-    if (!drillEnabled || drillPath.length === 0 || !activeDim) {
-      return props as StructuredProps | undefined;
+    if (drillEnabled && drillPath.length > 0 && activeDim) {
+      return {
+        ...(props as StructuredProps),
+        dataBinding: {
+          ...binding,
+          dimensions: [activeDim],
+        },
+      };
     }
-    return {
-      ...(props as StructuredProps),
-      dataBinding: {
-        ...binding,
-        dimensions: [activeDim],
-      },
-    };
-  }, [drillEnabled, drillPath.length, activeDim, props, binding]);
+    if (paramDimension) {
+      return {
+        ...(props as StructuredProps),
+        dataBinding: {
+          ...binding,
+          dimensions: [paramDimension, ...(binding?.dimensions ?? []).slice(1)],
+        },
+      };
+    }
+    return props as StructuredProps | undefined;
+  }, [
+    drillEnabled,
+    drillPath.length,
+    activeDim,
+    paramDimension,
+    props,
+    binding,
+  ]);
 
   const drillFilters = useMemo(
     () =>
@@ -218,9 +327,38 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
     [filters, crossFilters, drillFilters],
   );
 
-  const data = useWidgetRows(widget, allFilters, refreshKey);
-  const option = (props?.echartsOptions ?? {}) as Record<string, unknown>;
-  const chrome = props?.chrome as EchartsChromeValue | undefined;
+  const queryOverrides = useMemo(
+    () =>
+      paramTimeGrain || paramDimension || templateParams
+        ? {
+            timeGrain: paramTimeGrain,
+            dimension: paramDimension,
+            templateParams,
+          }
+        : undefined,
+    [paramTimeGrain, paramDimension, templateParams],
+  );
+  const data = useWidgetRows(widget, allFilters, refreshKey, queryOverrides);
+  const rawOption = (props?.echartsOptions ?? {}) as Record<string, unknown>;
+  const option = useMemo(() => {
+    const baseDim = dimensions[0];
+    if (baseDim && activeDim && baseDim !== activeDim) {
+      return rebindDimensionAlias(rawOption, baseDim, activeDim) as Record<
+        string,
+        unknown
+      >;
+    }
+    return rawOption;
+  }, [rawOption, dimensions, activeDim]);
+
+  useEffect(() => {
+    if (activeCrossRef.current !== undefined) {
+      activeCrossRef.current = undefined;
+      setCrossFilter?.(undefined);
+    }
+    // Clear stale cross-filter when the active dimension changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDim]);
   const targetValue = resolveNumericParam(customizations, chrome?.targetParam);
   const optionKey = JSON.stringify([
     option,
@@ -244,13 +382,10 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
         const echarts = await import('echarts');
         if (disposed || !container.current) return;
         const resolved = applyRowDrivenChart(
-          resolveOption(
-            applyStructuredSeries(option, effectiveProps),
-            {
-              rows: data.rows,
-              theme: theme as unknown as Record<string, unknown>,
-            },
-          ),
+          resolveOption(applyStructuredSeries(option, effectiveProps), {
+            rows: data.rows,
+            theme: theme as unknown as Record<string, unknown>,
+          }),
           effectiveProps,
           data.rows,
         );
@@ -277,19 +412,24 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
                 : '';
             if (!clicked) return;
             if (drillEnabled && drillPath.length < dimensions.length - 1) {
-              setDrillPath(prev => [...prev, { column: activeDim, value: clicked }]);
+              setDrillPath(prev => [
+                ...prev,
+                { column: activeDim, value: clicked },
+              ]);
               return;
             }
-            if (props?.crossFilter) {
+            if (props?.crossFilter && setCrossFilter) {
               if (activeCrossRef.current === clicked) {
                 activeCrossRef.current = undefined;
-                setCrossFilterValue(undefined);
+                setCrossFilter(undefined);
               } else {
                 activeCrossRef.current = clicked;
-                setCrossFilterValue({
+                setCrossFilter({
+                  ...(typeof binding?.datasetId === 'number'
+                    ? { datasetId: binding.datasetId }
+                    : {}),
                   column: activeDim,
-                  operator: 'in',
-                  value: [clicked],
+                  values: [clicked],
                 });
               }
             }
@@ -323,12 +463,9 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
     props?.fitMode === 'fit' || props?.fitMode === 'scroll'
       ? props.fitMode
       : 'auto';
-  const scrollDims =
-    fitMode === 'fit' ? {} : calendarScrollDimensions(option);
+  const scrollDims = fitMode === 'fit' ? {} : calendarScrollDimensions(option);
   const minHeight =
-    fitMode === 'scroll'
-      ? (scrollDims.minHeight ?? 240)
-      : scrollDims.minHeight;
+    fitMode === 'scroll' ? (scrollDims.minHeight ?? 240) : scrollDims.minHeight;
   return (
     <WithQuery
       query={data.query}
@@ -360,7 +497,9 @@ export default function EchartsRenderer(widget: canvasApi.CanvasWidgetProps) {
                   {' / '}
                   {idx < drillPath.length - 1 ? (
                     <Typography.Link
-                      onClick={() => setDrillPath(prev => prev.slice(0, idx + 1))}
+                      onClick={() =>
+                        setDrillPath(prev => prev.slice(0, idx + 1))
+                      }
                     >
                       {step.value}
                     </Typography.Link>

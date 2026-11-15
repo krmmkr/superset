@@ -540,3 +540,80 @@ def test_initial_create_failure_leaves_no_persisted_objects(
     if error_path is not None:
         assert any(error["path"] == error_path for error in result["errors"])
     assert published_state(session) == before
+
+
+def test_query_context_payload_time_grain_dimension_and_template_params() -> None:
+    from superset.canvas.data import query_context_payload
+
+    binding = {
+        "datasetId": 13,
+        "metrics": ["sales"],
+        "dimensions": ["order_date", "ship_date"],
+        "timeGrain": "P1D",
+        "timeGrainColumn": "ship_date",
+    }
+    payload = query_context_payload(
+        binding,
+        time_grain="P1W",
+        dimension="region",
+        template_params={"grain": "P1W", "top_n": 10},
+    )
+    query = payload["queries"][0]
+    assert query["columns"] == [
+        "region",
+        {
+            "sqlExpression": "ship_date",
+            "columnType": "BASE_AXIS",
+            "timeGrain": "P1W",
+            "label": "ship_date",
+        },
+    ]
+    assert query["template_params"] == {"grain": "P1W", "top_n": 10}
+
+
+def test_placement_data_rejects_invalid_time_grain(
+    client: Any,
+    full_api_access: None,
+    canvas: Any,
+) -> None:
+    response = client.post(
+        URL.format("chart"),
+        json={"runtime_filters": [], "time_grain": "INVALID; DROP TABLE"},
+    )
+    assert response.status_code == 400
+
+
+def test_normalize_time_grain_and_format_temporal_rows() -> None:
+    from superset.canvas.data import _format_temporal_rows, normalize_time_grain
+    from superset.utils.core import GenericDataType
+
+    assert normalize_time_grain("Month") == "P1M"
+    assert normalize_time_grain("quarter") == "P3M"
+    assert normalize_time_grain("Year") == "P1Y"
+    assert normalize_time_grain("P1W") == "P1W"
+
+    # 2004-01-01T00:00:00Z = 1072915200000 ms
+    # 2004-04-01T14:30:00Z = 1080829800000 ms
+    rows = [
+        {"order_date": 1072915200000, "sales": 100},
+        {"order_date": 1080829800000, "sales": 200},
+    ]
+    colnames = ["order_date", "sales"]
+    coltypes = [GenericDataType.TEMPORAL, GenericDataType.NUMERIC]
+
+    monthly = _format_temporal_rows(rows, colnames, coltypes, "P1M")
+    assert [r["order_date"] for r in monthly] == ["2004-01", "2004-04"]
+    quarterly = _format_temporal_rows(rows, colnames, coltypes, "P3M")
+    assert [r["order_date"] for r in quarterly] == ["2004-Q1", "2004-Q2"]
+    yearly = _format_temporal_rows(rows, colnames, coltypes, "P1Y")
+    assert [r["order_date"] for r in yearly] == ["2004", "2004"]
+    hourly = _format_temporal_rows(rows, colnames, coltypes, "PT1H")
+    assert [r["order_date"] for r in hourly] == [
+        "2004-01-01 00:00",
+        "2004-04-01 14:30",
+    ]
+    raw_daily = _format_temporal_rows(rows, colnames, coltypes, None)
+    assert [r["order_date"] for r in raw_daily] == [
+        "2004-01-01",
+        "2004-04-01 14:30",
+    ]

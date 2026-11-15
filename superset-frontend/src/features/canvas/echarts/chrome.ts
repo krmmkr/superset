@@ -47,6 +47,10 @@ export interface EchartsChromeValue {
   yAxisRotate?: number;
   yAxisFormat?: string;
   targetParam?: string;
+  scrollMode?: 'none' | 'zoombar' | 'scrollbar' | null;
+  visibleBars?: number | null;
+  timeGrainParam?: string;
+  dimensionParam?: string;
 }
 
 // ECharts has no single "position" property on `legend` — placement comes
@@ -197,7 +201,8 @@ function applyTargetMarkLine(
     return series;
   }
   const [first, ...rest] = series;
-  if (!first || typeof first !== 'object' || Array.isArray(first)) return series;
+  if (!first || typeof first !== 'object' || Array.isArray(first))
+    return series;
   const firstRecord = first as Record<string, unknown>;
   const existingMarkLine = asRecord(firstRecord.markLine);
   const nextFirst = {
@@ -210,6 +215,82 @@ function applyTargetMarkLine(
     },
   };
   return [nextFirst, ...rest];
+}
+
+function applyDataZoom(
+  existing: unknown,
+  resolved: Record<string, unknown>,
+  chrome: EchartsChromeValue,
+): { dataZoom: unknown; grid: unknown } {
+  const mode = chrome.scrollMode;
+  if (!mode || mode === 'none') {
+    return { dataZoom: existing, grid: resolved.grid };
+  }
+
+  const xAxisRecord = asRecord(firstEntry(resolved.xAxis));
+  const xData = Array.isArray(xAxisRecord.data) ? xAxisRecord.data : undefined;
+  const firstSeries = asRecord(firstEntry(resolved.series));
+  const sData = Array.isArray(firstSeries.data) ? firstSeries.data : undefined;
+  const categoryCount = xData?.length ?? sData?.length ?? 0;
+
+  const hasVisibleBars =
+    typeof chrome.visibleBars === 'number' && chrome.visibleBars >= 1;
+  const windowSize = hasVisibleBars ? Math.floor(chrome.visibleBars!) : 15;
+  const windowBounds =
+    (mode === 'scrollbar' || hasVisibleBars) &&
+    (categoryCount === 0 || categoryCount > windowSize)
+      ? { startValue: 0, endValue: windowSize - 1 }
+      : {};
+
+  const slider: Record<string, unknown> =
+    mode === 'scrollbar'
+      ? {
+          type: 'slider',
+          xAxisIndex: 0,
+          zoomLock: true,
+          showDetail: false,
+          showDataShadow: false,
+          brushSelect: false,
+          height: 10,
+          bottom: 8,
+          filterMode: 'none',
+          ...windowBounds,
+        }
+      : {
+          type: 'slider',
+          xAxisIndex: 0,
+          bottom: 8,
+          filterMode: 'none',
+          ...windowBounds,
+        };
+
+  const inside: Record<string, unknown> =
+    mode === 'scrollbar'
+      ? {
+          type: 'inside',
+          xAxisIndex: 0,
+          zoomOnMouseWheel: false,
+          moveOnMouseMove: true,
+          moveOnMouseWheel: true,
+          filterMode: 'none',
+        }
+      : {
+          type: 'inside',
+          xAxisIndex: 0,
+          filterMode: 'none',
+        };
+
+  const existingGrid = asRecord(resolved.grid);
+  const nextGrid =
+    existingGrid.bottom === undefined
+      ? {
+          ...existingGrid,
+          containLabel: existingGrid.containLabel ?? true,
+          bottom: mode === 'scrollbar' ? 32 : 44,
+        }
+      : resolved.grid;
+
+  return { dataZoom: [slider, inside], grid: nextGrid };
 }
 
 /**
@@ -247,15 +328,32 @@ export function applyStructuredChrome(
     effectiveChrome.yAxisRotate,
     effectiveChrome.yAxisFormat,
   );
+  const { dataZoom, grid } = applyDataZoom(
+    resolved.dataZoom,
+    resolved,
+    effectiveChrome,
+  );
   if (
     title === resolved.title &&
     legend === resolved.legend &&
     tooltip === resolved.tooltip &&
     series === resolved.series &&
     xAxis === resolved.xAxis &&
-    yAxis === resolved.yAxis
+    yAxis === resolved.yAxis &&
+    dataZoom === resolved.dataZoom &&
+    grid === resolved.grid
   ) {
     return resolved;
   }
-  return { ...resolved, title, legend, tooltip, series, xAxis, yAxis };
+  return {
+    ...resolved,
+    title,
+    legend,
+    tooltip,
+    series,
+    xAxis,
+    yAxis,
+    dataZoom,
+    grid,
+  };
 }

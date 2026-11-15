@@ -61,6 +61,8 @@ class DataBinding(MetricControl):
         "datasetId",
         "metrics",
         "dimensions",
+        "timeGrain",
+        "timeGrainColumn",
         "orderBy",
         "rowLimit",
     ]
@@ -75,6 +77,28 @@ class DataBinding(MetricControl):
         title="Dimensions",
         description="Columns to group by (the categories / series).",
         json_schema_extra={"x-control": "column-multi"},
+    )
+    time_grain: str | None = Field(
+        default=None,
+        alias="timeGrain",
+        title="Time grain",
+        description=(
+            "Optional time grain (Hour, Day, Week, Month, Quarter, Year, or "
+            "ISO-8601 duration) applied to the temporal dimension."
+        ),
+        json_schema_extra={
+            "x-control": "select",
+            "x-options": ["Hour", "Day", "Week", "Month", "Quarter", "Year"],
+        },
+    )
+    time_grain_column: str | None = Field(
+        default=None,
+        alias="timeGrainColumn",
+        title="Time grain column",
+        description=(
+            "Datetime column to truncate when `timeGrain` is set. "
+            "Defaults to the first dimension when omitted."
+        ),
     )
     # No `x-control` yet authors it through the control panel or MCP — it's
     # populated by other means (e.g. a dashboard filter binding a chart).
@@ -656,6 +680,49 @@ class EchartsChrome(BaseModel):
             "numeric value renders as a horizontal target markLine on Cartesian charts."
         ),
     )
+    scroll_mode: Literal["none", "zoombar", "scrollbar"] = Field(
+        default="none",
+        alias="scrollMode",
+        title="Horizontal scroll mode",
+        description=(
+            "Optional X-axis horizontal scrolling for wide datasets: 'zoombar' "
+            "adds an interactive ECharts dataZoom slider; 'scrollbar' locks the "
+            "window to `visibleBars` items with a horizontal scrollbar."
+        ),
+        json_schema_extra={
+            "x-control": "select",
+            "x-options": ["none", "zoombar", "scrollbar"],
+        },
+    )
+    visible_bars: int | None = Field(
+        default=None,
+        ge=1,
+        le=500,
+        alias="visibleBars",
+        title="Visible bars / points",
+        description=(
+            "Number of X-axis categories shown at once when `scrollMode` is "
+            "'scrollbar' (defaults to 15) or initial window in 'zoombar' mode."
+        ),
+    )
+    time_grain_param: str = Field(
+        default="",
+        alias="timeGrainParam",
+        title="Time grain parameter",
+        description=(
+            "Optional Parameter widget name whose value overrides "
+            "dataBinding.timeGrain (e.g. P1D, P1W, P1M)."
+        ),
+    )
+    dimension_param: str = Field(
+        default="",
+        alias="dimensionParam",
+        title="Dimension parameter",
+        description=(
+            "Optional Parameter widget name whose value overrides the first "
+            "grouping dimension."
+        ),
+    )
 
 
 class EchartsControls(BaseModel):
@@ -723,16 +790,19 @@ class EchartsControls(BaseModel):
             "x-hidden-in-form": True,
         },
     )
-    chart_type: Literal[
-        "bar",
-        "line",
-        "scatter",
-        "sankey",
-        "calendar",
-        "treemap",
-        "sunburst",
-        "tree",
-    ] | None = Field(
+    chart_type: (
+        Literal[
+            "bar",
+            "line",
+            "scatter",
+            "sankey",
+            "calendar",
+            "treemap",
+            "sunburst",
+            "tree",
+        ]
+        | None
+    ) = Field(
         default=None,
         alias="chartType",
         title="Chart type",
@@ -1070,6 +1140,15 @@ class PivotTableControls(BaseModel):
             "valueTo, tone, color, backgroundColor})."
         ),
         json_schema_extra={"x-control": "code", "x-language": "json"},
+    )
+    cross_filter: bool = Field(
+        default=False,
+        alias="crossFilter",
+        title="Cross-filter on click",
+        description=(
+            "Emit a cross-filter when a row dimension cell is clicked. "
+            "Clicking the same value again clears it."
+        ),
     )
 
 

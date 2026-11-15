@@ -89,6 +89,25 @@ const Container = styled.div<{ refreshing?: boolean }>`
       font-weight: ${theme.fontWeightStrong};
       background: ${theme.colorFillQuaternary};
     }
+
+    td.cross-filterable {
+      cursor: pointer;
+    }
+
+    td.cross-filterable:hover {
+      background: ${theme.colorFillAlter};
+    }
+
+    td.cross-filter-active {
+      background: ${theme.colorPrimaryBg};
+      color: ${theme.colorPrimaryText};
+      font-weight: ${theme.fontWeightStrong};
+    }
+
+    td.num.cross-filter-active {
+      outline: 2px solid ${theme.colorPrimary};
+      outline-offset: -2px;
+    }
   `}
 `;
 
@@ -96,7 +115,9 @@ const text = (value: unknown): string =>
   typeof value === 'string' ? value : '';
 
 const strings = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+  Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === 'string')
+    : [];
 
 type SortTarget =
   | { kind: 'rowField'; index: number }
@@ -126,11 +147,16 @@ const KEY_SEP = '\u0000';
  * numeric `metric` column and rendering optional row/column totals.
  */
 export default function PivotTableRenderer(widget: Props) {
-  const { props, filters, refreshKey } = widget;
+  const { props, filters, crossFilters, refreshKey, setCrossFilter } = widget;
   const theme = useTheme();
   const [sort, setSort] = useState<SortState>(null);
+  const [activeCrossKey, setActiveCrossKey] = useState<string | null>(null);
+  const effectiveFilters = useMemo(
+    () => [...filters, ...(crossFilters ?? [])],
+    [filters, crossFilters],
+  );
   const { rows, loading, error, query, language, datasource, retry } =
-    useWidgetRows(widget, filters, refreshKey);
+    useWidgetRows(widget, effectiveFilters, refreshKey);
   const rules = Array.isArray(props?.conditionalFormatting)
     ? (props.conditionalFormatting as ConditionalFormatRule[])
     : [];
@@ -155,6 +181,7 @@ export default function PivotTableRenderer(widget: Props) {
     const rowPartsMap = new Map<string, string[]>();
     const rowKeySet = new Set<string>();
     const colKeys: string[] = [];
+    const colPartsMap = new Map<string, string[]>();
     const colKeySet = new Set<string>();
     const cells = new Map<string, Map<string, number>>();
     const rowTotals = new Map<string, number>();
@@ -166,8 +193,9 @@ export default function PivotTableRenderer(widget: Props) {
         ? rowFields.map(f => String(row[f] ?? '–'))
         : [t('Total')];
       const rKey = parts.join(KEY_SEP);
+      const colParts = colFields.map(f => String(row[f] ?? '–'));
       const cKey = colFields.length
-        ? colFields.map(f => String(row[f] ?? '–')).join(' / ')
+        ? colParts.join(' / ')
         : metricKey || t('Value');
 
       if (!rowKeySet.has(rKey)) {
@@ -178,6 +206,7 @@ export default function PivotTableRenderer(widget: Props) {
       if (!colKeySet.has(cKey)) {
         colKeySet.add(cKey);
         colKeys.push(cKey);
+        colPartsMap.set(cKey, colParts);
       }
 
       const rawVal = metricKey ? row[metricKey] : 0;
@@ -208,6 +237,7 @@ export default function PivotTableRenderer(widget: Props) {
       rowKeys,
       rowPartsMap,
       colKeys,
+      colPartsMap,
       cells,
       rowTotals,
       colTotals,
@@ -252,7 +282,7 @@ export default function PivotTableRenderer(widget: Props) {
   const rowSpans = useMemo(() => {
     const colCount = Math.max(1, rowFields.length);
     const spans: number[][] = sortedRowKeys.map(() =>
-      new Array(colCount).fill(1),
+      Array.from({ length: colCount }, () => 1),
     );
     if (colCount <= 1) return spans;
 
@@ -310,7 +340,44 @@ export default function PivotTableRenderer(widget: Props) {
     })}${suffix}`;
   };
 
-  if (loading && rows.length === 0) return <Loading position="inline-centered" />;
+  const datasetId = (props?.dataBinding as { datasetId?: unknown } | undefined)
+    ?.datasetId;
+  const crossFilterEnabled = Boolean(props?.crossFilter);
+  const buildFilter = (column: string, value: string) => ({
+    ...(typeof datasetId === 'number' ? { datasetId } : {}),
+    column,
+    values: [value],
+  });
+  const toggleCrossFilter = (key: string, payload: unknown) => {
+    if (!crossFilterEnabled || !setCrossFilter) return;
+    if (activeCrossKey === key) {
+      setActiveCrossKey(null);
+      setCrossFilter(undefined);
+    } else {
+      setActiveCrossKey(key);
+      setCrossFilter(payload);
+    }
+  };
+  const handleRowCellClick = (column: string | undefined, value: string) => {
+    if (!column) return;
+    toggleCrossFilter(`row:${column}:${value}`, buildFilter(column, value));
+  };
+  const handleDataCellClick = (rKey: string, cKey: string) => {
+    const rParts = pivot.rowPartsMap.get(rKey) ?? [];
+    const cParts = pivot.colPartsMap.get(cKey) ?? [];
+    const filtersOut = [
+      ...rowFields.map((col, idx) => buildFilter(col, rParts[idx] ?? '')),
+      ...colFields.map((col, idx) => buildFilter(col, cParts[idx] ?? '')),
+    ].filter(f => f.values[0] !== '');
+    if (filtersOut.length === 0) return;
+    toggleCrossFilter(
+      `cell:${rKey}:${cKey}`,
+      filtersOut.length === 1 ? filtersOut[0] : filtersOut,
+    );
+  };
+
+  if (loading && rows.length === 0)
+    return <Loading position="inline-centered" />;
   if (error) return <WidgetError message={error} onRetry={retry} />;
   if (!loading && rows.length === 0) {
     return (
@@ -382,10 +449,27 @@ export default function PivotTableRenderer(widget: Props) {
                   {parts.map((part, cIdx) => {
                     const span = rowSpans[rIdx]?.[cIdx] ?? 1;
                     if (span === 0) return null;
+                    const fieldName = rowFields[cIdx];
+                    const isFilterable =
+                      crossFilterEnabled && Boolean(fieldName);
+                    const isActive =
+                      isFilterable &&
+                      activeCrossKey === `row:${fieldName}:${part}`;
+                    const cellClass = isActive
+                      ? 'cross-filterable cross-filter-active'
+                      : isFilterable
+                        ? 'cross-filterable'
+                        : undefined;
                     return (
                       <td
                         key={`${cIdx}-${part}`}
                         rowSpan={span > 1 ? span : undefined}
+                        className={cellClass}
+                        onClick={
+                          isFilterable
+                            ? () => handleRowCellClick(fieldName, part)
+                            : undefined
+                        }
                       >
                         {part}
                       </td>
@@ -403,8 +487,27 @@ export default function PivotTableRenderer(widget: Props) {
                             theme,
                           )
                         : undefined;
+                    const cellFilterable =
+                      crossFilterEnabled &&
+                      cellVal !== undefined &&
+                      (rowFields.length > 0 || colFields.length > 0);
+                    const cellActive =
+                      cellFilterable &&
+                      activeCrossKey === `cell:${rKey}:${cKey}`;
+                    const cellClasses = ['num'];
+                    if (cellFilterable) cellClasses.push('cross-filterable');
+                    if (cellActive) cellClasses.push('cross-filter-active');
                     return (
-                      <td key={cKey} className="num" style={cellStyle}>
+                      <td
+                        key={cKey}
+                        className={cellClasses.join(' ')}
+                        style={cellStyle}
+                        onClick={
+                          cellFilterable
+                            ? () => handleDataCellClick(rKey, cKey)
+                            : undefined
+                        }
+                      >
                         {formatNum(cellVal)}
                       </td>
                     );

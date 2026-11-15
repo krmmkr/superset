@@ -348,7 +348,9 @@ class FilterBar(Widget):
     behavior = WidgetBehavior(
         container=True,
         grid_columns=24,
-        accepted_children=frozenset({"filter.select", "filter.date_range", "parameter"}),
+        accepted_children=frozenset(
+            {"filter.select", "filter.date_range", "parameter"}
+        ),
         # Filters in the bar drive the canvas, not just the bar.
         bounds_filter_scope=False,
         structural=True,
@@ -445,7 +447,7 @@ class Header(Widget):
 )
 class PivotTable(Widget):
     controls_class = PivotTableControls
-    behavior = QUERYING
+    behavior = CHART
     ui = WidgetUi(default_size=(12, 8))
 
 

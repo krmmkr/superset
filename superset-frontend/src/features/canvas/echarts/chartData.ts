@@ -26,6 +26,8 @@ export interface DataBinding {
   datasetId: number;
   metrics: unknown[];
   dimensions?: string[];
+  timeGrain?: string;
+  timeGrainColumn?: string;
   filters?: Record<string, unknown>[];
   rowLimit?: number;
   orderBy?: { field: string; descending?: boolean }[];
@@ -75,20 +77,22 @@ export function runtimeFilters(
 ): RuntimeFilterValue[] {
   const result: RuntimeFilterValue[] = [];
   for (const filter of filters) {
-    const { value } = filter;
-    if (isSelectFilterValue(value) && value.values.length > 0) {
-      result.push({
-        datasetId: value.datasetId,
-        column: value.column,
-        values: value.values,
-      });
-    } else if (isDateRangeFilterValue(value)) {
-      result.push({
-        datasetId: value.datasetId,
-        column: value.column,
-        op: 'TEMPORAL_RANGE',
-        timeRange: value.timeRange,
-      });
+    const items = Array.isArray(filter.value) ? filter.value : [filter.value];
+    for (const value of items) {
+      if (isSelectFilterValue(value) && value.values.length > 0) {
+        result.push({
+          datasetId: value.datasetId,
+          column: value.column,
+          values: value.values,
+        });
+      } else if (isDateRangeFilterValue(value)) {
+        result.push({
+          datasetId: value.datasetId,
+          column: value.column,
+          op: 'TEMPORAL_RANGE',
+          timeRange: value.timeRange,
+        });
+      }
     }
   }
   return result;
@@ -111,6 +115,9 @@ export async function fetchPlacementData({
   draftToken,
   versionUuid,
   filters,
+  timeGrain,
+  dimension,
+  templateParams,
 }: {
   canvasId: number;
   placementId: string;
@@ -118,6 +125,9 @@ export async function fetchPlacementData({
   /** Read the placement as this version saved it. */
   versionUuid?: string;
   filters: RuntimeFilterValue[];
+  timeGrain?: string;
+  dimension?: string;
+  templateParams?: Record<string, unknown>;
 }): Promise<PlacementData> {
   const headers = {
     ...(draftToken ? { [DRAFT_TOKEN_HEADER]: draftToken } : {}),
@@ -128,7 +138,14 @@ export async function fetchPlacementData({
       placementId,
     )}/data`,
     headers,
-    jsonPayload: { runtime_filters: filters },
+    jsonPayload: {
+      runtime_filters: filters,
+      ...(timeGrain ? { time_grain: timeGrain } : {}),
+      ...(dimension ? { dimension } : {}),
+      ...(templateParams && Object.keys(templateParams).length > 0
+        ? { template_params: templateParams }
+        : {}),
+    },
   });
   const dataset = json?.result?.datasets?.[0];
   return {

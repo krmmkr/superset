@@ -67,6 +67,10 @@ def test_chrome_schema_is_flat_one_level_under_chrome() -> None:
         "yAxisRotate",
         "yAxisFormat",
         "targetParam",
+        "scrollMode",
+        "visibleBars",
+        "timeGrainParam",
+        "dimensionParam",
     }
     # Flat, not nested: every field's own schema is a plain scalar (string,
     # boolean, integer, or a nullable enum) — never another $ref to a
@@ -155,7 +159,9 @@ def test_a_widget_without_any_chrome_still_validates_cleanly() -> None:
     assert errors == []
 
 
-@pytest.mark.parametrize("app", [{"FEATURE_FLAGS": {"CANVAS_CUSTOM": True}}], indirect=True)
+@pytest.mark.parametrize(
+    "app", [{"FEATURE_FLAGS": {"CANVAS_CUSTOM": True}}], indirect=True
+)
 def test_control_schema_rest_endpoint_exposes_chrome(client, full_api_access) -> None:
     resp = client.get("/api/v1/widgets/type/echarts/control-schema")
     assert resp.status_code == 200
@@ -163,7 +169,9 @@ def test_control_schema_rest_endpoint_exposes_chrome(client, full_api_access) ->
     assert "chrome" in schema["properties"]
 
 
-@pytest.mark.parametrize("app", [{"FEATURE_FLAGS": {"CANVAS_CUSTOM": True}}], indirect=True)
+@pytest.mark.parametrize(
+    "app", [{"FEATURE_FLAGS": {"CANVAS_CUSTOM": True}}], indirect=True
+)
 def test_validate_rest_endpoint_accepts_chrome_fields(client, full_api_access) -> None:
     resp = client.post(
         "/api/v1/widgets/type/echarts/validate",

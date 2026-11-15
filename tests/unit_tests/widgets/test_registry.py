@@ -134,7 +134,7 @@ def test_validate_control_values_rejects_unknown_fields() -> None:
             "dataBinding": {
                 "datasetId": 1,
                 "metrics": ["count"],
-                "timeGrain": "P1M",
+                "bogusField": "P1M",
                 "orderBy": [{"field": "count", "direction": "desc"}],
             },
             "colour": "red",
@@ -142,8 +142,8 @@ def test_validate_control_values_rejects_unknown_fields() -> None:
     )
     assert sorted(error["loc"] for error in errors) == [
         ["colour"],
+        ["dataBinding", "bogusField"],
         ["dataBinding", "orderBy", "0", "direction"],
-        ["dataBinding", "timeGrain"],
     ]
     assert {error["message"] for error in errors} == {"Unknown field"}
 
@@ -202,6 +202,8 @@ def test_data_binding_schema_is_unchanged_after_metric_control_extraction() -> N
         "datasetId",
         "metrics",
         "dimensions",
+        "timeGrain",
+        "timeGrainColumn",
         "orderBy",
         "rowLimit",
     ]
@@ -265,6 +267,8 @@ def test_data_binding_schema_unchanged_via_mcp_boundary() -> None:
         "datasetId",
         "metrics",
         "dimensions",
+        "timeGrain",
+        "timeGrainColumn",
         "orderBy",
         "rowLimit",
     ]
