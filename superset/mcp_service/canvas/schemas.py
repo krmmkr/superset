@@ -262,3 +262,9 @@ class CanvasDraftResponse(_Compact):
     operation: int | None = Field(
         default=None, description="Index of the operation that failed."
     )
+
+
+class CanvasSettingsSchemaResponse(BaseModel):
+    definition_version: int = 1
+    keys: list[str]
+    settings_schema: dict[str, Any]

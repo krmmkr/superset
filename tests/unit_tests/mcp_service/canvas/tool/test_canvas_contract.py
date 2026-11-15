@@ -85,6 +85,7 @@ TOOLS = (
     "get_canvas",
     "create_canvas_draft",
     "get_canvas_draft",
+    "get_canvas_settings_schema",
     "commit_canvas_draft",
     "delete_canvas_draft",
     "update_canvas",
@@ -1209,3 +1210,36 @@ async def test_preview_dataset_denial_keeps_permission_type_on_the_wire(
     assert counters.count("mcp.tool.preview_widget.error") == 1
     assert "mcp.tool.preview_widget.success" not in counters
     assert not any(name.startswith("mcp.tool.call_tool.") for name in counters)
+
+
+@pytest.mark.asyncio
+async def test_get_canvas_settings_schema_exposes_card_styles() -> None:
+    server = await _server(structured=True, compact=False)
+    async with Client(server) as client:
+        full = _data(
+            await _call(client, "get_canvas_settings_schema", {}, proxy=False),
+            structured=True,
+        )
+        scoped = _data(
+            await _call(
+                client, "get_canvas_settings_schema", {"key": "display"}, proxy=False
+            ),
+            structured=True,
+        )
+
+    assert full["keys"] == ["refresh", "colors", "display", "crossFilters"]
+    assert set(full["settings_schema"]["properties"]) == {
+        "refresh",
+        "colors",
+        "display",
+        "crossFilters",
+    }
+    assert set(scoped["settings_schema"]["properties"]) == {"display"}
+    card_style = scoped["settings_schema"]["$defs"]["CardStyle"]["properties"]
+    assert {
+        "backgroundColor",
+        "borderless",
+        "hideTitle",
+        "titleAlign",
+        "subtitle",
+    } <= set(card_style)

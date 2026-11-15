@@ -268,6 +268,7 @@ Canvases and widgets (requires CANVAS feature flag):
 - update_canvas: Change a canvas' title, slug or description
 - create_canvas_draft: Start a private draft of a canvas and get its token and link
 - get_canvas_draft: Read a draft
+- get_canvas_settings_schema: Get the schema for canvas settings (display.cardStyles, colors, refresh, crossFilters)
 - apply_canvas_draft_ops: Change a draft through operations
 - commit_canvas_draft: Publish a draft (only when the user asks to publish)
 - delete_canvas_draft: Discard a draft
@@ -863,6 +864,7 @@ from superset.mcp_service.canvas.tool import (  # noqa: F401, E402
     delete_canvas_draft,
     get_canvas,
     get_canvas_draft,
+    get_canvas_settings_schema,
     list_canvases,
     preview_widget,
     update_canvas,
@@ -1099,6 +1101,7 @@ CANVAS_TOOLS = (
     "update_canvas",
     "create_canvas_draft",
     "get_canvas_draft",
+    "get_canvas_settings_schema",
     "apply_canvas_draft_ops",
     "commit_canvas_draft",
     "delete_canvas_draft",

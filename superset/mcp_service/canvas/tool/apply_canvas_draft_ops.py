@@ -126,7 +126,9 @@ def apply_canvas_draft_ops(
       on ``add``; ``rename`` changes it, on every canvas that places it.
     - ``scope: null`` on ``set_scope`` restores auto (the filter's nearest
       scoping container) and ``value: null`` on ``set_settings`` resets that
-      section. Both are required, so omitting one is an error, not a reset.
+      section. Call ``get_canvas_settings_schema`` to discover valid
+      ``set_settings`` keys and fields (including ``display.cardStyles``).
+      Both are required, so omitting one is an error, not a reset.
 
     A ``layout`` is ``{"col", "row", "colSpan", "rowSpan"}`` on a 1-based
     grid: ``col`` runs from 1 to the grid's columns (24 on the root;
