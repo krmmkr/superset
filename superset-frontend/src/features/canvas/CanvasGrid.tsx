@@ -259,6 +259,183 @@ const TitledBody = styled.div`
   overflow: auto;
 `;
 
+function renderQuickWidgetSettings(
+  widgetType: string,
+  widgetProps: Record<string, unknown>,
+  updateWidgetProps: (
+    patch: Record<string, unknown>,
+    chromePatch?: Record<string, unknown>,
+  ) => void,
+): React.ReactNode {
+  const chrome =
+    (widgetProps.chrome as Record<string, unknown> | undefined) ?? {};
+  const toggleRows: Array<{
+    key: string;
+    label: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  }> = [];
+
+  if (widgetType === 'echarts') {
+    toggleRows.push(
+      {
+        key: 'crossFilter',
+        label: t('Cross-filter'),
+        checked: Boolean(widgetProps.crossFilter),
+        onChange: checked => updateWidgetProps({ crossFilter: checked }),
+      },
+      {
+        key: 'legendShow',
+        label: t('Show legend'),
+        checked: Boolean(chrome.legendShow),
+        onChange: checked => updateWidgetProps({}, { legendShow: checked }),
+      },
+      {
+        key: 'labelShow',
+        label: t('Show labels'),
+        checked: Boolean(chrome.labelShow),
+        onChange: checked => updateWidgetProps({}, { labelShow: checked }),
+      },
+      {
+        key: 'showGridLines',
+        label: t('Grid lines'),
+        checked: chrome.showGridLines !== false,
+        onChange: checked => updateWidgetProps({}, { showGridLines: checked }),
+      },
+      {
+        key: 'stack',
+        label: t('Stacked'),
+        checked: Boolean(chrome.stack),
+        onChange: checked => updateWidgetProps({}, { stack: checked }),
+      },
+      {
+        key: 'horizontal',
+        label: t('Horizontal'),
+        checked: Boolean(chrome.horizontal),
+        onChange: checked => updateWidgetProps({}, { horizontal: checked }),
+      },
+    );
+  } else if (widgetType === 'ag-grid-table') {
+    toggleRows.push(
+      {
+        key: 'crossFilter',
+        label: t('Cross-filter'),
+        checked: Boolean(widgetProps.crossFilter),
+        onChange: checked => updateWidgetProps({ crossFilter: checked }),
+      },
+      {
+        key: 'searchable',
+        label: t('Search bar'),
+        checked: Boolean(widgetProps.searchable),
+        onChange: checked => updateWidgetProps({ searchable: checked }),
+      },
+      {
+        key: 'wrapText',
+        label: t('Wrap text'),
+        checked: Boolean(widgetProps.wrapText),
+        onChange: checked => updateWidgetProps({ wrapText: checked }),
+      },
+    );
+  } else if (widgetType === 'pivot-table') {
+    toggleRows.push(
+      {
+        key: 'crossFilter',
+        label: t('Cross-filter'),
+        checked: Boolean(widgetProps.crossFilter),
+        onChange: checked => updateWidgetProps({ crossFilter: checked }),
+      },
+      {
+        key: 'compactNumbers',
+        label: t('Compact numbers'),
+        checked: Boolean(widgetProps.compactNumbers),
+        onChange: checked => updateWidgetProps({ compactNumbers: checked }),
+      },
+      {
+        key: 'freezeRowFields',
+        label: t('Freeze row cols'),
+        checked: widgetProps.freezeRowFields !== false,
+        onChange: checked => updateWidgetProps({ freezeRowFields: checked }),
+      },
+    );
+  } else {
+    return null;
+  }
+
+  return (
+    <StylePopoverBody
+      onPointerDown={e => e.stopPropagation()}
+      data-test="canvas-widget-props-popover"
+    >
+      {toggleRows.map(row => (
+        <StyleRow key={row.key}>
+          <span>{row.label}</span>
+          <Switch
+            size="small"
+            aria-label={row.label}
+            checked={row.checked}
+            onChange={row.onChange}
+          />
+        </StyleRow>
+      ))}
+      {widgetType === 'echarts' && (
+        <StyleRow>
+          <span>{t('Format')}</span>
+          <SwatchRow>
+            {(
+              [
+                ['none', t('Raw')],
+                ['compact', '1.2k'],
+                ['currency', '$'],
+                ['percent', '%'],
+              ] as const
+            ).map(([fmt, label]) => (
+              <Button
+                key={fmt}
+                size="small"
+                type={
+                  (chrome.numberFormat ?? 'none') === fmt
+                    ? 'primary'
+                    : 'default'
+                }
+                onClick={() => updateWidgetProps({}, { numberFormat: fmt })}
+              >
+                {label}
+              </Button>
+            ))}
+          </SwatchRow>
+        </StyleRow>
+      )}
+      {widgetType === 'ag-grid-table' && (
+        <StyleRow>
+          <span>{t('Density')}</span>
+          <SwatchRow>
+            {(
+              [
+                ['compact', 'S'],
+                ['normal', 'M'],
+                ['comfortable', 'L'],
+              ] as const
+            ).map(([density, label]) => (
+              <Button
+                key={density}
+                size="small"
+                type={
+                  (widgetProps.density ?? 'compact') === density
+                    ? 'primary'
+                    : 'default'
+                }
+                onClick={() => updateWidgetProps({ density })}
+              >
+                {label}
+              </Button>
+            ))}
+          </SwatchRow>
+        </StyleRow>
+      )}
+    </StylePopoverBody>
+  );
+}
+
 const Placeholder = styled.div`
   ${({ theme }) => css`
     height: 100%;
@@ -804,6 +981,32 @@ export default function CanvasGrid({
         },
       ]);
     };
+    const widgetProps = (contentOf(nodeId)?.props ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const updateWidgetProps = (
+      patch: Record<string, unknown>,
+      chromePatch?: Record<string, unknown>,
+    ) => {
+      if (!onApplyOps) return;
+      const nextProps: Record<string, unknown> = { ...widgetProps, ...patch };
+      if (chromePatch) {
+        const prevChrome =
+          (widgetProps.chrome as Record<string, unknown> | undefined) ?? {};
+        nextProps.chrome = { ...prevChrome, ...chromePatch };
+      }
+      void onApplyOps([
+        {
+          op: 'set_props',
+          id: nodeId,
+          props: nextProps,
+        },
+      ]);
+    };
+    const quickSettingsContent = canQuickEdit
+      ? renderQuickWidgetSettings(widgetType, widgetProps, updateWidgetProps)
+      : null;
     // A widget with no title, subtitle, mark, card style, or scope link needs
     // no wrapper unless quick edit controls are active.
     if (
@@ -988,6 +1191,24 @@ export default function CanvasGrid({
                     />
                   </Tooltip>
                 </Popover>
+                {quickSettingsContent && (
+                  <Popover
+                    trigger="click"
+                    placement="bottomRight"
+                    content={quickSettingsContent}
+                  >
+                    <Tooltip title={t('Widget settings')}>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<Icons.SettingOutlined />}
+                        aria-label={t('Widget settings')}
+                        data-test="canvas-widget-props-btn"
+                        onPointerDown={e => e.stopPropagation()}
+                      />
+                    </Tooltip>
+                  </Popover>
+                )}
               </QuickActions>
             )}
             {isScopeSource && (

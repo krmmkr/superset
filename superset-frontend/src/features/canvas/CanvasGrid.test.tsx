@@ -1196,3 +1196,118 @@ test('hovering a filter source highlights its target widgets on the canvas', () 
   fireEvent.mouseLeave(filterCard);
   expect(c1Node.querySelector('[data-scope-highlighted="true"]')).toBeNull();
 });
+
+test('quick widget settings popover dispatches set_props preserving existing props', async () => {
+  canvas.registerWidgetRenderer('echarts', Chart);
+  canvas.registerWidgetRenderer('ag-grid-table', Chart);
+  const onApplyOps = jest.fn().mockResolvedValue(undefined);
+  const widgetResult: CanvasDefinitionResult = {
+    ...result,
+    titles: { ...result.titles, c1: 'Sales Chart', odd: 'Orders Table' },
+    widgetTypes: {
+      ...result.widgetTypes,
+      c1: 'echarts',
+      odd: 'ag-grid-table',
+    },
+    definition: {
+      ...result.definition,
+      nodes: {
+        ...result.definition.nodes,
+        c1: {
+          widgetType: 'echarts',
+          schemaVersion: 1,
+          props: {
+            chartType: 'bar',
+            chrome: { legendShow: false },
+          },
+          layout: { colSpan: 6 },
+        },
+        odd: {
+          widgetType: 'ag-grid-table',
+          schemaVersion: 1,
+          props: {
+            searchable: false,
+            density: 'compact',
+          },
+          layout: { colSpan: 12 },
+        },
+      },
+    },
+  };
+
+  const { container } = render(
+    <CanvasGrid
+      canvasId={7}
+      result={widgetResult}
+      values={emptyScopeValues()}
+      onValueChange={jest.fn()}
+      layout={layoutOf(widgetResult)}
+      editable
+      onApplyOps={onApplyOps}
+    />,
+  );
+
+  // Unsupported widget type ('test.filter') has no widget settings button.
+  const fNode = container.querySelector('[data-node-id="f"]') as HTMLElement;
+  expect(
+    fNode.querySelector('[data-test="canvas-widget-props-btn"]'),
+  ).toBeNull();
+
+  // ECharts widget: toggle Cross-filter and change numberFormat.
+  const c1Node = container.querySelector('[data-node-id="c1"]') as HTMLElement;
+  const c1PropsBtn = c1Node.querySelector(
+    '[data-test="canvas-widget-props-btn"]',
+  ) as HTMLElement;
+  fireEvent.click(c1PropsBtn);
+
+  const crossFilterSwitch = await screen.findByRole('switch', {
+    name: 'Cross-filter',
+  });
+  fireEvent.click(crossFilterSwitch);
+  expect(onApplyOps).toHaveBeenCalledWith([
+    {
+      op: 'set_props',
+      id: 'c1',
+      props: {
+        chartType: 'bar',
+        chrome: { legendShow: false },
+        crossFilter: true,
+      },
+    },
+  ]);
+
+  const compactBtn = screen.getByRole('button', { name: '1.2k' });
+  fireEvent.click(compactBtn);
+  expect(onApplyOps).toHaveBeenCalledWith([
+    {
+      op: 'set_props',
+      id: 'c1',
+      props: {
+        chartType: 'bar',
+        chrome: { legendShow: false, numberFormat: 'compact' },
+      },
+    },
+  ]);
+
+  // AG Grid table widget: change density to comfortable ('L').
+  const oddNode = container.querySelector(
+    '[data-node-id="odd"]',
+  ) as HTMLElement;
+  const oddPropsBtn = oddNode.querySelector(
+    '[data-test="canvas-widget-props-btn"]',
+  ) as HTMLElement;
+  fireEvent.click(oddPropsBtn);
+
+  const largeBtn = await screen.findByRole('button', { name: 'L' });
+  fireEvent.click(largeBtn);
+  expect(onApplyOps).toHaveBeenCalledWith([
+    {
+      op: 'set_props',
+      id: 'odd',
+      props: {
+        searchable: false,
+        density: 'comfortable',
+      },
+    },
+  ]);
+});
