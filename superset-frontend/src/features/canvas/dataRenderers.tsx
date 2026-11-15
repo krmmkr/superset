@@ -597,6 +597,21 @@ export function TableRenderer(widget: Props) {
       };
     });
   }, [defs, rows, baseRules, thresholdNum, theme, sortable]);
+  const searchable = Boolean(props?.searchable);
+  const visibleRows = useMemo(() => {
+    const trimmed = searchTerm.trim().toLowerCase();
+    if (!searchable || !trimmed) return rows;
+    return rows.filter(row =>
+      columns.some(col => {
+        const val = row[col.key];
+        return (
+          val !== null &&
+          val !== undefined &&
+          String(val).toLowerCase().includes(trimmed)
+        );
+      }),
+    );
+  }, [rows, columns, searchable, searchTerm]);
   if (error) return <WidgetError message={error} onRetry={retry} />;
   if (!loading && rows.length === 0) {
     return (
@@ -612,7 +627,6 @@ export function TableRenderer(widget: Props) {
   const headerBgColor = text(props?.headerBgColor);
   const headerTextColor = text(props?.headerTextColor);
   const striped = Boolean(props?.striped);
-  const searchable = Boolean(props?.searchable);
   const wrapText = Boolean(props?.wrapText);
   const density =
     props?.density === 'normal' || props?.density === 'comfortable'
@@ -628,21 +642,6 @@ export function TableRenderer(widget: Props) {
       ? binding.dimensions[0]
       : undefined) || (columns[0]?.key as string | undefined);
   const datasetId = binding?.datasetId;
-
-  const visibleRows = useMemo(() => {
-    const trimmed = searchTerm.trim().toLowerCase();
-    if (!searchable || !trimmed) return rows;
-    return rows.filter(row =>
-      columns.some(col => {
-        const val = row[col.key];
-        return (
-          val !== null &&
-          val !== undefined &&
-          String(val).toLowerCase().includes(trimmed)
-        );
-      }),
-    );
-  }, [rows, columns, searchable, searchTerm]);
 
   const handleRowClick = (record: Record<string, unknown>) => {
     if (!crossFilterEnabled || !firstDim || !setCrossFilter) return;

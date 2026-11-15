@@ -27,6 +27,7 @@ import {
   Popover,
   Switch,
   Tag,
+  Tooltip,
 } from '@superset-ui/core/components';
 import { ErrorBoundary } from 'src/components/ErrorBoundary';
 import { useWidgetRenderers } from 'src/core';
@@ -262,6 +263,31 @@ const Placeholder = styled.div`
     border-radius: ${theme.borderRadius}px;
     color: ${theme.colorTextSecondary};
     text-align: center;
+  `}
+`;
+
+const QuickActions = styled.span`
+  ${({ theme }) => css`
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    .canvas-titled-card:hover &,
+    .canvas-titled-card:focus-within & {
+      opacity: 1;
+    }
+    .ant-btn {
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      padding: 0;
+      color: ${theme.colorTextTertiary};
+      &:hover {
+        color: ${theme.colorText};
+        background: ${theme.colorFillTertiary};
+      }
+    }
   `}
 `;
 
@@ -699,6 +725,7 @@ export default function CanvasGrid({
     }
     return (
       <Titled
+        className="canvas-titled-card"
         $mark={mark}
         $bg={cardStyle?.backgroundColor}
         $borderless={cardStyle?.borderless}
@@ -739,20 +766,22 @@ export default function CanvasGrid({
               )
             )}
             {canQuickEdit && !isEditingTitle && (
-              <>
+              <QuickActions>
                 {effectiveTitle && (
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<Icons.EditOutlined />}
-                    aria-label={t('Rename widget')}
-                    data-test="canvas-widget-rename-btn"
-                    onPointerDown={e => e.stopPropagation()}
-                    onClick={() => {
-                      setDraftTitle(effectiveTitle);
-                      setEditingTitleNode(nodeId);
-                    }}
-                  />
+                  <Tooltip title={t('Rename')}>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<Icons.EditOutlined />}
+                      aria-label={t('Rename widget')}
+                      data-test="canvas-widget-rename-btn"
+                      onPointerDown={e => e.stopPropagation()}
+                      onClick={() => {
+                        setDraftTitle(effectiveTitle);
+                        setEditingTitleNode(nodeId);
+                      }}
+                    />
+                  </Tooltip>
                 )}
                 <Popover
                   trigger="click"
@@ -843,16 +872,18 @@ export default function CanvasGrid({
                     </StylePopoverBody>
                   }
                 >
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<Icons.BgColorsOutlined />}
-                    aria-label={t('Customize card')}
-                    data-test="canvas-widget-style-btn"
-                    onPointerDown={e => e.stopPropagation()}
-                  />
+                  <Tooltip title={t('Customize card')}>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<Icons.BgColorsOutlined />}
+                      aria-label={t('Customize card')}
+                      data-test="canvas-widget-style-btn"
+                      onPointerDown={e => e.stopPropagation()}
+                    />
+                  </Tooltip>
                 </Popover>
-              </>
+              </QuickActions>
             )}
             {mark && mark !== 'removed' && (
               <Mark color={MARKS[mark].color} data-test="canvas-widget-mark">
