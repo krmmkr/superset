@@ -1177,3 +1177,22 @@ test('quick card style popover in edit mode dispatches set_settings op', async (
     },
   ]);
 });
+
+test('hovering a filter source highlights its target widgets on the canvas', () => {
+  const { container } = renderGrid();
+  const filterNode = container.querySelector(
+    '[data-node-id="f"]',
+  ) as HTMLElement;
+  const filterCard = filterNode.querySelector(
+    '[data-test="canvas-widget-card"]',
+  ) as HTMLElement;
+  const c1Node = container.querySelector('[data-node-id="c1"]') as HTMLElement;
+
+  expect(c1Node.querySelector('[data-scope-highlighted="true"]')).toBeNull();
+  fireEvent.mouseEnter(filterCard);
+  expect(
+    c1Node.querySelector('[data-scope-highlighted="true"]'),
+  ).not.toBeNull();
+  fireEvent.mouseLeave(filterCard);
+  expect(c1Node.querySelector('[data-scope-highlighted="true"]')).toBeNull();
+});

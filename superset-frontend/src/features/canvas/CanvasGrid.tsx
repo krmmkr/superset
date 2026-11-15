@@ -132,8 +132,9 @@ const Titled = styled.div<{
   $mark?: DraftChange['kind'];
   $bg?: string;
   $borderless?: boolean;
+  $highlighted?: boolean;
 }>`
-  ${({ theme, $mark, $bg, $borderless }) => css`
+  ${({ theme, $mark, $bg, $borderless, $highlighted }) => css`
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -150,6 +151,14 @@ const Titled = styled.div<{
       css`
         border: none;
         box-shadow: none;
+      `
+    }
+    ${
+      $highlighted &&
+      css`
+        box-shadow: inset 0 0 0 2px ${theme.colorPrimary};
+        border-radius: ${theme.borderRadius}px;
+        transition: box-shadow 0.15s ease;
       `
     }
     ${
@@ -333,6 +342,30 @@ const CARD_BG_PRESETS = [
   { label: 'Purple', value: 'rgba(114, 46, 209, 0.10)' },
 ] as const;
 
+function widgetBindsParam(
+  props: Record<string, unknown> | undefined,
+  paramName: string,
+): boolean {
+  if (!props || !paramName) return false;
+  const chrome = props.chrome as Record<string, unknown> | undefined;
+  if (
+    chrome?.targetParam === paramName ||
+    chrome?.timeGrainParam === paramName ||
+    chrome?.dimensionParam === paramName ||
+    chrome?.metricParam === paramName ||
+    props.targetParam === paramName ||
+    props.thresholdParam === paramName
+  ) {
+    return true;
+  }
+  const token = `{{${paramName}}}`;
+  for (const key of ['message', 'content', 'label'] as const) {
+    const val = props[key];
+    if (typeof val === 'string' && val.includes(token)) return true;
+  }
+  return false;
+}
+
 export interface CanvasGridProps {
   canvasId: number;
   result: CanvasDefinitionResult;
@@ -383,6 +416,7 @@ export default function CanvasGrid({
 }: CanvasGridProps) {
   const [editingTitleNode, setEditingTitleNode] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
+  const [hoveredSourceId, setHoveredSourceId] = useState<string | null>(null);
   const getRenderer = useWidgetRenderers();
   const {
     definition,
@@ -514,6 +548,62 @@ export default function CanvasGrid({
   const { gap, rowUnit, columns, widthMode, fixedWidth } =
     definition.root.layout;
   const { colors, display, crossFilters } = definition.settings;
+  const scopeTargetsBySource = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const [sourceId, targets] of Object.entries(filterScopes ?? {})) {
+      if (targets.length > 0) map[sourceId] = targets;
+    }
+    if (crossFilters.enabled) {
+      for (const [sourceId, targets] of Object.entries(
+        crossFilterScopes ?? {},
+      )) {
+        const srcNode = definition.nodes[sourceId];
+        const srcProps = srcNode?.widgetId
+          ? widgets[srcNode.widgetId]?.props
+          : srcNode?.props;
+        if (targets.length > 0 && srcProps?.crossFilter) {
+          map[sourceId] = [...new Set([...(map[sourceId] ?? []), ...targets])];
+        }
+      }
+    }
+    for (const [sourceId, targets] of Object.entries(
+      customizationScopes ?? {},
+    )) {
+      if (targets.length === 0) continue;
+      const srcNode = definition.nodes[sourceId];
+      const srcProps = srcNode?.widgetId
+        ? widgets[srcNode.widgetId]?.props
+        : srcNode?.props;
+      const paramName = srcProps?.name;
+      const bound =
+        typeof paramName === 'string' && paramName
+          ? targets.filter(tId => {
+              const tNode = definition.nodes[tId];
+              const tProps = tNode?.widgetId
+                ? widgets[tNode.widgetId]?.props
+                : tNode?.props;
+              return widgetBindsParam(tProps, paramName);
+            })
+          : [];
+      const effective = bound.length > 0 ? bound : targets;
+      map[sourceId] = [...new Set([...(map[sourceId] ?? []), ...effective])];
+    }
+    return map;
+  }, [
+    filterScopes,
+    crossFilterScopes,
+    customizationScopes,
+    crossFilters.enabled,
+    definition.nodes,
+    widgets,
+  ]);
+  const highlightedTargets = useMemo(
+    () =>
+      hoveredSourceId
+        ? new Set(scopeTargetsBySource[hoveredSourceId] ?? [])
+        : new Set<string>(),
+    [hoveredSourceId, scopeTargetsBySource],
+  );
   const sharedColors = useMemo<canvasApi.CanvasColors>(
     () => ({ scheme: colors.scheme, labelColors: colors.labelColors }),
     [colors.scheme, colors.labelColors],
@@ -686,6 +776,9 @@ export default function CanvasGrid({
     const subtitle = cardStyle?.subtitle;
     const titleAlign = cardStyle?.titleAlign ?? display.titleAlign ?? 'left';
     const canQuickEdit = editable && Boolean(onApplyOps);
+    const sourceTargets = scopeTargetsBySource[nodeId];
+    const isScopeSource = Boolean(sourceTargets && sourceTargets.length > 0);
+    const isHighlighted = highlightedTargets.has(nodeId);
     const isEditingTitle = canQuickEdit && editingTitleNode === nodeId;
     const commitTitle = () => {
       const nextName = draftTitle.trim();
@@ -711,15 +804,17 @@ export default function CanvasGrid({
         },
       ]);
     };
-    // A widget with no title, subtitle, mark, or card style needs no wrapper
-    // unless quick edit controls are active.
+    // A widget with no title, subtitle, mark, card style, or scope link needs
+    // no wrapper unless quick edit controls are active.
     if (
       !effectiveTitle &&
       !subtitle &&
       !mark &&
       !cardStyle?.backgroundColor &&
       !cardStyle?.borderless &&
-      !canQuickEdit
+      !canQuickEdit &&
+      !isScopeSource &&
+      !isHighlighted
     ) {
       return widget;
     }
@@ -729,8 +824,18 @@ export default function CanvasGrid({
         $mark={mark}
         $bg={cardStyle?.backgroundColor}
         $borderless={cardStyle?.borderless}
+        $highlighted={isHighlighted}
         data-test="canvas-widget-card"
         data-borderless={cardStyle?.borderless ? 'true' : undefined}
+        data-scope-highlighted={isHighlighted ? 'true' : undefined}
+        onMouseEnter={
+          isScopeSource ? () => setHoveredSourceId(nodeId) : undefined
+        }
+        onMouseLeave={
+          isScopeSource
+            ? () => setHoveredSourceId(prev => (prev === nodeId ? null : prev))
+            : undefined
+        }
       >
         {(effectiveTitle || (mark && mark !== 'removed') || canQuickEdit) && (
           <TitleRow $align={titleAlign}>
@@ -884,6 +989,18 @@ export default function CanvasGrid({
                   </Tooltip>
                 </Popover>
               </QuickActions>
+            )}
+            {isScopeSource && (
+              <Tooltip
+                title={t('Affects %s widget(s)', sourceTargets?.length ?? 0)}
+              >
+                <span
+                  data-test="canvas-scope-source-icon"
+                  style={{ display: 'inline-flex', opacity: 0.55 }}
+                >
+                  <Icons.FilterOutlined iconSize="s" />
+                </span>
+              </Tooltip>
             )}
             {mark && mark !== 'removed' && (
               <Mark color={MARKS[mark].color} data-test="canvas-widget-mark">
