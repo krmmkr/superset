@@ -40,6 +40,7 @@ class PivotTableChartPlugin(BaseChartPlugin):
     display_name = "Pivot Table"
     native_viz_types: ClassVar[Mapping[str, str]] = {
         "pivot_table_v2": "Pivot Table",
+        "antvs2_table_pivot": "AntV S2 Pivot Table",
     }
     query_role_keys = BaseChartPlugin.query_role_keys | {
         "groupbyColumns",
@@ -123,7 +124,7 @@ class PivotTableChartPlugin(BaseChartPlugin):
         return self._with_context(what, context)
 
     def resolve_viz_type(self, config: Any) -> str:
-        return "pivot_table_v2"
+        return getattr(config, "viz_type", "pivot_table_v2")
 
     def normalize_column_refs(self, config: Any, dataset_context: Any) -> Any:
         config_dict = config.model_dump(exclude_unset=True)
