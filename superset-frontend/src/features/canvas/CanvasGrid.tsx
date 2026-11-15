@@ -162,6 +162,7 @@ const ALIGNMENT = {
 const TitleRow = styled.div<{ $align: 'left' | 'center' | 'right' }>`
   ${({ theme, $align }) => css`
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: ${ALIGNMENT[$align]};
     gap: ${theme.sizeUnit * 2}px;
@@ -200,6 +201,7 @@ const WidgetTitle = styled.div`
 const TitledBody = styled.div`
   flex: 1;
   min-height: 0;
+  overflow: auto;
 `;
 
 const Placeholder = styled.div`
