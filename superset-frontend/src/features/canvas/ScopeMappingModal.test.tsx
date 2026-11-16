@@ -210,3 +210,89 @@ test('ScopeMappingModal annotates dataset and parameter compatibility on targets
     screen.getByText(/Sales by Product \(echarts\) — Different dataset/),
   ).toBeInTheDocument();
 });
+
+test('ScopeMappingModal checks only resolved targets in auto mode', () => {
+  const partialResult: CanvasDefinitionResult = {
+    ...baseResult,
+    crossFilterScopes: { chart1: ['table1'] },
+  };
+  render(
+    <ScopeMappingModal
+      open
+      onClose={jest.fn()}
+      result={partialResult}
+      draftToken="draft-123"
+      revision={4}
+      onApplied={jest.fn()}
+    />,
+  );
+
+  const tableCheckbox = screen.getByRole('checkbox', {
+    name: /Top Countries \(ag-grid-table\)/,
+  });
+  const chart2Checkbox = screen.getByRole('checkbox', {
+    name: /Sales by Product \(echarts\)/,
+  });
+  expect(tableCheckbox).toBeChecked();
+  expect(chart2Checkbox).not.toBeChecked();
+});
+
+test('ScopeMappingModal checks only param-bound targets for parameter in auto mode', () => {
+  const paramResult: CanvasDefinitionResult = {
+    ...baseResult,
+    crossFilterScopes: {},
+    titles: { ...baseResult.titles, param1: 'Goal' },
+    widgetTypes: { ...baseResult.widgetTypes, param1: 'parameter' },
+    customizationScopes: { param1: ['chart1', 'chart2', 'table1'] },
+    definition: {
+      ...baseResult.definition,
+      nodes: {
+        param1: {
+          widgetType: 'parameter',
+          schemaVersion: 1,
+          props: { name: 'goal' },
+          layout: {},
+        },
+        chart1: {
+          widgetType: 'echarts',
+          schemaVersion: 1,
+          props: { chrome: { targetParam: 'goal' } },
+          layout: {},
+        },
+        chart2: {
+          widgetType: 'echarts',
+          schemaVersion: 1,
+          props: {},
+          layout: {},
+        },
+        table1: {
+          widgetType: 'ag-grid-table',
+          schemaVersion: 1,
+          props: {},
+          layout: {},
+        },
+      },
+    },
+  };
+
+  render(
+    <ScopeMappingModal
+      open
+      onClose={jest.fn()}
+      result={paramResult}
+      draftToken="draft-123"
+      revision={4}
+      onApplied={jest.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByRole('checkbox', { name: /Sales by Year \(echarts\) — Bound/ }),
+  ).toBeChecked();
+  expect(
+    screen.getByRole('checkbox', { name: /Sales by Product \(echarts\)/ }),
+  ).not.toBeChecked();
+  expect(
+    screen.getByRole('checkbox', { name: /Top Countries \(ag-grid-table\)/ }),
+  ).not.toBeChecked();
+});

@@ -48,6 +48,7 @@ import {
 import { CanvasDragProvider } from './useCanvasDrag';
 import { CanvasActiveTabContext } from './widgetChrome';
 import { fitPlacements } from './resolveGrid';
+import { resolveEffectiveTargets } from './scopeUtils';
 
 /** Current values set by nodes, per scope kind, by node id. */
 export type ScopeValues = Record<canvasApi.ScopeKind, Record<string, unknown>>;
@@ -135,6 +136,7 @@ const Titled = styled.div<{
   $highlighted?: boolean;
 }>`
   ${({ theme, $mark, $bg, $borderless, $highlighted }) => css`
+    position: relative;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -156,9 +158,11 @@ const Titled = styled.div<{
     ${
       $highlighted &&
       css`
-        box-shadow: inset 0 0 0 2px ${theme.colorPrimary};
+        box-shadow:
+          inset 0 0 0 1px ${theme.colorPrimaryBorder},
+          0 0 0 2px ${theme.colorPrimaryBg};
         border-radius: ${theme.borderRadius}px;
-        transition: box-shadow 0.15s ease;
+        transition: box-shadow 0.2s ease;
       `
     }
     ${
@@ -170,6 +174,27 @@ const Titled = styled.div<{
           ${$mark === 'new' ? theme.colorSuccess : theme.colorPrimary};
         border-radius: ${theme.borderRadius}px;
       `
+    }
+  `}
+`;
+
+const ScopeBadge = styled.span<{ $floating?: boolean; $editable?: boolean }>`
+  ${({ theme, $floating, $editable }) => css`
+    ${
+      $floating &&
+      css`
+        position: absolute;
+        top: ${theme.sizeUnit}px;
+        right: ${$editable ? theme.sizeUnit * 31 : theme.sizeUnit * 1.5}px;
+        z-index: 2;
+      `
+    }
+    display: inline-flex;
+    align-items: center;
+    opacity: 0.45;
+    transition: opacity 0.15s ease;
+    &:hover {
+      opacity: 0.95;
     }
   `}
 `;
@@ -361,11 +386,19 @@ function renderQuickWidgetSettings(
     return null;
   }
 
+  const sectionTitle =
+    widgetType === 'echarts'
+      ? t('Chart settings')
+      : widgetType === 'ag-grid-table'
+        ? t('Table settings')
+        : t('Pivot settings');
+
   return (
     <StylePopoverBody
       onPointerDown={e => e.stopPropagation()}
       data-test="canvas-widget-props-popover"
     >
+      <PopoverSectionTitle>{sectionTitle}</PopoverSectionTitle>
       {toggleRows.map(row => (
         <StyleRow key={row.key}>
           <span>{row.label}</span>
@@ -452,11 +485,20 @@ const Placeholder = styled.div`
   `}
 `;
 
-const QuickActions = styled.span`
-  ${({ theme }) => css`
+const QuickActions = styled.span<{ $floating?: boolean }>`
+  ${({ theme, $floating }) => css`
     display: inline-flex;
     align-items: center;
     gap: 2px;
+    ${
+      $floating &&
+      css`
+        position: absolute;
+        top: ${theme.sizeUnit * 1.5}px;
+        right: ${theme.sizeUnit * 21}px;
+        z-index: 2;
+      `
+    }
     opacity: 0;
     transition: opacity 0.15s ease;
     .canvas-titled-card:hover &,
@@ -464,14 +506,18 @@ const QuickActions = styled.span`
       opacity: 1;
     }
     .ant-btn {
-      width: 22px;
-      height: 22px;
-      min-width: 22px;
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
       padding: 0;
-      color: ${theme.colorTextTertiary};
-      &:hover {
-        color: ${theme.colorText};
-        background: ${theme.colorFillTertiary};
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      color: ${theme.colorTextQuaternary};
+      &:hover,
+      &:focus {
+        color: ${theme.colorTextSecondary};
+        background: transparent;
       }
     }
   `}
@@ -482,7 +528,19 @@ const StylePopoverBody = styled.div`
     display: flex;
     flex-direction: column;
     gap: ${theme.sizeUnit * 2}px;
-    width: 240px;
+    min-width: 256px;
+    max-width: 300px;
+    font-size: ${theme.fontSizeSM}px;
+  `}
+`;
+
+const PopoverSectionTitle = styled.div`
+  ${({ theme }) => css`
+    font-size: ${theme.fontSizeSM}px;
+    font-weight: ${theme.fontWeightStrong};
+    color: ${theme.colorTextSecondary};
+    padding-bottom: ${theme.sizeUnit}px;
+    border-bottom: 1px solid ${theme.colorBorderSecondary};
   `}
 `;
 
@@ -490,13 +548,15 @@ const StyleRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 `;
 
 const SwatchRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px;
 `;
 
 const SwatchButton = styled.button<{ $color?: string; $active?: boolean }>`
@@ -518,30 +578,6 @@ const CARD_BG_PRESETS = [
   { label: 'Amber', value: 'rgba(250, 140, 22, 0.10)' },
   { label: 'Purple', value: 'rgba(114, 46, 209, 0.10)' },
 ] as const;
-
-function widgetBindsParam(
-  props: Record<string, unknown> | undefined,
-  paramName: string,
-): boolean {
-  if (!props || !paramName) return false;
-  const chrome = props.chrome as Record<string, unknown> | undefined;
-  if (
-    chrome?.targetParam === paramName ||
-    chrome?.timeGrainParam === paramName ||
-    chrome?.dimensionParam === paramName ||
-    chrome?.metricParam === paramName ||
-    props.targetParam === paramName ||
-    props.thresholdParam === paramName
-  ) {
-    return true;
-  }
-  const token = `{{${paramName}}}`;
-  for (const key of ['message', 'content', 'label'] as const) {
-    const val = props[key];
-    if (typeof val === 'string' && val.includes(token)) return true;
-  }
-  return false;
-}
 
 export interface CanvasGridProps {
   canvasId: number;
@@ -727,44 +763,38 @@ export default function CanvasGrid({
   const { colors, display, crossFilters } = definition.settings;
   const scopeTargetsBySource = useMemo(() => {
     const map: Record<string, string[]> = {};
-    for (const [sourceId, targets] of Object.entries(filterScopes ?? {})) {
-      if (targets.length > 0) map[sourceId] = targets;
-    }
-    if (crossFilters.enabled) {
-      for (const [sourceId, targets] of Object.entries(
-        crossFilterScopes ?? {},
-      )) {
-        const srcNode = definition.nodes[sourceId];
-        const srcProps = srcNode?.widgetId
-          ? widgets[srcNode.widgetId]?.props
-          : srcNode?.props;
-        if (targets.length > 0 && srcProps?.crossFilter) {
-          map[sourceId] = [...new Set([...(map[sourceId] ?? []), ...targets])];
+    const propsOf = (id: string) => {
+      const n = definition.nodes[id];
+      return (n?.widgetId ? widgets[n.widgetId]?.props : n?.props) as
+        | Record<string, unknown>
+        | undefined;
+    };
+    const addResolved = (
+      kind: canvasApi.ScopeKind,
+      scopes: Record<string, string[]> | undefined,
+      requireCrossFilterProp = false,
+    ) => {
+      for (const [sourceId, targets] of Object.entries(scopes ?? {})) {
+        if (targets.length === 0) continue;
+        if (requireCrossFilterProp && !propsOf(sourceId)?.crossFilter) continue;
+        const effective = resolveEffectiveTargets(
+          kind,
+          sourceId,
+          targets,
+          propsOf,
+        );
+        if (effective.length > 0) {
+          map[sourceId] = [
+            ...new Set([...(map[sourceId] ?? []), ...effective]),
+          ];
         }
       }
+    };
+    addResolved('filter', filterScopes);
+    if (crossFilters.enabled) {
+      addResolved('crossFilter', crossFilterScopes, true);
     }
-    for (const [sourceId, targets] of Object.entries(
-      customizationScopes ?? {},
-    )) {
-      if (targets.length === 0) continue;
-      const srcNode = definition.nodes[sourceId];
-      const srcProps = srcNode?.widgetId
-        ? widgets[srcNode.widgetId]?.props
-        : srcNode?.props;
-      const paramName = srcProps?.name;
-      const bound =
-        typeof paramName === 'string' && paramName
-          ? targets.filter(tId => {
-              const tNode = definition.nodes[tId];
-              const tProps = tNode?.widgetId
-                ? widgets[tNode.widgetId]?.props
-                : tNode?.props;
-              return widgetBindsParam(tProps, paramName);
-            })
-          : [];
-      const effective = bound.length > 0 ? bound : targets;
-      map[sourceId] = [...new Set([...(map[sourceId] ?? []), ...effective])];
-    }
+    addResolved('customization', customizationScopes);
     return map;
   }, [
     filterScopes,
@@ -1021,6 +1051,151 @@ export default function CanvasGrid({
     ) {
       return widget;
     }
+    const showTitleRow = Boolean(
+      effectiveTitle || (mark && mark !== 'removed'),
+    );
+    const quickActionsEl =
+      canQuickEdit && !isEditingTitle ? (
+        <QuickActions $floating={!showTitleRow}>
+          <Popover
+            trigger="click"
+            placement="bottomRight"
+            content={
+              <StylePopoverBody
+                onPointerDown={e => e.stopPropagation()}
+                data-test="canvas-widget-style-popover"
+              >
+                <PopoverSectionTitle>{t('Card style')}</PopoverSectionTitle>
+                <StyleRow>
+                  <span>{t('Hide title')}</span>
+                  <Switch
+                    size="small"
+                    checked={Boolean(cardStyle?.hideTitle)}
+                    onChange={checked =>
+                      updateCardStyle({ hideTitle: checked })
+                    }
+                  />
+                </StyleRow>
+                <StyleRow>
+                  <span>{t('Borderless')}</span>
+                  <Switch
+                    size="small"
+                    checked={Boolean(cardStyle?.borderless)}
+                    onChange={checked =>
+                      updateCardStyle({ borderless: checked })
+                    }
+                  />
+                </StyleRow>
+                <StyleRow>
+                  <span>{t('Title align')}</span>
+                  <SwatchRow>
+                    {(['left', 'center', 'right'] as const).map(align => (
+                      <Button
+                        key={align}
+                        size="small"
+                        type={titleAlign === align ? 'primary' : 'default'}
+                        onClick={() => updateCardStyle({ titleAlign: align })}
+                      >
+                        {align[0].toUpperCase()}
+                      </Button>
+                    ))}
+                  </SwatchRow>
+                </StyleRow>
+                <StyleRow>
+                  <span>{t('Tint')}</span>
+                  <SwatchRow>
+                    {CARD_BG_PRESETS.map(preset => (
+                      <SwatchButton
+                        key={preset.label}
+                        type="button"
+                        aria-label={preset.label}
+                        $color={preset.value}
+                        $active={cardStyle?.backgroundColor === preset.value}
+                        onClick={() =>
+                          updateCardStyle({
+                            backgroundColor: preset.value,
+                          })
+                        }
+                      />
+                    ))}
+                  </SwatchRow>
+                </StyleRow>
+                <Input
+                  size="small"
+                  placeholder={t('Subtitle (Enter to save)')}
+                  defaultValue={cardStyle?.subtitle ?? ''}
+                  onPressEnter={e =>
+                    updateCardStyle({
+                      subtitle: (e.target as HTMLInputElement).value.trim(),
+                    })
+                  }
+                  onBlur={e => {
+                    const nextSub = e.target.value.trim();
+                    if (nextSub !== (cardStyle?.subtitle ?? '')) {
+                      updateCardStyle({ subtitle: nextSub });
+                    }
+                  }}
+                />
+              </StylePopoverBody>
+            }
+          >
+            <Tooltip title={t('Customize card')}>
+              <Button
+                type="text"
+                size="small"
+                icon={<Icons.BgColorsOutlined iconSize="s" />}
+                aria-label={t('Customize card')}
+                data-test="canvas-widget-style-btn"
+                onPointerDown={e => e.stopPropagation()}
+              />
+            </Tooltip>
+          </Popover>
+          {quickSettingsContent && (
+            <Popover
+              trigger="click"
+              placement="bottomRight"
+              content={quickSettingsContent}
+            >
+              <Tooltip title={t('Widget settings')}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<Icons.SettingOutlined iconSize="s" />}
+                  aria-label={t('Widget settings')}
+                  data-test="canvas-widget-props-btn"
+                  onPointerDown={e => e.stopPropagation()}
+                />
+              </Tooltip>
+            </Popover>
+          )}
+        </QuickActions>
+      ) : null;
+    const scopeBadgeEl = isScopeSource ? (
+      <Tooltip
+        title={
+          <div>
+            <div>{t('Affects %s widget(s):', sourceTargets?.length ?? 0)}</div>
+            {(sourceTargets ?? []).map(targetId => (
+              <div key={targetId}>
+                {`• ${titles[targetId] || widgetTypes[targetId] || targetId}`}
+              </div>
+            ))}
+          </div>
+        }
+      >
+        <ScopeBadge
+          $floating={!showTitleRow}
+          $editable={editable}
+          data-test="canvas-scope-source-icon"
+          onMouseEnter={() => setHoveredSourceId(nodeId)}
+          onMouseLeave={() =>
+            setHoveredSourceId(prev => (prev === nodeId ? null : prev))
+          }
+        >
+          <Icons.FilterOutlined iconSize="s" />
+        </ScopeBadge>
+      </Tooltip>
+    ) : null;
     return (
       <Titled
         className="canvas-titled-card"
@@ -1031,20 +1206,9 @@ export default function CanvasGrid({
         data-test="canvas-widget-card"
         data-borderless={cardStyle?.borderless ? 'true' : undefined}
         data-scope-highlighted={isHighlighted ? 'true' : undefined}
-        onMouseEnter={
-          isScopeSource ? () => setHoveredSourceId(nodeId) : undefined
-        }
-        onMouseLeave={
-          isScopeSource
-            ? () => setHoveredSourceId(prev => (prev === nodeId ? null : prev))
-            : undefined
-        }
       >
-        {(effectiveTitle ||
-          (mark && mark !== 'removed') ||
-          canQuickEdit ||
-          isScopeSource) && (
-          <TitleRow $align={titleAlign}>
+        {showTitleRow ? (
+          <TitleRow $align={titleAlign} data-test="canvas-widget-title-row">
             {isEditingTitle ? (
               <Input
                 size="small"
@@ -1076,173 +1240,19 @@ export default function CanvasGrid({
                 </WidgetTitle>
               )
             )}
-            {canQuickEdit && !isEditingTitle && (
-              <QuickActions>
-                {effectiveTitle && (
-                  <Tooltip title={t('Rename')}>
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<Icons.EditOutlined />}
-                      aria-label={t('Rename widget')}
-                      data-test="canvas-widget-rename-btn"
-                      onPointerDown={e => e.stopPropagation()}
-                      onClick={() => {
-                        setDraftTitle(effectiveTitle);
-                        setEditingTitleNode(nodeId);
-                      }}
-                    />
-                  </Tooltip>
-                )}
-                <Popover
-                  trigger="click"
-                  placement="bottomRight"
-                  content={
-                    <StylePopoverBody
-                      onPointerDown={e => e.stopPropagation()}
-                      data-test="canvas-widget-style-popover"
-                    >
-                      <StyleRow>
-                        <span>{t('Hide title')}</span>
-                        <Switch
-                          size="small"
-                          checked={Boolean(cardStyle?.hideTitle)}
-                          onChange={checked =>
-                            updateCardStyle({ hideTitle: checked })
-                          }
-                        />
-                      </StyleRow>
-                      <StyleRow>
-                        <span>{t('Borderless')}</span>
-                        <Switch
-                          size="small"
-                          checked={Boolean(cardStyle?.borderless)}
-                          onChange={checked =>
-                            updateCardStyle({ borderless: checked })
-                          }
-                        />
-                      </StyleRow>
-                      <StyleRow>
-                        <span>{t('Title align')}</span>
-                        <SwatchRow>
-                          {(['left', 'center', 'right'] as const).map(align => (
-                            <Button
-                              key={align}
-                              size="small"
-                              type={
-                                titleAlign === align ? 'primary' : 'default'
-                              }
-                              onClick={() =>
-                                updateCardStyle({ titleAlign: align })
-                              }
-                            >
-                              {align[0].toUpperCase()}
-                            </Button>
-                          ))}
-                        </SwatchRow>
-                      </StyleRow>
-                      <StyleRow>
-                        <span>{t('Tint')}</span>
-                        <SwatchRow>
-                          {CARD_BG_PRESETS.map(preset => (
-                            <SwatchButton
-                              key={preset.label}
-                              type="button"
-                              aria-label={preset.label}
-                              $color={preset.value}
-                              $active={
-                                cardStyle?.backgroundColor === preset.value
-                              }
-                              onClick={() =>
-                                updateCardStyle({
-                                  backgroundColor: preset.value,
-                                })
-                              }
-                            />
-                          ))}
-                        </SwatchRow>
-                      </StyleRow>
-                      <Input
-                        size="small"
-                        placeholder={t('Subtitle (Enter to save)')}
-                        defaultValue={cardStyle?.subtitle ?? ''}
-                        onPressEnter={e =>
-                          updateCardStyle({
-                            subtitle: (
-                              e.target as HTMLInputElement
-                            ).value.trim(),
-                          })
-                        }
-                        onBlur={e => {
-                          const nextSub = e.target.value.trim();
-                          if (nextSub !== (cardStyle?.subtitle ?? '')) {
-                            updateCardStyle({ subtitle: nextSub });
-                          }
-                        }}
-                      />
-                    </StylePopoverBody>
-                  }
-                >
-                  <Tooltip title={t('Customize card')}>
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<Icons.BgColorsOutlined />}
-                      aria-label={t('Customize card')}
-                      data-test="canvas-widget-style-btn"
-                      onPointerDown={e => e.stopPropagation()}
-                    />
-                  </Tooltip>
-                </Popover>
-                {quickSettingsContent && (
-                  <Popover
-                    trigger="click"
-                    placement="bottomRight"
-                    content={quickSettingsContent}
-                  >
-                    <Tooltip title={t('Widget settings')}>
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<Icons.SettingOutlined />}
-                        aria-label={t('Widget settings')}
-                        data-test="canvas-widget-props-btn"
-                        onPointerDown={e => e.stopPropagation()}
-                      />
-                    </Tooltip>
-                  </Popover>
-                )}
-              </QuickActions>
-            )}
-            {isScopeSource && (
-              <Tooltip
-                title={
-                  <div>
-                    <div>
-                      {t('Affects %s widget(s):', sourceTargets?.length ?? 0)}
-                    </div>
-                    {(sourceTargets ?? []).map(targetId => (
-                      <div key={targetId}>
-                        {`• ${titles[targetId] || widgetTypes[targetId] || targetId}`}
-                      </div>
-                    ))}
-                  </div>
-                }
-              >
-                <span
-                  data-test="canvas-scope-source-icon"
-                  style={{ display: 'inline-flex', opacity: 0.55 }}
-                >
-                  <Icons.FilterOutlined iconSize="s" />
-                </span>
-              </Tooltip>
-            )}
+            {quickActionsEl}
+            {scopeBadgeEl}
             {mark && mark !== 'removed' && (
               <Mark color={MARKS[mark].color} data-test="canvas-widget-mark">
                 {MARKS[mark].label()}
               </Mark>
             )}
           </TitleRow>
+        ) : (
+          <>
+            {quickActionsEl}
+            {scopeBadgeEl}
+          </>
         )}
         {subtitle && (
           <WidgetSubtitle

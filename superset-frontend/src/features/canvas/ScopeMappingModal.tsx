@@ -32,6 +32,12 @@ import {
   Typography,
 } from '@superset-ui/core/components';
 import { DRAFT_TOKEN_HEADER } from './useCanvasDefinition';
+import {
+  datasetIdOf,
+  nodePropsOf,
+  resolveEffectiveTargets,
+  widgetBindsParam,
+} from './scopeUtils';
 import type { CanvasDefinitionResult } from './types';
 
 type ScopeMode = 'auto' | 'global' | 'custom';
@@ -108,47 +114,6 @@ const KIND_LABELS: Record<canvasApi.ScopeKind, string> = {
   customization: t('Parameter'),
 };
 
-function nodeProps(
-  result: CanvasDefinitionResult,
-  nodeId: string,
-): Record<string, unknown> | undefined {
-  const node = result.definition?.nodes?.[nodeId];
-  if (!node) return undefined;
-  return node.widgetId ? result.widgets?.[node.widgetId]?.props : node.props;
-}
-
-function datasetIdOf(
-  props: Record<string, unknown> | undefined,
-): number | null {
-  if (!props) return null;
-  if (typeof props.datasetId === 'number') return props.datasetId;
-  const binding = props.dataBinding as Record<string, unknown> | undefined;
-  return typeof binding?.datasetId === 'number' ? binding.datasetId : null;
-}
-
-function targetBindsParam(
-  props: Record<string, unknown> | undefined,
-  paramName: string,
-): boolean {
-  if (!props || !paramName) return false;
-  const chrome = props.chrome as Record<string, unknown> | undefined;
-  if (
-    chrome?.targetParam === paramName ||
-    chrome?.timeGrainParam === paramName ||
-    chrome?.dimensionParam === paramName ||
-    chrome?.metricParam === paramName ||
-    props.targetParam === paramName ||
-    props.thresholdParam === paramName
-  ) {
-    return true;
-  }
-  const token = `{{${paramName}}}`;
-  return ['message', 'content', 'label'].some(k => {
-    const val = props[k];
-    return typeof val === 'string' && val.includes(token);
-  });
-}
-
 export interface ScopeMappingModalProps {
   open: boolean;
   onClose: () => void;
@@ -187,7 +152,7 @@ export default function ScopeMappingModal({
         ...Object.keys(stored ?? {}),
       ]);
       for (const id of ids) {
-        const props = nodeProps(result, id);
+        const props = nodePropsOf(result, id);
         const suffix =
           kind === 'crossFilter' && props && !props.crossFilter
             ? ` [${t('Disabled on widget')}]`
@@ -232,7 +197,7 @@ export default function ScopeMappingModal({
   const candidateTargets = useMemo(() => {
     const out: { label: string; value: string; rank: number }[] = [];
     const srcProps = activeSource
-      ? nodeProps(result, activeSource.id)
+      ? nodePropsOf(result, activeSource.id)
       : undefined;
     const srcDatasetId = datasetIdOf(srcProps);
     const paramName =
@@ -244,11 +209,11 @@ export default function ScopeMappingModal({
     for (const [id, widgetType] of Object.entries(result.widgetTypes ?? {})) {
       if (activeSource && id === activeSource.id) continue;
       if (CONTAINER_TYPES.has(widgetType)) continue;
-      const tProps = nodeProps(result, id);
+      const tProps = nodePropsOf(result, id);
       let badge = '';
       let rank = 1;
       if (activeSource?.kind === 'customization' && paramName) {
-        if (targetBindsParam(tProps, paramName)) {
+        if (widgetBindsParam(tProps, paramName)) {
           badge = ` — ${t('Bound')}`;
           rank = 0;
         }
@@ -297,6 +262,12 @@ export default function ScopeMappingModal({
         : activeSource.kind === 'crossFilter'
           ? interactions?.crossFilters
           : interactions?.customizations;
+    const resolvedMap =
+      activeSource.kind === 'filter'
+        ? result.filterScopes
+        : activeSource.kind === 'crossFilter'
+          ? result.crossFilterScopes
+          : result.customizationScopes;
     const stored = storedMap?.[activeSource.id];
     const nextMode: ScopeMode =
       stored?.mode === 'global' || stored?.mode === 'custom'
@@ -305,13 +276,26 @@ export default function ScopeMappingModal({
     setMode(nextMode);
     if (nextMode === 'custom') {
       setCheckedTargets(stored?.targets ?? []);
+    } else if (nextMode === 'auto') {
+      const candidateSet = new Set(candidateTargets.map(c => c.value));
+      const resolved = (resolvedMap?.[activeSource.id] ?? []).filter(id =>
+        candidateSet.has(id),
+      );
+      setCheckedTargets(
+        resolveEffectiveTargets(
+          activeSource.kind,
+          activeSource.id,
+          resolved,
+          id => nodePropsOf(result, id),
+        ),
+      );
     } else {
       const excluded = new Set(stored?.exclude ?? []);
       setCheckedTargets(
         candidateTargets.map(c => c.value).filter(id => !excluded.has(id)),
       );
     }
-  }, [activeSource, interactions, candidateTargets]);
+  }, [activeSource, interactions, result, candidateTargets]);
 
   const sendOps = async (ops: Record<string, unknown>[]) => {
     setSaving(true);

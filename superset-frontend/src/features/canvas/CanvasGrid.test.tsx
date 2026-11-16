@@ -1121,10 +1121,13 @@ test('inline title editing in edit mode dispatches rename op', () => {
   );
 
   const c1Node = container.querySelector('[data-node-id="c1"]') as HTMLElement;
-  const renameBtn = c1Node.querySelector(
-    '[data-test="canvas-widget-rename-btn"]',
+  expect(
+    c1Node.querySelector('[data-test="canvas-widget-rename-btn"]'),
+  ).toBeNull();
+  const titleEl = c1Node.querySelector(
+    '[data-test="canvas-widget-title"]',
   ) as HTMLElement;
-  fireEvent.click(renameBtn);
+  fireEvent.doubleClick(titleEl);
 
   const input = c1Node.querySelector(
     '[data-test="canvas-widget-title-input"]',
@@ -1178,22 +1181,22 @@ test('quick card style popover in edit mode dispatches set_settings op', async (
   ]);
 });
 
-test('hovering a filter source highlights its target widgets on the canvas', () => {
+test('hovering a filter scope icon highlights its target widgets on the canvas', () => {
   const { container } = renderGrid();
   const filterNode = container.querySelector(
     '[data-node-id="f"]',
   ) as HTMLElement;
-  const filterCard = filterNode.querySelector(
-    '[data-test="canvas-widget-card"]',
+  const scopeIcon = filterNode.querySelector(
+    '[data-test="canvas-scope-source-icon"]',
   ) as HTMLElement;
   const c1Node = container.querySelector('[data-node-id="c1"]') as HTMLElement;
 
   expect(c1Node.querySelector('[data-scope-highlighted="true"]')).toBeNull();
-  fireEvent.mouseEnter(filterCard);
+  fireEvent.mouseEnter(scopeIcon);
   expect(
     c1Node.querySelector('[data-scope-highlighted="true"]'),
   ).not.toBeNull();
-  fireEvent.mouseLeave(filterCard);
+  fireEvent.mouseLeave(scopeIcon);
   expect(c1Node.querySelector('[data-scope-highlighted="true"]')).toBeNull();
 });
 
@@ -1336,4 +1339,27 @@ test('scope source filter icon tooltip lists target widget names', async () => {
 
   expect(await screen.findByText('Affects 1 widget(s):')).toBeInTheDocument();
   expect(await screen.findByText('• Revenue Chart')).toBeInTheDocument();
+});
+
+test('untitled widget in edit mode floats quick actions without adding a title row', () => {
+  const { container } = render(
+    <CanvasGrid
+      canvasId={7}
+      result={result}
+      values={emptyScopeValues()}
+      onValueChange={jest.fn()}
+      layout={layoutOf(result)}
+      editable
+      onApplyOps={jest.fn()}
+    />,
+  );
+  const filterNode = container.querySelector(
+    '[data-node-id="f"]',
+  ) as HTMLElement;
+  expect(
+    filterNode.querySelector('[data-test="canvas-widget-title-row"]'),
+  ).toBeNull();
+  expect(
+    filterNode.querySelector('[data-test="canvas-widget-style-btn"]'),
+  ).not.toBeNull();
 });
