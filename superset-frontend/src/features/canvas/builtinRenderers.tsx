@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useContext } from 'react';
+import { useContext, useMemo } from 'react';
 import type { ComponentType } from 'react';
 import type { canvas as canvasApi } from '@apache-superset/core';
 import { t } from '@apache-superset/core/translation';
@@ -45,7 +45,11 @@ function interpolateParams(
   template: string,
   customizations: canvasApi.CanvasWidgetProps['customizations'],
 ): string {
-  if (!template || !Array.isArray(customizations) || customizations.length === 0) {
+  if (
+    !template ||
+    !Array.isArray(customizations) ||
+    customizations.length === 0
+  ) {
     return template;
   }
   const map = new Map<string, string>();
@@ -183,11 +187,15 @@ const Markdown = styled.div`
 `;
 
 const MarkdownRenderer = (widget: Props) => {
-  const { props, filters, refreshKey, customizations } = widget;
+  const { props, filters, crossFilters, refreshKey, customizations } = widget;
   const binding = props?.dataBinding as DataBinding | undefined;
+  const effectiveFilters = useMemo(
+    () => [...filters, ...(crossFilters ?? [])],
+    [filters, crossFilters],
+  );
   const { rows, error, query, language, datasource } = useWidgetRows(
     widget,
-    filters,
+    effectiveFilters,
     refreshKey,
   );
 
@@ -266,7 +274,10 @@ const CalloutBox = styled.div<{ variant: CalloutVariant }>`
   }}
 `;
 
-const CALLOUT_ICONS: Record<CalloutVariant, ComponentType<{ className?: string }>> = {
+const CALLOUT_ICONS: Record<
+  CalloutVariant,
+  ComponentType<{ className?: string }>
+> = {
   info: Icons.InfoCircleOutlined,
   success: Icons.CheckCircleOutlined,
   warning: Icons.ExclamationCircleOutlined,

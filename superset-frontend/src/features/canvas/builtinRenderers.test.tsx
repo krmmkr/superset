@@ -369,7 +369,8 @@ test('MetricTileRenderer prefers configured metric over numeric dimensions and c
             { year: 2005, 'Total Sales': 1500 },
             { year: 2004, 'Total Sales': 1000 },
           ],
-          query: 'SELECT year, SUM(sales) AS "Total Sales" FROM sales GROUP BY year',
+          query:
+            'SELECT year, SUM(sales) AS "Total Sales" FROM sales GROUP BY year',
           language: 'sql',
         },
       ],
@@ -408,5 +409,62 @@ test('MetricTileRenderer prefers configured metric over numeric dimensions and c
   expect(await screen.findByText('$1,500')).toBeInTheDocument();
   expect(screen.getByText('+50.0%')).toBeInTheDocument();
   expect(screen.getByText('vs prior year')).toBeInTheDocument();
+  fetchMock.removeRoutes();
+});
+
+test('MetricTileRenderer applies crossFilters to its data query', async () => {
+  fetchMock.clearHistory();
+  fetchMock.post('glob:*/api/v1/canvas/2/placement/kpi1/data', {
+    result: {
+      datasets: [
+        {
+          name: 'main',
+          row_count: 1,
+          inline_data: [{ 'Total Sales': 420 }],
+          query: 'SELECT SUM(sales) FROM tbl WHERE region IN ("EMEA")',
+          language: 'sql',
+        },
+      ],
+    },
+  });
+
+  render(
+    <MetricTileRenderer
+      canvasId={2}
+      nodeId="kpi1"
+      widgetType="metric-tile"
+      props={{
+        label: 'Total Sales',
+        prefix: '$',
+        decimals: 0,
+        dataBinding: {
+          datasetId: 13,
+          metrics: [{ label: 'Total Sales' }],
+        },
+      }}
+      filters={[]}
+      crossFilters={[
+        {
+          sourceId: 'c1',
+          value: { datasetId: 13, column: 'region', values: ['EMEA'] },
+        },
+      ]}
+      events={[]}
+      refreshKey={0}
+      setFilterValue={jest.fn()}
+      setCrossFilterValue={jest.fn()}
+      emitEvent={jest.fn()}
+      childNodes={[]}
+      renderGrid={jest.fn()}
+    />,
+    { useRedux: true, useRouter: true },
+  );
+
+  expect(await screen.findByText('$420')).toBeInTheDocument();
+  const [call] = fetchMock.callHistory.calls();
+  const body = JSON.parse(String(call.options.body));
+  expect(body.runtime_filters).toEqual([
+    { datasetId: 13, column: 'region', values: ['EMEA'] },
+  ]);
   fetchMock.removeRoutes();
 });

@@ -46,8 +46,6 @@ export interface CanvasToolbarProps {
   actions: DraftActions;
   /** Whether a draft is being started. */
   starting?: boolean;
-  /** Opens the filter/cross-filter scope mapping modal while editing. */
-  onOpenScopes?: () => void;
   /** Opens the canvas-level custom CSS editor modal while editing. */
   onOpenCss?: () => void;
 }
@@ -70,7 +68,6 @@ export default function CanvasToolbar({
   history,
   actions,
   starting = false,
-  onOpenScopes,
   onOpenCss,
 }: CanvasToolbarProps) {
   const editing = Boolean(draftToken);
@@ -126,17 +123,6 @@ export default function CanvasToolbar({
             data-test="canvas-edit"
           />
         </Tooltip>
-      )}
-      {editing && onOpenScopes && (
-        <Button
-          buttonStyle="tertiary"
-          icon={<Icons.FilterOutlined iconSize="m" />}
-          disabled={busy}
-          onClick={onOpenScopes}
-          data-test="canvas-scopes"
-        >
-          {t('Scopes')}
-        </Button>
       )}
       {editing && onOpenCss && (
         <Button

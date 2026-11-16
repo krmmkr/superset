@@ -256,9 +256,13 @@ function deltaTone(pct: number, invert: boolean): 'success' | 'danger' {
 
 /** The first row's value of the tile's metric, as a big number. */
 export function MetricTileRenderer(widget: Props) {
-  const { props, filters, refreshKey } = widget;
+  const { props, filters, crossFilters, refreshKey } = widget;
+  const effectiveFilters = useMemo(
+    () => [...filters, ...(crossFilters ?? [])],
+    [filters, crossFilters],
+  );
   const { rows, loading, error, query, language, datasource, retry } =
-    useWidgetRows(widget, filters, refreshKey);
+    useWidgetRows(widget, effectiveFilters, refreshKey);
   if (loading && rows.length === 0)
     return <Loading position="inline-centered" />;
   if (error) return <WidgetError message={error} onRetry={retry} />;

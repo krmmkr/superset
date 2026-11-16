@@ -28,7 +28,6 @@ import CanvasGrid, { EventValues, ScopeValues } from './CanvasGrid';
 import DraftBanner from './DraftBanner';
 import CanvasToolbar from './CanvasToolbar';
 import CssEditorModal from './CssEditorModal';
-import ScopeMappingModal from './ScopeMappingModal';
 import { useDraftActions } from './useDraftActions';
 import { useDraftHistory } from './useDraftHistory';
 import { useStartDraft } from './useStartDraft';
@@ -115,7 +114,6 @@ export default function CanvasBody({
   }, [error, addDangerToast, dismissError]);
   // True while the draft is being published or discarded.
   const [committing, setCommitting] = useState(false);
-  const [scopesOpen, setScopesOpen] = useState(false);
   const [cssOpen, setCssOpen] = useState(false);
   const actions = useDraftActions(
     draftToken,
@@ -173,7 +171,6 @@ export default function CanvasBody({
       history={history}
       actions={actions}
       starting={starting}
-      onOpenScopes={() => setScopesOpen(true)}
       onOpenCss={() => setCssOpen(true)}
     />
   );
@@ -199,14 +196,6 @@ export default function CanvasBody({
             saving={layout.saving}
             changes={result.changes}
             titles={result.titles}
-          />
-          <ScopeMappingModal
-            open={scopesOpen}
-            onClose={() => setScopesOpen(false)}
-            result={result}
-            draftToken={draftToken}
-            revision={layout.revision}
-            onApplied={reload}
           />
           <CssEditorModal
             show={cssOpen}
