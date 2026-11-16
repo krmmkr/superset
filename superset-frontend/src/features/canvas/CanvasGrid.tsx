@@ -191,8 +191,12 @@ const ScopeBadge = styled.span<{ $floating?: boolean; $editable?: boolean }>`
     }
     display: inline-flex;
     align-items: center;
-    opacity: 0.45;
+    opacity: 0;
     transition: opacity 0.15s ease;
+    .canvas-titled-card:hover &,
+    .canvas-titled-card:focus-within & {
+      opacity: 0.55;
+    }
     &:hover {
       opacity: 0.95;
     }
@@ -224,8 +228,11 @@ const ALIGNMENT = {
  * name and the tag beside it read as one thing, and centring the text inside
  * its own box would leave the tag stranded at the far edge of the widget.
  */
-const TitleRow = styled.div<{ $align: 'left' | 'center' | 'right' }>`
-  ${({ theme, $align }) => css`
+const TitleRow = styled.div<{
+  $align: 'left' | 'center' | 'right';
+  $editable?: boolean;
+}>`
+  ${({ theme, $align, $editable }) => css`
     display: flex;
     flex-shrink: 0;
     align-items: center;
@@ -233,10 +240,15 @@ const TitleRow = styled.div<{ $align: 'left' | 'center' | 'right' }>`
     gap: ${theme.sizeUnit * 2}px;
     min-width: 0;
     min-height: ${theme.sizeUnit * 8}px;
-    /* Clear of the grip: 4 units of corner, then its own 8. */
-    padding-left: ${theme.sizeUnit * 12}px;
-    /* Clear of the menu (5 units in, 8 wide) and the remove button beside it. */
-    padding-right: ${theme.sizeUnit * 21}px;
+    ${
+      $editable &&
+      css`
+        /* Clear of the grip: 4 units of corner, then its own 8. */
+        padding-left: ${theme.sizeUnit * 12}px;
+        /* Clear of the menu (5 units in, 8 wide) and the remove button beside it. */
+        padding-right: ${theme.sizeUnit * 21}px;
+      `
+    }
   `}
 `;
 
@@ -263,11 +275,19 @@ const WidgetTitle = styled.div`
   `}
 `;
 
-const WidgetSubtitle = styled.div<{ $align: 'left' | 'center' | 'right' }>`
-  ${({ theme, $align }) => css`
+const WidgetSubtitle = styled.div<{
+  $align: 'left' | 'center' | 'right';
+  $editable?: boolean;
+}>`
+  ${({ theme, $align, $editable }) => css`
     flex-shrink: 0;
-    padding-left: ${theme.sizeUnit * 12}px;
-    padding-right: ${theme.sizeUnit * 21}px;
+    ${
+      $editable &&
+      css`
+        padding-left: ${theme.sizeUnit * 12}px;
+        padding-right: ${theme.sizeUnit * 21}px;
+      `
+    }
     text-align: ${$align};
     color: ${theme.colorTextSecondary};
     font-size: ${theme.fontSizeSM}px;
@@ -1208,7 +1228,11 @@ export default function CanvasGrid({
         data-scope-highlighted={isHighlighted ? 'true' : undefined}
       >
         {showTitleRow ? (
-          <TitleRow $align={titleAlign} data-test="canvas-widget-title-row">
+          <TitleRow
+            $align={titleAlign}
+            $editable={editable}
+            data-test="canvas-widget-title-row"
+          >
             {isEditingTitle ? (
               <Input
                 size="small"
@@ -1257,6 +1281,7 @@ export default function CanvasGrid({
         {subtitle && (
           <WidgetSubtitle
             $align={titleAlign}
+            $editable={editable}
             title={subtitle}
             data-test="canvas-widget-subtitle"
           >

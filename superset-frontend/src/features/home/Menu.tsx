@@ -230,6 +230,7 @@ export function Menu({
     // prefixes must map to the Datasets tab so the top-nav highlight
     // survives navigation into the create/edit flow. See #42467.
     Dataset = '/dataset',
+    Canvas = '/canvas',
     SqlLab = '/sqllab',
     SavedQueries = '/savedqueryview',
   }
@@ -239,6 +240,7 @@ export function Menu({
   // active tab against them keeps highlighting working in every language.
   enum MenuKeys {
     Dashboards = 'Dashboards',
+    Canvases = 'Canvases',
     Charts = 'Charts',
     Datasets = 'Datasets',
     SqlLab = 'SQL Lab',
@@ -252,6 +254,9 @@ export function Menu({
     switch (true) {
       case path.startsWith(Paths.Dashboard):
         setActiveTabs([MenuKeys.Dashboards]);
+        break;
+      case path.startsWith(Paths.Canvas):
+        setActiveTabs([MenuKeys.Canvases]);
         break;
       case path.startsWith(Paths.Chart) || path.startsWith(Paths.Explore):
         setActiveTabs([MenuKeys.Charts]);
