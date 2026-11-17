@@ -23,10 +23,18 @@ import {
 } from './apiKeyScopes';
 
 test('offers read and write scopes for every supported resource', () => {
-  expect(API_KEY_SCOPE_OPTIONS).toHaveLength(32);
+  expect(API_KEY_SCOPE_OPTIONS).toHaveLength(36);
   expect(API_KEY_SCOPE_OPTIONS).toContainEqual({
     label: 'superset:dashboard:read',
     value: 'superset:dashboard:read',
+  });
+  expect(API_KEY_SCOPE_OPTIONS).toContainEqual({
+    label: 'superset:canvas:read',
+    value: 'superset:canvas:read',
+  });
+  expect(API_KEY_SCOPE_OPTIONS).toContainEqual({
+    label: 'superset:widget:write',
+    value: 'superset:widget:write',
   });
   expect(API_KEY_SCOPE_OPTIONS).toContainEqual({
     label: 'superset:sqllab:write',

@@ -43,6 +43,7 @@ class TableChartPlugin(BaseChartPlugin):
     native_viz_types: ClassVar[Mapping[str, str]] = {
         "table": "Table",
         "ag-grid-table": "Interactive Table",
+        "antvs2_table": "AntV S2 Table",
     }
     supports_column_append = True
 

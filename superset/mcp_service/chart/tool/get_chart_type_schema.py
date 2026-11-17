@@ -36,7 +36,10 @@ from superset.mcp_service.chart.schemas import (
     BoxPlotChartConfig,
     BubbleChartConfig,
     BulletChartConfig,
+    CalendarHeatmapCustomChartConfig,
     CountryMapChartConfig,
+    CustomControlsChartConfig,
+    CustomDatePickerChartConfig,
     DeckScatterChartConfig,
     GanttChartConfig,
     GaugeChartConfig,
@@ -46,6 +49,7 @@ from superset.mcp_service.chart.schemas import (
     MixedTimeseriesChartConfig,
     PieChartConfig,
     PivotTableChartConfig,
+    SankeyMultiLevelChartConfig,
     SunburstChartConfig,
     TableChartConfig,
     TreemapChartConfig,
@@ -89,6 +93,10 @@ _CHART_TYPE_ADAPTERS: Dict[str, TypeAdapter[Any]] = {
     "bubble_v2": TypeAdapter(BubbleChartConfig),
     "waterfall": TypeAdapter(WaterfallChartConfig),
     "gantt": TypeAdapter(GanttChartConfig),
+    "custom_controls": TypeAdapter(CustomControlsChartConfig),
+    "custom_datepicker": TypeAdapter(CustomDatePickerChartConfig),
+    "sankey_multi_level": TypeAdapter(SankeyMultiLevelChartConfig),
+    "calendar_heatmap_custom": TypeAdapter(CalendarHeatmapCustomChartConfig),
 }
 
 VALID_CHART_TYPES = sorted(_CHART_TYPE_ADAPTERS.keys())
@@ -341,6 +349,41 @@ _CHART_EXAMPLES: Dict[str, list[Dict[str, Any]]] = {
             "number_format": ",.2f",
             "sort_by_metric": False,
             "row_limit": 100,
+        },
+    ],
+    "custom_controls": [
+        {
+            "chart_type": "custom_controls",
+            "filter_column": {"name": "region"},
+            "control_type": "Dropdown",
+            "multi_select": True,
+        },
+    ],
+    "custom_datepicker": [
+        {
+            "chart_type": "custom_datepicker",
+            "filter_column": {"name": "order_date"},
+            "picker_type": "RangePicker",
+            "preset_ranges": True,
+        },
+    ],
+    "sankey_multi_level": [
+        {
+            "chart_type": "sankey_multi_level",
+            "groupby": [
+                {"name": "source_channel"},
+                {"name": "product_category"},
+                {"name": "order_status"},
+            ],
+            "metric": {"name": "revenue", "aggregate": "SUM"},
+        },
+    ],
+    "calendar_heatmap_custom": [
+        {
+            "chart_type": "calendar_heatmap_custom",
+            "temporal_column": "order_date",
+            "metrics": [{"name": "revenue", "aggregate": "SUM"}],
+            "time_grain": "P1D",
         },
     ],
 }

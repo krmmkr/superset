@@ -460,6 +460,7 @@ const config = {
       This prevents "Module not found" errors for moment locale files.
       */
       'moment/min/moment-with-locales': false,
+      '@antv/g2': false,
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.yml'],
     fallback: {
@@ -534,6 +535,11 @@ const config = {
             },
           },
         ],
+      },
+      {
+        test: /\.less$/,
+        include: /node_modules\/@antv/,
+        type: 'asset/source',
       },
       /* for css linking images (and viz plugin thumbnails) */
       {

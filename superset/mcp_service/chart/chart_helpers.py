@@ -850,12 +850,23 @@ def resolve_metrics(form_data: dict[str, Any], viz_type: str) -> list[Any]:
     """Extract metrics from form_data, handling chart-type-specific fields."""
     if (fields := _plugin_query_fields(form_data, viz_type)) is not None:
         return fields[0]
-    return resolve_shared_metrics(form_data)
+    metrics = list(resolve_shared_metrics(form_data))
+    if viz_type == "calendar_heatmap_custom":
+        extra = (
+            form_data.get("tooltip_metrics")
+            or form_data.get("tooltipMetrics")
+            or []
+        )
+        if isinstance(extra, list):
+            for m in extra:
+                if m and m not in metrics:
+                    metrics.append(m)
+    return metrics
 
 
 def resolve_shared_metrics(form_data: Mapping[str, Any]) -> list[Any]:
     """Extract metrics from the shared ``metrics``/``metric`` roles."""
-    metrics = form_data.get("metrics") or []
+    metrics = list(form_data.get("metrics") or [])
     if not metrics and (metric := form_data.get("metric")):
         metrics = [metric]
     return metrics
@@ -876,12 +887,22 @@ def resolve_groupby(form_data: dict[str, Any]) -> list[Any]:
     groupby = normalize_groupby(form_data)
 
     if groupby:
+        if form_data.get("viz_type") == "antvs2_table_pivot":
+            form_columns = form_data.get("columns")
+            if isinstance(form_columns, list):
+                for col in form_columns:
+                    if col not in groupby:
+                        groupby.append(col)
         return groupby
 
-    for field in ("entity", "series"):
+    for field in ("entity", "series", "filterColumn"):
         value = form_data.get(field)
         if isinstance(value, str) and value not in groupby:
             groupby.append(value)
+        elif isinstance(value, list):
+            for col in value:
+                if isinstance(col, str) and col not in groupby:
+                    groupby.append(col)
 
     form_columns = form_data.get("columns")
     if isinstance(form_columns, list):

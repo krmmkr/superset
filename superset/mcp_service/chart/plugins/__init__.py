@@ -31,6 +31,13 @@ from superset.mcp_service.chart.plugins.big_number import BigNumberChartPlugin
 from superset.mcp_service.chart.plugins.box_plot import BoxPlotChartPlugin
 from superset.mcp_service.chart.plugins.bubble import BubbleChartPlugin
 from superset.mcp_service.chart.plugins.bullet import BulletChartPlugin
+from superset.mcp_service.chart.plugins.calendar_heatmap_custom import (
+    CalendarHeatmapCustomChartPlugin,
+)
+from superset.mcp_service.chart.plugins.custom_controls import CustomControlsChartPlugin
+from superset.mcp_service.chart.plugins.custom_datepicker import (
+    CustomDatePickerChartPlugin,
+)
 from superset.mcp_service.chart.plugins.gantt import GanttChartPlugin
 from superset.mcp_service.chart.plugins.gauge import GaugeChartPlugin
 from superset.mcp_service.chart.plugins.geographic import (
@@ -48,6 +55,9 @@ from superset.mcp_service.chart.plugins.mixed_timeseries import (
 )
 from superset.mcp_service.chart.plugins.pie import PieChartPlugin
 from superset.mcp_service.chart.plugins.pivot_table import PivotTableChartPlugin
+from superset.mcp_service.chart.plugins.sankey_multi_level import (
+    SankeyMultiLevelChartPlugin,
+)
 from superset.mcp_service.chart.plugins.sunburst import SunburstChartPlugin
 from superset.mcp_service.chart.plugins.table import TableChartPlugin
 from superset.mcp_service.chart.plugins.treemap import TreemapChartPlugin
@@ -73,12 +83,19 @@ register(HistogramChartPlugin())
 register(BoxPlotChartPlugin())
 register(WaterfallChartPlugin())
 register(GanttChartPlugin())
+register(CustomControlsChartPlugin())
+register(CustomDatePickerChartPlugin())
+register(SankeyMultiLevelChartPlugin())
+register(CalendarHeatmapCustomChartPlugin())
 
 __all__ = [
     "BigNumberChartPlugin",
     "BoxPlotChartPlugin",
     "BubbleChartPlugin",
     "BulletChartPlugin",
+    "CalendarHeatmapCustomChartPlugin",
+    "CustomControlsChartPlugin",
+    "CustomDatePickerChartPlugin",
     "GanttChartPlugin",
     "GaugeChartPlugin",
     "CountryMapChartPlugin",
@@ -90,6 +107,7 @@ __all__ = [
     "MixedTimeseriesChartPlugin",
     "PieChartPlugin",
     "PivotTableChartPlugin",
+    "SankeyMultiLevelChartPlugin",
     "SunburstChartPlugin",
     "TableChartPlugin",
     "TreemapChartPlugin",

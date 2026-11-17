@@ -33,6 +33,7 @@ METHOD_PERMISSION_SCOPE_ACTION: dict[str, str] = {
 # public spellings that differ from their internal class names.
 RESOURCE_SCOPE_NAME: dict[str, str] = {
     "Annotation": "annotation",
+    "Canvas": "canvas",
     "Chart": "chart",
     "Dashboard": "dashboard",
     "Database": "database",
@@ -48,6 +49,7 @@ RESOURCE_SCOPE_NAME: dict[str, str] = {
     "Task": "task",
     "Theme": "theme",
     "User": "user",
+    "Widget": "widget",
 }
 
 RESOURCE_SCOPE_CLASS: dict[str, str] = {

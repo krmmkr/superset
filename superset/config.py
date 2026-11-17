@@ -730,7 +730,7 @@ DEFAULT_FEATURE_FLAGS: dict[str, bool] = {
     # -----------------------------------------------------------------
     # Enables Table V2 (AG Grid) viz plugin
     # @lifecycle: development
-    "AG_GRID_TABLE_ENABLED": False,
+    "AG_GRID_TABLE_ENABLED": True,
     # Enables the per-schedule "Run As" fields in Alerts & Reports (SIP-209).
     # When enabled, each alert/report records which user's credentials (RBAC,
     # database OAuth2 tokens) are used at execution time, and alerts can specify
@@ -742,6 +742,11 @@ DEFAULT_FEATURE_FLAGS: dict[str, bool] = {
     # Enables experimental tabs UI for Alerts and Reports
     # @lifecycle: development
     "ALERT_REPORT_TABS": False,
+    # Enables Canvas, the next generation of dashboards, and the Widget Framework
+    # it places: schema-driven, extension-delivered widgets and saved widget
+    # instances (SIPs: apache/superset#44989 and apache/superset#44875)
+    # @lifecycle: development
+    "CANVAS_CUSTOM": True,
     # Enables experimental chart plugins
     # @lifecycle: development
     "CHART_PLUGINS_EXPERIMENTAL": False,
@@ -758,7 +763,7 @@ DEFAULT_FEATURE_FLAGS: dict[str, bool] = {
     # Enable API key authentication via FAB SecurityManager
     # When enabled, users can create/manage API keys in the User Info page
     # @lifecycle: development
-    "FAB_API_KEY_ENABLED": False,
+    "FAB_API_KEY_ENABLED": True,
     # Enable granular export controls (can_export_data, can_export_image,
     # can_copy_clipboard) instead of the single can_csv permission
     # @lifecycle: development
@@ -1363,6 +1368,20 @@ ENABLE_UI_THEME_ADMINISTRATION = True  # Allows admins to set system themes via 
 
 # Default theme mode for sessions without a saved user preference.
 THEME_DEFAULT_MODE: Literal["default", "dark", "system"] = "system"
+
+# Canvas widget previews (the ``preview_widget`` MCP tool) run the widget's
+# query on their own. With a renderer service set here, they also return the
+# resolved chart option, render warnings and an image: Superset POSTs the
+# widget's props, its rows, the theme and the canvas colors to
+# ``<url>/render/echarts`` and expects ``{"png": <base64>, "option": {...},
+# "warnings": [...]}`` back.
+CANVAS_WIDGET_RENDERER_URL: str | None = None
+
+# Canvas drafts expire after this long without a write.
+CANVAS_DRAFT_TTL_SECONDS: int = 7 * 24 * 60 * 60
+# How often, in seconds, an open draft page checks for changes made elsewhere,
+# such as by an agent working in the same draft. 0 turns checking off.
+CANVAS_DRAFT_POLL_INTERVAL: int = 5
 
 # Maximum number of font URLs allowed per theme.
 THEME_FONTS_MAX_URLS: int = 15
@@ -2434,7 +2453,7 @@ FAB_ADD_SECURITY_PERMISSION_VIEWS_VIEW = False
 # FAB reads this config directly to register the ApiKeyApi blueprint.
 # The FAB_API_KEY_ENABLED feature flag (in DEFAULT_FEATURE_FLAGS) controls
 # the frontend UI visibility independently.
-FAB_API_KEY_ENABLED = False
+FAB_API_KEY_ENABLED = True
 FAB_API_KEY_PREFIXES = ["sst_"]
 
 # The link to a page containing common errors and their resolutions
@@ -3608,6 +3627,8 @@ SUBJECTS_RELATED_TYPES_RLS: list[SubjectType] | None = [
 ]
 SUBJECTS_RELATED_TYPES_ALERT_REPORTS: list[SubjectType] | None = None
 SUBJECTS_RELATED_TYPES_THEMES: list[SubjectType] | None = None
+SUBJECTS_RELATED_TYPES_CANVASES: list[SubjectType] | None = None
+SUBJECTS_RELATED_TYPES_WIDGETS: list[SubjectType] | None = None
 
 
 # Extra dynamic query filters make it possible to limit which objects are shown
@@ -3631,12 +3652,15 @@ EXTRA_DYNAMIC_QUERY_FILTERS: ExtraDynamicQueryFilters = {}
 
 
 # Extra access query filters inject additional OR conditions into
-# ChartFilter and DashboardAccessFilter, enabling external systems
-# (e.g. folder permissions) to grant asset visibility.
+# ChartFilter, DashboardAccessFilter and CanvasAccessFilter, enabling external
+# systems (e.g. folder permissions) to grant asset visibility.
 # The callable receives the current user ID and returns a subquery of asset IDs.
+# Canvas applies this to single fetches as well as lists, since its DAO runs
+# CanvasAccessFilter as a base filter.
 class ExtraAccessQueryFilters(TypedDict, total=False):
     charts: Callable[[int], Query]
     dashboards: Callable[[int], Query]
+    canvases: Callable[[int], Query]
 
 
 # Extra access query exclusions inject an AND NOT condition into ChartFilter
@@ -3672,7 +3696,7 @@ class ExtraAccessQueryExclusions(TypedDict, total=False):
 
 
 # Extension hooks for deployments to plug in custom access logic.
-# Additional query filters for chart/dashboard list views.
+# Additional query filters for chart/dashboard/canvas access.
 EXTRA_ACCESS_QUERY_FILTERS: ExtraAccessQueryFilters = {}
 # Asset IDs to withhold from chart/dashboard list views, exports and
 # related-field lookups. See ``ExtraAccessQueryExclusions`` above.
@@ -3685,7 +3709,8 @@ EXTRA_RAISE_FOR_ACCESS_BYPASS: Callable[..., bool] | None = None
 # Resolve additional editor subjects for a resource. Also used for editorship
 # checks and lockout-prevention logic.
 EXTRA_EDITORS_RESOLVER: Callable[..., list[Any]] | None = None
-# Post-create hook for charts/dashboards. Receives (model, asset_type).
+# Post-create hook for charts/dashboards/canvases. Receives
+# (model, asset_type), where asset_type is "chart", "dashboard" or "canvas".
 AFTER_ASSET_CREATE: Callable[[Any, str], None] | None = None
 # Contribute extra fields to a chart or dashboard export. Receives
 # (model, asset_type) and returns a mapping serialised under the "extra" key of
