@@ -16,7 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ComponentProps,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useParams } from 'react-router-dom';
 import { t } from '@apache-superset/core/translation';
 import { css, styled } from '@apache-superset/core/theme';
@@ -136,27 +142,19 @@ const notFound = (
   />
 );
 
-function CanvasContent({ id }: { id: number }) {
-  const metadata = useApiV1Resource<CanvasMetadata>(`/api/v1/canvas/${id}`);
-  const draft = useDraftToken();
-  // `reload` is how a rejected layout write resyncs (see `useCanvasLayout`).
-  const { state, reload } = useCanvasDefinition(id, draft.token);
-  // History is of published versions, so a draft doesn't show it.
-  const history = useCanvasVersionHistory(
-    metadata.result?.uuid,
-    !draft.token && isFeatureEnabled(FeatureFlag.VersionHistory),
-  );
-  const [historyOpen, setHistoryOpen] = useState(false);
 const SCOPE_QUERY_PARAM = 'scope';
 
 function readScopeValuesFromUrl(): ScopeValues {
   const base = emptyScopeValues();
   try {
-    const raw = new URLSearchParams(window.location.search).get(SCOPE_QUERY_PARAM);
+    const raw = new URLSearchParams(window.location.search).get(
+      SCOPE_QUERY_PARAM,
+    );
     if (!raw) return base;
     const parsed = JSON.parse(raw) as Partial<ScopeValues>;
     return {
-      filter: parsed.filter && typeof parsed.filter === 'object' ? parsed.filter : {},
+      filter:
+        parsed.filter && typeof parsed.filter === 'object' ? parsed.filter : {},
       crossFilter:
         parsed.crossFilter && typeof parsed.crossFilter === 'object'
           ? parsed.crossFilter
@@ -189,19 +187,20 @@ function writeScopeValuesToUrl(values: ScopeValues): void {
   }
 }
 
-  const [values, setValues] = useState<ScopeValues>(readScopeValuesFromUrl);
-  useEffect(() => {
-    writeScopeValuesToUrl(values);
-  }, [values]);
-  // The header's right-hand side, handed to the body so its toolbar lands on
-  // the title row. State rather than a ref: the body renders into the node, so
-  // it has to re-render once the node exists.
-  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
-  const [events, setEvents] = useState<EventValues>({});
-  const refreshKeys = useCanvasRefresh(
-    state.status === 'complete' ? state.result.definition : undefined,
+// Interaction values have the same lifetime as the body that publishes them.
+// A version preview remounts both, so its first query cannot inherit a hidden
+// selection from the previously displayed version. Drafts keep this key.
+function CanvasBodyWithValues(
+  props: Omit<ComponentProps<typeof CanvasBody>, 'values' | 'onValueChange'>,
+) {
+  const [values, setValues] = useState<ScopeValues>(() =>
+    props.versionUuid ? emptyScopeValues() : readScopeValuesFromUrl(),
   );
-
+  useEffect(() => {
+    if (!props.versionUuid) {
+      writeScopeValuesToUrl(values);
+    }
+  }, [values, props.versionUuid]);
   const onValueChange = useCallback(
     (kind: canvasApi.ScopeKind, nodeId: string, value: unknown) => {
       setValues(previous => {
@@ -212,6 +211,30 @@ function writeScopeValuesToUrl(values: ScopeValues): void {
       });
     },
     [],
+  );
+  return (
+    <CanvasBody {...props} values={values} onValueChange={onValueChange} />
+  );
+}
+
+function CanvasContent({ id }: { id: number }) {
+  const metadata = useApiV1Resource<CanvasMetadata>(`/api/v1/canvas/${id}`);
+  const draft = useDraftToken();
+  // `reload` is how a rejected layout write resyncs (see `useCanvasLayout`).
+  const { state, reload } = useCanvasDefinition(id, draft.token);
+  // History is of published versions, so a draft doesn't show it.
+  const history = useCanvasVersionHistory(
+    metadata.result?.uuid,
+    !draft.token && isFeatureEnabled(FeatureFlag.VersionHistory),
+  );
+  const [historyOpen, setHistoryOpen] = useState(false);
+  // The header's right-hand side, handed to the body so its toolbar lands on
+  // the title row. State rather than a ref: the body renders into the node, so
+  // it has to re-render once the node exists.
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
+  const [events, setEvents] = useState<EventValues>({});
+  const refreshKeys = useCanvasRefresh(
+    state.status === 'complete' ? state.result.definition : undefined,
   );
   const onPublish = useCallback(
     (kind: string, nodeId: string, value: unknown) => {
@@ -325,13 +348,11 @@ function writeScopeValuesToUrl(values: ScopeValues): void {
             onClose={history.showCurrent}
           />
         )}
-        <CanvasBody
-          key={preview?._version.version_uuid ?? 'current'}
+        <CanvasBodyWithValues
+          key={`${id}:${preview?._version.version_uuid ?? 'current'}`}
           canvasId={id}
           result={shown}
           reload={reload}
-          values={values}
-          onValueChange={onValueChange}
           events={events}
           onPublish={onPublish}
           refreshKeys={refreshKeys}

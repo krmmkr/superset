@@ -25,6 +25,7 @@ import {
   useState,
 } from 'react';
 import type { canvas as canvasApi } from '@apache-superset/core';
+import { t } from '@apache-superset/core/translation';
 import { getClientErrorObject } from '@superset-ui/core';
 import {
   DataBinding,
@@ -60,6 +61,24 @@ export interface WidgetQueryOverrides {
   templateParams?: Record<string, unknown>;
 }
 
+/** Restrict the shared normalizer to server responses and fixed transport errors. */
+function canNormalizeError(
+  error: unknown,
+): error is Parameters<typeof getClientErrorObject>[0] {
+  if (error instanceof Response) return !error.bodyUsed;
+  return (
+    (error instanceof TypeError && error.message === 'Failed to fetch') ||
+    Boolean(
+      error &&
+      typeof error === 'object' &&
+      'statusText' in error &&
+      error.statusText === 'timeout' &&
+      'timeout' in error &&
+      typeof error.timeout === 'number',
+    )
+  );
+}
+
 /**
  * A placement's rows, queried on the server from its stored `dataBinding`,
  * narrowed by the filter values that reach it and refetched on refresh. A
@@ -83,6 +102,8 @@ export function useWidgetRows(
   // The binding is in the key so an edit refetches; the server reads it from
   // the stored definition.
   const key = JSON.stringify([
+    canvasId,
+    nodeId,
     binding ?? null,
     selected,
     draftToken ?? null,
@@ -91,18 +112,28 @@ export function useWidgetRows(
   ]);
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt(count => count + 1), []);
-  const [state, setState] = useState<Omit<WidgetRows, 'retry'>>({
-    rows: [],
-    loading: bound,
+  const [state, setState] = useState<{
+    key: string;
+    value: Omit<WidgetRows, 'retry'>;
+  }>({
+    key,
+    value: { rows: [], loading: bound },
   });
 
   useEffect(() => {
     if (!bound) {
-      setState({ rows: [], loading: false });
+      setState({ key, value: { rows: [], loading: false } });
       return undefined;
     }
     let cancelled = false;
-    setState(previous => ({ ...previous, loading: true }));
+    // Refresh the same request in place; a new binding/context starts empty.
+    setState(previous => ({
+      key,
+      value: {
+        ...(previous.key === key ? previous.value : { rows: [] }),
+        loading: true,
+      },
+    }));
     fetchPlacementData({
       canvasId,
       placementId: nodeId,
@@ -115,13 +146,30 @@ export function useWidgetRows(
       templateParams: queryOverrides?.templateParams,
     })
       .then(data => {
-        if (!cancelled) setState({ ...data, loading: false });
-      })
-      .catch(async e => {
-        if (cancelled) return;
-        const { error } = await getClientErrorObject(e);
         if (!cancelled) {
-          setState({ rows: [], loading: false, error: error ?? String(e) });
+          setState({ key, value: { ...data, loading: false } });
+        }
+      })
+      .catch(async (e: unknown) => {
+        if (cancelled) return;
+        let message = t("The widget's query failed");
+        try {
+          // Unwrap HTTP failures without allowing arbitrary message/statusText
+          // fallbacks, including the normalizer's consumed-Response fallback.
+          const input =
+            e && typeof e === 'object' && 'response' in e ? e.response : e;
+          if (canNormalizeError(input)) {
+            const { error } = await getClientErrorObject(input);
+            if (error) message = error;
+          }
+        } catch {
+          // A malformed transport error must not expose the raw exception.
+        }
+        if (!cancelled) {
+          setState({
+            key,
+            value: { rows: [], loading: false, error: message },
+          });
         }
       });
     return () => {
@@ -129,12 +177,16 @@ export function useWidgetRows(
     };
     // The key stands in for the binding and filters, recreated every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasId, nodeId, key, refreshKey, attempt]);
+  }, [key, refreshKey, attempt]);
 
   const datasource = bound ? `${binding?.datasetId}__table` : undefined;
   // Stable between renders, so callers can depend on it in effects.
   return useMemo(
-    () => ({ ...state, datasource, retry }),
-    [state, datasource, retry],
+    () => ({
+      ...(state.key === key ? state.value : { rows: [], loading: bound }),
+      datasource,
+      retry,
+    }),
+    [state, key, bound, datasource, retry],
   );
 }

@@ -28,7 +28,11 @@ import {
   Typography,
 } from '@superset-ui/core/components';
 import type { SelectFilterValue } from './echarts/chartData';
-import { CanvasFilterValuesContext } from './useWidgetRows';
+import {
+  CanvasDraftContext,
+  CanvasFilterValuesContext,
+  CanvasVersionContext,
+} from './useWidgetRows';
 
 const Wrapper = styled.div`
   ${({ theme }) => css`
@@ -54,18 +58,16 @@ const CheckboxList = styled.div<{ vertical: boolean }>`
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.map(String) : [];
 
-/**
- * A multi-select over one dataset column. Its value reaches the widgets in
- * its scope as `{datasetId, column, values}`, or clears when nothing is
- * selected.
- */
-export default function FilterSelectRenderer({
+function FilterSelect({
   nodeId,
+  datasetId,
+  column,
   props,
+  refreshKey,
   setFilterValue,
-}: canvasApi.CanvasWidgetProps) {
-  const datasetId = Number(props?.datasetId);
-  const column = typeof props?.column === 'string' ? props.column : '';
+}: canvasApi.CanvasWidgetProps & { datasetId: number; column: string }) {
+  const draftToken = useContext(CanvasDraftContext);
+  const versionUuid = useContext(CanvasVersionContext);
   const label =
     typeof props?.label === 'string' && props.label
       ? props.label
@@ -77,11 +79,18 @@ export default function FilterSelectRenderer({
   const orientation =
     props?.orientation === 'vertical' ? 'vertical' : 'horizontal';
   const staticOptions = strings(props?.options);
-  const [fetched, setFetched] = useState<string[]>([]);
+  const optionsKey = JSON.stringify([
+    staticOptions,
+    draftToken ?? null,
+    versionUuid ?? null,
+  ]);
+  const [fetched, setFetched] = useState<{ key: string; values: string[] }>({
+    key: optionsKey,
+    values: [],
+  });
   const [selected, setSelected] = useState<string[]>(() =>
     strings(props?.defaultSelection),
   );
-  const published = useRef(false);
   const hadLiveValue = useRef(false);
   const liveFilterValue = useContext(CanvasFilterValuesContext)[nodeId];
 
@@ -95,6 +104,9 @@ export default function FilterSelectRenderer({
   }, [liveFilterValue]);
 
   useEffect(() => {
+    setFetched(previous =>
+      previous.key === optionsKey ? previous : { key: optionsKey, values: [] },
+    );
     if (staticOptions.length || !datasetId || !column) return undefined;
     let cancelled = false;
     SupersetClient.get({
@@ -102,18 +114,21 @@ export default function FilterSelectRenderer({
     })
       .then(({ json }) => {
         if (!cancelled) {
-          setFetched(strings(json?.result).filter(value => value !== 'null'));
+          setFetched({
+            key: optionsKey,
+            values: strings(json?.result).filter(value => value !== 'null'),
+          });
         }
       })
       .catch(() => {
-        if (!cancelled) setFetched([]);
+        if (!cancelled) setFetched({ key: optionsKey, values: [] });
       });
     return () => {
       cancelled = true;
     };
-    // staticOptions is recreated on every render; its length decides.
+    // Keep options during a refresh, but cancel any older pending request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetId, column, staticOptions.length]);
+  }, [optionsKey, refreshKey]);
 
   const publish = (values: string[]) => {
     const value: SelectFilterValue | null = values.length
@@ -122,28 +137,28 @@ export default function FilterSelectRenderer({
     setFilterValue(value);
   };
 
-  // A default selection applies once, on first render.
+  // The keyed component owns one binding's selection. Always publish its
+  // initial value, including an empty default that clears a parent's old value.
+  // Draft transitions and refreshes preserve this component and its selection.
   useEffect(() => {
-    if (published.current) return;
-    published.current = true;
-    if (selected.length) publish(selected);
+    publish(selected);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selected]);
 
   const options = useMemo(
     () =>
-      (staticOptions.length ? staticOptions : fetched).map(value => ({
+      (staticOptions.length
+        ? staticOptions
+        : fetched.key === optionsKey
+          ? fetched.values
+          : []
+      ).map(value => ({
         label: value,
         value,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fetched, staticOptions.join('\u0000')],
+    [fetched, optionsKey],
   );
-
-  const updateSelection = (values: string[]) => {
-    setSelected(values);
-    publish(values);
-  };
 
   return (
     <Wrapper>
@@ -154,7 +169,7 @@ export default function FilterSelectRenderer({
             aria-label={label}
             options={options}
             value={selected}
-            onChange={checked => updateSelection(strings(checked))}
+            onChange={checked => setSelected(strings(checked))}
           />
         </CheckboxList>
       )}
@@ -166,7 +181,7 @@ export default function FilterSelectRenderer({
           options={[{ label: t('All'), value: '__all__' }, ...options]}
           onChange={e => {
             const val = String(e.target.value);
-            updateSelection(val === '__all__' ? [] : [val]);
+            setSelected(val === '__all__' ? [] : [val]);
           }}
         />
       )}
@@ -178,9 +193,36 @@ export default function FilterSelectRenderer({
           placeholder={t('All')}
           options={options}
           value={selected}
-          onChange={value => updateSelection(strings(value))}
+          onChange={value => setSelected(strings(value))}
         />
       )}
     </Wrapper>
+  );
+}
+
+/**
+ * A multi-select over one dataset column. Its value reaches the widgets in
+ * its scope as `{datasetId, column, values}`, or clears when nothing is
+ * selected.
+ */
+export default function FilterSelectRenderer(
+  widget: canvasApi.CanvasWidgetProps,
+) {
+  const datasetId = Number(widget.props?.datasetId);
+  const column =
+    typeof widget.props?.column === 'string' ? widget.props.column : '';
+  const sourceKey = JSON.stringify([
+    widget.canvasId,
+    widget.nodeId,
+    datasetId,
+    column,
+  ]);
+  return (
+    <FilterSelect
+      key={sourceKey}
+      {...widget}
+      datasetId={datasetId}
+      column={column}
+    />
   );
 }
